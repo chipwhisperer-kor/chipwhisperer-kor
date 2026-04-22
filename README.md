@@ -22,6 +22,13 @@
 
 모든 설정은 Ubuntu 게스트 OS를 기준으로 작성되었습니다. 사용 시 폴더 경로는 수정이 필요합니다.
 
+```
+chipwhisperer-kor/   ← 저장소 루트 (README.md 기준)
+├── README.md
+├── setup/
+└── workspace/
+```
+
 ---
 
 ## 1. VMware Tools 설치
@@ -159,7 +166,7 @@ newgrp docker
 분석 환경 컨테이너를 빌드하고 백그라운드로 실행합니다.
 
 ```bash
-cd ~/setup/
+cd ./setup/
 docker compose down
 docker compose up -d --build
 ```
@@ -170,10 +177,10 @@ docker compose up -d --build
 
 ChipWhisperer 장비를 USB로 연결했을 때 권한 없이 접근할 수 있도록 udev 규칙과 그룹 권한을 설정합니다.
 
-> `~/setup/50-newae.rules` 파일은 ChipWhisperer 공식 저장소 Commit `f618563` 기준입니다.
+> `./setup/50-newae.rules` 파일은 ChipWhisperer 공식 저장소 Commit `f618563` 기준입니다.
 
 ```bash
-sudo cp ~/setup/cw-build/50-newae.rules /etc/udev/rules.d/50-newae.rules
+sudo cp ./setup/cw-build/50-newae.rules /etc/udev/rules.d/50-newae.rules
 sudo udevadm control --reload-rules
 sudo groupadd -fr chipwhisperer
 sudo usermod -aG chipwhisperer $USER
@@ -200,10 +207,20 @@ http://localhost:8080
 
 ---
 
-## 📦 백업
+## 📦 동기화
 
-변경 사항을 GitHub에 백업할 때는 아래 명령어를 사용합니다.
+### 백업 (Push)
+
+로컬 변경 사항을 GitHub에 업로드합니다.
 
 ```bash
 git add . && git commit -m "backup $(date '+%F_%T')" && git push
+```
+
+### 복원 (Pull)
+
+GitHub의 최신 내용을 로컬로 내려받습니다.
+
+```bash
+git pull
 ```
