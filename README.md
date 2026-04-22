@@ -12,8 +12,8 @@
 4. [한글 입력기 설치](#3-한글-입력기-설치)
 5. [기타 유틸리티](#4-기타-유틸리티)
 6. [Docker 설치](#5-docker-설치)
-7. [컨테이너 실행](#6-컨테이너-실행)
-8. [ChipWhisperer 하드웨어 설정](#7-chipwhisperer-하드웨어-설정)
+7. [ChipWhisperer 하드웨어 설정](#6-chipwhisperer-하드웨어-설정)
+8. [컨테이너 실행](#7-컨테이너-실행)
 9. [VS Code 웹 IDE 실행](#8-vs-code-웹-ide-실행)
 
 ---
@@ -28,6 +28,8 @@ chipwhisperer-kor/   ← 저장소 루트 (README.md 기준)
 ├── setup/
 └── workspace/
 ```
+
+> **📌 참고:** 저장소 내 상대경로(`./setup/` 등)를 사용하는 명령어는 **저장소 루트 디렉토리에서 실행**해야 합니다.
 
 ---
 
@@ -67,6 +69,8 @@ ls /mnt/hgfs
 ln -s /mnt/hgfs ~/Desktop/hgfs
 ```
 
+> **⚠️ 주의:** 위 마운트 명령어는 재부팅 시 초기화됩니다. 재부팅 후에는 `sudo vmhgfs-fuse .host:/ /mnt/hgfs -o allow_other` 를 다시 실행해야 합니다.
+
 ---
 
 ## 3. 한글 입력기 설치
@@ -96,6 +100,8 @@ ibus restart
 ### 파일 및 폴더 권한 일괄 설정
 
 접근 권한 문제가 발생할 경우에만 사용합니다.
+
+> **⚠️ 주의:** 홈 디렉토리 전체의 권한을 777로 변경합니다. SSH 키·인증 파일 등 민감한 파일도 포함되므로 꼭 필요한 경우에만 사용하십시오.
 
 ```bash
 sudo chmod -R 777 ~
@@ -152,32 +158,22 @@ sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plug
 
 ### 5-6. sudo 없이 Docker 사용
 
-매번 `sudo`를 입력하지 않아도 되도록 현재 사용자를 docker 그룹에 추가합니다.
+현재 사용자를 docker 그룹에 추가합니다.
 
 ```bash
 sudo usermod -aG docker $USER
 newgrp docker
 ```
 
----
-
-## 6. 컨테이너 실행
-
-분석 환경 컨테이너를 빌드하고 백그라운드로 실행합니다.
-
-```bash
-cd ./setup/
-docker compose down
-docker compose up -d --build
-```
+> **💡 참고:** `newgrp docker` 는 현재 터미널 세션에만 즉시 적용됩니다. 모든 터미널에서 적용되려면 로그아웃 후 재로그인이 필요합니다.
 
 ---
 
-## 7. ChipWhisperer 하드웨어 설정
+## 6. ChipWhisperer 하드웨어 설정
 
-ChipWhisperer 장비를 USB로 연결했을 때 권한 없이 접근할 수 있도록 udev 규칙과 그룹 권한을 설정합니다.
+ChipWhisperer 장비를 USB로 연결했을 때 권한 없이 접근할 수 있도록 udev 규칙과 그룹 권한을 설정합니다. **컨테이너 실행 전에 먼저 적용해야 합니다.**
 
-> `./setup/50-newae.rules` 파일은 ChipWhisperer 공식 저장소 Commit `f618563` 기준입니다.
+> `./setup/cw-build/50-newae.rules` 파일은 ChipWhisperer 공식 저장소 Commit `f618563` 기준입니다.
 
 ```bash
 sudo cp ./setup/cw-build/50-newae.rules /etc/udev/rules.d/50-newae.rules
@@ -186,6 +182,18 @@ sudo groupadd -fr chipwhisperer
 sudo usermod -aG chipwhisperer $USER
 sudo usermod -aG plugdev $USER
 sudo reboot
+```
+
+---
+
+## 7. 컨테이너 실행
+
+분석 환경 컨테이너를 빌드하고 백그라운드로 실행합니다.
+
+```bash
+cd ./setup/
+docker compose down
+docker compose up -d --build
 ```
 
 ---
