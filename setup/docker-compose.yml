@@ -1,0 +1,13 @@
+services:
+  chipwhisperer:
+    build:
+      context: ./cw-build
+      dockerfile: Dockerfile
+    container_name: chipwhisperer-kor
+    restart: unless-stopped
+    privileged: true
+    ports:
+      - "8080:8080"
+    volumes:
+      - ../workspace:/workspace           # 작업 파일 저장소
+      - /dev/bus/usb:/dev/bus/usb      # USB 장치 직접 매핑
