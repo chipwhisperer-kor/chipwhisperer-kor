@@ -1,0 +1,93 @@
+   1              		.cpu cortex-m4
+   2              		.arch armv7e-m
+   3              		.fpu softvfp
+   4              		.eabi_attribute 20, 1
+   5              		.eabi_attribute 21, 1
+   6              		.eabi_attribute 23, 3
+   7              		.eabi_attribute 24, 1
+   8              		.eabi_attribute 25, 1
+   9              		.eabi_attribute 26, 1
+  10              		.eabi_attribute 30, 4
+  11              		.eabi_attribute 34, 1
+  12              		.eabi_attribute 18, 4
+  13              		.file	"my_crypt.c"
+  14              		.text
+  15              	.Ltext0:
+  16              		.cfi_sections	.debug_frame
+  17              		.file 1 "my_crypt.c"
+  18              		.section	.text.MY_OTP,"ax",%progbits
+  19              		.align	1
+  20              		.global	MY_OTP
+  21              		.syntax unified
+  22              		.thumb
+  23              		.thumb_func
+  25              	MY_OTP:
+  26              	.LVL0:
+  27              	.LFB0:
+   1:my_crypt.c    **** #include "my_crypt.h"
+   2:my_crypt.c    **** 
+   3:my_crypt.c    **** 
+   4:my_crypt.c    **** int MY_OTP(uint8_t *output, uint8_t *input_k, uint8_t *input_p, uint8_t len) {
+  28              		.loc 1 4 78 view -0
+  29              		.cfi_startproc
+  30              		@ args = 0, pretend = 0, frame = 0
+  31              		@ frame_needed = 0, uses_anonymous_args = 0
+   5:my_crypt.c    **** 
+   6:my_crypt.c    **** 	int i;
+  32              		.loc 1 6 2 view .LVU1
+   7:my_crypt.c    **** 
+   8:my_crypt.c    **** 	for (i = 0; i < len; i++) output[i] = input_k[i] ^ input_p[i];
+  33              		.loc 1 8 2 view .LVU2
+   4:my_crypt.c    **** 
+  34              		.loc 1 4 78 is_stmt 0 view .LVU3
+  35 0000 70B5     		push	{r4, r5, r6, lr}
+  36              	.LCFI0:
+  37              		.cfi_def_cfa_offset 16
+  38              		.cfi_offset 4, -16
+  39              		.cfi_offset 5, -12
+  40              		.cfi_offset 6, -8
+  41              		.cfi_offset 14, -4
+  42              		.loc 1 8 9 view .LVU4
+  43 0002 0024     		movs	r4, #0
+  44              	.LVL1:
+  45              	.L2:
+  46              		.loc 1 8 16 is_stmt 1 discriminator 1 view .LVU5
+  47 0004 A342     		cmp	r3, r4
+  48 0006 01DC     		bgt	.L3
+   9:my_crypt.c    **** 	
+  10:my_crypt.c    **** 	return 0;
+  49              		.loc 1 10 2 view .LVU6
+  11:my_crypt.c    **** }...
+  50              		.loc 1 11 1 is_stmt 0 view .LVU7
+  51 0008 0020     		movs	r0, #0
+  52              	.LVL2:
+  53              		.loc 1 11 1 view .LVU8
+  54 000a 70BD     		pop	{r4, r5, r6, pc}
+  55              	.LVL3:
+  56              	.L3:
+   8:my_crypt.c    **** 	for (i = 0; i < len; i++) output[i] = input_k[i] ^ input_p[i];
+  57              		.loc 1 8 28 is_stmt 1 discriminator 3 view .LVU9
+   8:my_crypt.c    **** 	for (i = 0; i < len; i++) output[i] = input_k[i] ^ input_p[i];
+  58              		.loc 1 8 38 is_stmt 0 discriminator 3 view .LVU10
+  59 000c 0D5D     		ldrb	r5, [r1, r4]	@ zero_extendqisi2
+  60 000e 165D     		ldrb	r6, [r2, r4]	@ zero_extendqisi2
+  61 0010 7540     		eors	r5, r5, r6
+  62 0012 0555     		strb	r5, [r0, r4]
+   8:my_crypt.c    **** 	for (i = 0; i < len; i++) output[i] = input_k[i] ^ input_p[i];
+  63              		.loc 1 8 24 is_stmt 1 discriminator 3 view .LVU11
+  64 0014 0134     		adds	r4, r4, #1
+  65              	.LVL4:
+   8:my_crypt.c    **** 	for (i = 0; i < len; i++) output[i] = input_k[i] ^ input_p[i];
+  66              		.loc 1 8 24 is_stmt 0 discriminator 3 view .LVU12
+  67 0016 F5E7     		b	.L2
+  68              		.cfi_endproc
+  69              	.LFE0:
+  71              		.text
+  72              	.Letext0:
+  73              		.file 2 "/usr/lib/gcc/arm-none-eabi/12.2.1/include/stdint.h"
+DEFINED SYMBOLS
+                            *ABS*:00000000 my_crypt.c
+     /tmp/ccw8Xqub.s:19     .text.MY_OTP:00000000 $t
+     /tmp/ccw8Xqub.s:25     .text.MY_OTP:00000000 MY_OTP
+
+NO UNDEFINED SYMBOLS
