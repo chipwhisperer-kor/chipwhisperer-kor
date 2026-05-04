@@ -1,6 +1,7 @@
 # 🔬 ChipWhisperer-KOR
 
 > ChipWhisperer 분석 플랫폼 한국어 버전
+>> [extra] 표기가 있는 폴더는 공식 ChipWhisperer와 무관한 연구 프로젝트입니다.
 
 ---
 
