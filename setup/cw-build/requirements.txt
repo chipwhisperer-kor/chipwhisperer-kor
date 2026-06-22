@@ -30,3 +30,6 @@ holoviews
 phoenixAES
 pyusb
 setuptools
+lief
+unicorn
+capstone
