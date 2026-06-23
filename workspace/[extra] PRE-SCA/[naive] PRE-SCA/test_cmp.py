@@ -1,0 +1,95 @@
+import os
+import glob
+
+def get_file_path_by_suffix(folder, suffix):
+    """
+    폴더 내에서 특정 접미사(suffix)로 끝나는 파일의 전체 경로를 찾습니다.
+    예: 2026-01-22...LogReg.csv 파일을 찾기 위해 사용
+    """
+    # 폴더 내의 모든 파일을 검색하여 suffix로 끝나는지 확인
+    search_pattern = os.path.join(folder, "*" + suffix)
+    found_files = glob.glob(search_pattern)
+    
+    if len(found_files) == 1:
+        return found_files[0]
+    else:
+        print(f"[오류] '{folder}' 안에 '{suffix}' 파일이 없거나 여러 개입니다.")
+        return None
+
+def compare_files_binary(file_a, file_b):
+    """
+    두 파일을 바이너리('rb')로 읽어서 내용이 완벽히 같은지 비교합니다.
+    """
+    try:
+        with open(file_a, 'rb') as fa:
+            data_a = fa.read()  # 파일 A 전체 읽기
+        
+        with open(file_b, 'rb') as fb:
+            data_b = fb.read()  # 파일 B 전체 읽기
+            
+        return data_a == data_b
+        
+    except Exception as e:
+        print(f"[오류] 파일 읽기 실패: {e}")
+        return False
+
+def main():
+    # 1. 대상 폴더들이 있는 경로 패턴 (사용자 환경에 맞게 수정 필요)
+    base_pattern = "./log/*tiny-AES_rand"
+    
+    # 모든 폴더 목록 가져오기 (시간 순 정렬)
+    folders = sorted(glob.glob(base_pattern))
+    
+    if len(folders) < 2:
+        print("비교할 폴더가 2개 미만입니다.")
+        return
+
+    # 2. 비교할 기준이 되는 첫 번째 폴더 (disassembly)
+    ref_folder = folders[0]
+    print(f"기준 폴더: {ref_folder}\n" + "-"*60)
+
+    # 3. 비교할 파일 종류 (파일명의 뒷부분)
+    target_suffixes = ["LogReg.csv", "LogVirIN.csv", "LogVirOUT.csv"]
+    
+    all_matched = True
+
+    # 4. 나머지 모든 폴더를 기준 폴더와 비교
+    for target_folder in folders[1:]:
+        print(f"비교 대상: {target_folder}")
+        
+        for suffix in target_suffixes:
+            # 기준 파일과 대상 파일 찾기
+            ref_file = get_file_path_by_suffix(ref_folder, suffix)
+            tgt_file = get_file_path_by_suffix(target_folder, suffix)
+            
+            if ref_file and tgt_file:
+                # 바이너리 비교 수행
+                is_same = compare_files_binary(ref_file, tgt_file)
+                
+                if is_same:
+                    print(f"  [일치] {suffix}")
+                else:
+                    print(f"  [불일치!] {suffix} 파일이 서로 다릅니다.")
+                    all_matched = False
+            else:
+                all_matched = False
+        print("-" * 30)
+
+    print("=" * 60)
+
+    is_same = compare_files_binary("./disassembly_v3.1.txt", "./disassembly.txt")
+
+    if is_same:
+        print(f"  [일치] disassembly.txt")
+    else:
+        print(f"  [불일치!] disassembly.txt 파일이 서로 다릅니다.")
+        all_matched = False
+
+    print("=" * 60)
+    if all_matched:
+        print("결과: 모든 폴더의 파일 내용이 완벽하게 동일합니다.")
+    else:
+        print("결과: 일부 파일이 다르거나 찾을 수 없습니다.")
+
+if __name__ == "__main__":
+    main()

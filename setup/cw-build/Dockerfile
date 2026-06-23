@@ -16,6 +16,7 @@ WORKDIR /workspace
 # - libusb-1.0-0-dev: 칩위스퍼러 하드웨어 통신
 # - gcc-arm-none-eabi, avr-libc 등: 타겟 보드 펌웨어 컴파일용
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    fonts-nanum \
     build-essential \
     git \
     make \
