@@ -174,10 +174,10 @@ newgrp docker
 
 ChipWhisperer 장비를 USB로 연결했을 때 권한 없이 접근할 수 있도록 udev 규칙과 그룹 권한을 설정합니다. **컨테이너 실행 전에 먼저 적용해야 합니다.**
 
-> `./setup/cw-build/50-newae.rules` 파일은 ChipWhisperer 공식 저장소 Commit `f618563` 기준입니다.
+> `./setup/50-newae.rules` 파일은 ChipWhisperer 공식 저장소 Commit `f618563` 기준입니다.
 
 ```bash
-sudo cp ./setup/cw-build/50-newae.rules /etc/udev/rules.d/50-newae.rules
+sudo cp ./setup/50-newae.rules /etc/udev/rules.d/50-newae.rules
 sudo udevadm control --reload-rules
 sudo groupadd -fr chipwhisperer
 sudo usermod -aG chipwhisperer $USER

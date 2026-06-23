@@ -1,0 +1,47 @@
+# ----------------------------------------------------------------------------
+# Code-Server 확장 프로그램 목록
+# ----------------------------------------------------------------------------
+# - 한 줄에 확장 ID 하나씩 작성합니다. (예: ms-python.python)
+# - '#' 으로 시작하는 줄과 빈 줄은 무시됩니다.
+# - Dockerfile 빌드 시 이 목록을 순회하며 자동 설치됩니다.
+#
+# [참고] code-server는 기본적으로 Open VSX(open-vsx.org) 레지스트리를 사용합니다.
+#        일부 Microsoft 독점/라이선스 확장(pylance, cpptools, remote-ssh 등)이나
+#        벤더 전용 확장은 Open VSX에 없을 수 있어 설치가 실패할 수 있습니다.
+#        설치 실패 시 빌드는 중단되지 않고 경고만 출력한 뒤 계속 진행됩니다.
+# ----------------------------------------------------------------------------
+
+anthropic.claude-code
+bioinfo.markitdown-vscode
+davidanson.vscode-markdownlint
+google.geminicodeassist
+hediet.vscode-drawio
+marp-team.marp-vscode
+ms-azuretools.vscode-containers
+ms-ceintl.vscode-language-pack-ko
+ms-python.debugpy
+ms-python.python
+ms-python.vscode-pylance
+ms-python.vscode-python-envs
+ms-toolsai.jupyter
+ms-toolsai.jupyter-keymap
+ms-toolsai.jupyter-renderers
+ms-toolsai.vscode-jupyter-cell-tags
+ms-toolsai.vscode-jupyter-slideshow
+ms-vscode-remote.remote-ssh
+ms-vscode-remote.remote-ssh-edit
+ms-vscode.cmake-tools
+ms-vscode.cpp-devtools
+ms-vscode.cpptools
+ms-vscode.cpptools-extension-pack
+ms-vscode.cpptools-themes
+ms-vscode.remote-explorer
+mushan.vscode-paste-image
+naumovs.color-highlight
+openai.chatgpt
+pranaygp.vscode-css-peek
+saoudrizwan.claude-dev
+tomoki1207.pdf
+usernamehw.errorlens
+yzane.markdown-pdf
+yzhang.markdown-all-in-one

@@ -36,12 +36,23 @@ COPY requirements.txt .
 RUN pip install -r requirements.txt \
     && rm requirements.txt
 
-# Code-Server 설치 및 확장 프로그램
-RUN curl -fsSL https://code-server.dev/install.sh | sh && \
-    code-server --install-extension ms-python.python && \
-    code-server --install-extension ms-toolsai.jupyter && \
-    code-server --install-extension DavidAnson.vscode-markdownlint && \
-    code-server --install-extension ms-vscode.cpptools-themes
+# Code-Server 설치
+RUN curl -fsSL https://code-server.dev/install.sh | sh
+
+# Code-Server 확장 프로그램 설치
+# - extensions.txt 의 목록을 순회하며 설치 (requirements.txt 방식과 유사)
+# - '#' 주석/빈 줄은 무시하고, CRLF(\r) 줄바꿈도 처리
+# - 개별 확장 설치 실패 시 빌드를 중단하지 않고 경고만 출력
+COPY extensions.txt .
+RUN sed -e 's/\r$//' extensions.txt | while IFS= read -r ext; do \
+        case "$ext" in \
+            ''|\#*) continue ;; \
+        esac; \
+        echo ">>> Installing extension: $ext"; \
+        code-server --install-extension "$ext" \
+            || echo "!!! WARNING: failed to install extension: $ext"; \
+    done \
+    && rm extensions.txt
 
 
 EXPOSE 8080
