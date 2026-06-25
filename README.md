@@ -201,7 +201,9 @@ docker compose up -d --build
 ```
 
 > [!NOTE]
-> 첫 빌드는 패키지·확장 설치로 **수 분 이상** 걸릴 수 있습니다. Docker가 아직 없다면 아래 상세 절차를 먼저 진행하세요.
+> 빠른 시작은 ChipWhisperer와 Docker를 이미 활용 중인 연구 환경에서 동작합니다.
+> **Ubuntu 설치 후에 첫 부팅이라면, 아래 상세 절차(▶클릭)를 먼저 진행**하세요.
+> 첫 빌드는 패키지·확장 설치로 **수 분 이상** 걸릴 수 있습니다. 
 
 ### 📦 상세 절차
 
@@ -216,7 +218,12 @@ sudo apt-get remove docker docker-engine docker.io containerd runc
 
 # 1-2. 필수 패키지 설치
 sudo apt-get update
+sudo apt-get upgrade
 sudo apt-get install -y ca-certificates curl gnupg
+sudo apt update
+sudo apt upgrade
+sudo apt install util-linux-extra
+
 
 # 1-3. Docker 공식 GPG 키 추가
 sudo install -m 0755 -d /etc/apt/keyrings
