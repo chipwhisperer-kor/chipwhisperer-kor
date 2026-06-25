@@ -287,11 +287,14 @@ cd ./setup/
 # 빌드 + 백그라운드 실행
 docker compose up -d --build
 
-```
-
-```bash
 # 상태 확인
 docker compose ps
+
+```
+
+이하 기타 Docker 컨테이너 운영 명령어
+
+```bash
 
 # 로그 실시간 확인
 docker compose logs -f
