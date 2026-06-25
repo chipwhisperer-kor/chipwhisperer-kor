@@ -287,6 +287,9 @@ cd ./setup/
 # 빌드 + 백그라운드 실행
 docker compose up -d --build
 
+```
+
+```bash
 # 상태 확인
 docker compose ps
 
