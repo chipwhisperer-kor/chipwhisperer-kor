@@ -87,6 +87,14 @@ section.code-small pre {
     font-size: 18px;
 }
 
+section.tiny {
+    font-size: 18px;
+}
+
+section.code-tiny pre {
+    font-size: 14px;
+}
+
 .columns {
     display: flex;
     gap: 48px;
@@ -830,10 +838,12 @@ print(values)
 <!-- _class: small -->
 ## 내용이 많은 슬라이드
 
-`small` 클래스를 사용하면 글자를 줄일 수 있습니다.
+`small, code-small, tiny, code-tiny` 클래스를 사용하면 글자를 줄일 수 있습니다.
 
 ```markdown
 <!-- _class: small -->
+<!-- _class: code-small -->
+<!-- _class: small code-small -->
 ```
 
 다만 실제 발표에서는 글자를 줄이기보다 슬라이드를 나누는 편이 좋습니다.
