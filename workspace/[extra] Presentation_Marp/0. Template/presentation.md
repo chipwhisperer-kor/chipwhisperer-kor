@@ -126,7 +126,10 @@ section.lead::after {
 </style>
 
 <!-- _class: lead -->
-# Marp 연구 발표 템플릿
+
+<!-- 강제 줄 바꿈에는 </br>를 사용합니다. -->
+
+# 연구 발표 템플릿 </br> with Marp
 
 ### 수식 · 알고리즘 · C/Python 코드 중심
 
