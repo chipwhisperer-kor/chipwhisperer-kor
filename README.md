@@ -62,7 +62,7 @@ ChipWhisperer 한국어 튜토리얼 & Docker 개발 환경
 | 🇰🇷 **한국어 튜토리얼** | SCA·FA·TraceWhisperer·Husky 와이어태핑 등 단계별 Jupyter 노트북 |
 | 🐳 **Docker 환경** | Python 3.9 + ChipWhisperer + Jupyter + code-server 일괄 제공 |
 | 🔧 **펌웨어·HAL** | `workspace/base/` — STM32F3, XMEGA, AVR 등 타겟 보드 빌드 자료 |
-| 📊 **발표 자료** | `Marp with LaTeX.css/` — Marp + LaTeX.css 기반 한국어 슬라이드 |
+| 📊 **발표 자료** | `[extra] Presentation_Marp/` — Marp 슬라이드 발표 자료 |
 | 🔬 **연구 프로젝트** | `[extra] PRE-SCA/` — Unicorn 에뮬레이션 기반 사전(pre-silicon) 분석 실험 |
 
 ### 🗺 아키텍처 한눈에 보기
@@ -144,11 +144,10 @@ flowchart LR
 
 > 공식 학습 경로와 별도이며, 결과 CSV는 `nb_output/`에 저장됩니다. **실하드웨어 없이 실행 가능합니다.**
 
-**Marp with LaTeX.css/ — 발표 자료**
+**[extra] Presentation_Marp/ — 발표 자료**
 
-Marp + LaTeX.css + Noto Serif KR 폰트 기반 한국어 슬라이드. VS Code/code-server의 Marp 확장에서 미리보기·PDF 내보내기가 가능합니다.
+Marp 기반 한국어 슬라이드. VS Code/code-server의 Marp 확장에서 미리보기·PDF 내보내기가 가능합니다.
 
-- `cw kor/presentation_Wiretapping.md` — 와이어태핑 발표
 - `0. Template/presentation.md` — 슬라이드 작성 템플릿
 
 </details>
