@@ -225,7 +225,7 @@ section.lead::after {
 Marp는 Markdown 이미지 문법에 크기 지정 문법을 더해 사용할 수 있습니다.
 
 ```markdown
-![h:420](images/result.png "실험 결과")
+![h:420](images/이미지_삽입_데모.png "실험 결과 이미지 예시")
 ```
 
 ![h:380](images/이미지_삽입_데모.png "이미지 설명 문구")

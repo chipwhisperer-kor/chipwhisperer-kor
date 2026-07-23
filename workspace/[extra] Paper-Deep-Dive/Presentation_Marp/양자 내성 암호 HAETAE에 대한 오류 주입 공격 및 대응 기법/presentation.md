@@ -375,9 +375,10 @@ $$
 \hat{w}[j+\mathrm{len}]\leftarrow\hat{w}[j],\qquad
 \hat{w}[j]\leftarrow\hat{w}[j]
 $$
+<div class="takeaway">전 *stage* 적용 시 출력 $\hat{w}[i]=w_0$ ($\forall i$)</div>
 
-→ 전 *stage* 적용 시 출력 $\hat{w}[i]=w_0$ ($\forall i$) 
-→ *entropy collapse* (입력 첫 계수 반복)
+<div class="takeaway">*entropy collapse* (입력 첫 계수 반복)</div>
+
 
 | 층위 | 내용 | 성격 |
 |------|------|------|
@@ -740,8 +741,8 @@ sc[i] + y[i], & i=0 \\
 sc[i], & 1 \le i < n
 \end{cases}
 $$
+<div class="takeaway">$sc$ 의 **거의 모든 계수**가 $z^*$ 에 노출.</div>
 
-→ $sc$ 의 **거의 모든 계수**가 $z^*$ 에 노출.  
 첫 계수는 추측 후 $\ell_\infty(s)$ 범위로 진위 판별 ([11]).
 
 *Rejection* 루프의 **첫 반복**에서 $\mathrm{NTT}(y)$ 가 고정 시점에 있어 조준이 가능하다고 서술 ([11]).
@@ -1446,7 +1447,8 @@ FI는 연산 흐름·내부 데이터를 왜곡하여 비밀 추출·검증 우�
 구조적으로 Dilithium과 유사함에도 **전체 서명 과정**에 대한 종합 FI 분석은 아직 보고되지 않음.
 
 특히 **온라인/오프라인 기반 랜덤화 서명**은 공식 구현·하드웨어 검증이 부족해 현실적 분석에 제약이 있다. 
-→ 본 연구가 **deterministic** *HAETAE* 를 대상으로 하는 동기와 연결.
+<div class="takeaway">본 연구가 **deterministic** *HAETAE* 를 대상으로 하는 동기와 연결.</div>
+
 
 ---
 

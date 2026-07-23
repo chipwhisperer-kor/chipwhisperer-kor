@@ -1,24 +1,24 @@
-# FI_HAETAE 논문 및 참고문헌 아카이브
-
-정리 완료일: 2026-07-23
+# Papers — 연구 자산 저장소 (`curator` 소유)
 
 ## 구성
 
-- `Papers/` — 대상 논문 2편, 번호별 참고문헌 PDF, 단순 참조용 표준문서, 수집 매니페스트
-- `Papers/[표준문서] NIST.FIPS.204_Module-Lattice-Based Digital Signature Standard (CRYSTALS-DILITHIUM).pdf`
-  - 단순 참조용 NIST FIPS 204 표준문서
-  - 레퍼런스 논문 폴더 생성 대상이 아님
-- `Papers/Public Coefficient Matters A Practical Differential Fault Attack on ML-DSA and HAETAE/`
-  - PDF 대상 참고문헌 35편
-  - [8]은 웹사이트, [35]는 소프트웨어 저장소이므로 PDF 대상이 아님
-- `Papers/양자 내성 암호 HAETAE에 대한 오류 주입 공격 및 대응 기법/`
-  - 참고문헌 PDF 24편
+| 경로 | 내용 |
+|------|------|
+| `*.pdf` | 대상 논문 2편 + 표준문서 1편 |
+| `<논문제목>/[n] 제목.pdf` | 1-deep 참고문헌 (HAETAE 24, PCM 35 PDF) |
+| `reference-download-manifest.csv` | 레거시 파일 존재·크기 장부 |
+| `ASSET_CATALOG_SCHEMA.md` | 신규·재검증 메타 **필드 규격** |
+| `ASSET_CATALOG.md` | 신규·재검증 메타 **기록 표** |
+| `assets/<paper_id>/<reference_id>/` | 코드·구현·데이터·실험 원본 |
 
-## 완료 상태
+## 상태 (D34)
 
-- 대상 논문: 2편
-- 참고문헌 PDF: 59편
-- 단순 참조용 표준문서: 1편
-- 누락된 PDF 대상 참고문헌: 없음
+- 대상 논문 2 · 참고 PDF 59 · 표준 1 · PDF 대상 누락 0
+- v2 카탈로그 3건 · 공식 재현 아티팩트 ZIP 1건
+- 기존 장부 빈 출처는 **추정 채움 금지**
 
-세부 파일명, 크기와 수집 출처는 `Papers/reference-download-manifest.csv`를 참조하십시오.
+## 운영
+
+- 쓰기: `curator` only
+- 신규/재검증: SCHEMA 필드 → CATALOG 행 + 파일 저장
+- analyst/producer: 읽기만
