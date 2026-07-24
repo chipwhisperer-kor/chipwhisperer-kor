@@ -1,16 +1,74 @@
-# SYNC
+# SYNC — 작업 루트 선언
 
-| 항목 | 값 |
-|------|-----|
-| Canonical | `/home/user/fia_cm_haetae/Collabo_HB` |
-| 정책 | Canonical에서 직접 작업 시 **추가 복사 불필요**. worktree 사용 시에만 → Canonical 동기화 |
-| 근거 | PROMPT §7 · D11 · D37–D38 |
+**운영 문서 · `director` 단독 쓰기.** 프로젝트에서 **절대경로가 허용되는 유일한 파일**이다 (S2 격리 구역).
+다른 문서는 여기 값을 옮겨 적지 않고 이 파일을 가리킨다 (P1).
+
+---
+
+## 작업 루트 (유효한 사본은 하나뿐)
+
+아래 한 줄이 **선언**이다. 형식을 바꾸지 말 것 — 기계 대조가 이 줄에 의존한다.
+
+```text
+작업루트=/home/user/chipwhisperer-kor/workspace/[extra] Paper-Deep-Dive
+```
+
+**세션 시작 시 대조한다** (`PROMPT` §7.0 · S7). 한 줄로 끝난다:
+
+```bash
+[ "$(pwd)" = "$(grep -m1 '^작업루트=' .Intermediate_Artifacts/SYNC.md | cut -d= -f2-)" ] \
+  && echo "OK 작업 루트" || echo "STOP 다른 사본 — 쓰지 말 것"
+```
+
+**`STOP`이면 아무것도 쓰지 않고 사용자에게 알린 뒤 대기한다.** 다른 사본에 쓴 것은 없는 것으로 간주한다.
+
+---
+
+## 왜 확인이 필요한가
+
+모든 사본이 **자기완결적**(S1)이라 어느 사본에 있든 완전하고 권위 있어 보인다. **사본을 겉으로 구별할 방법이 없다.** 자기완결성이 치르는 대가이며, 그래서 S7의 명시적 대조가 필요하다.
+
+---
+
+## 사본 목록 (2026-07-24 — **4개**)
+
+| 사본 | 절대경로 | 상태 |
+|------|----------|------|
+| **작업 루트** | `/home/user/chipwhisperer-kor/workspace/[extra] Paper-Deep-Dive` | **유일하게 유효** |
+| 동결 백업 | `/home/user/fia_cm_haetae/Collabo_HB/Paper-Deep-Dive` | 2026-07-24 시점 **동결**. 동기화 중단(D50) · 작업 금지. `작업루트=` 줄을 담고 있어 **S7이 STOP 처리 → 자기 보호됨** |
+| ⚠️ **Grok 활성 worktree** | `/home/user/.grok/worktrees/user-chipwhisperer-kor/2026-07-24-214ec02b/workspace/[extra] Paper-Deep-Dive` | **위험 · 처리 미정.** 오늘 10:16 스냅숏, 등록된 worktree(detached `19efcf7`). D40+ 구조라 **현행처럼 보이지만** S7 이전 지침이라 **대조 자체를 하지 않는다** |
+| 휴지통 | `/home/user/.local/share/Trash/files/[extra] Paper-Deep-Dive` | 2026-07-22 · 폐지된 `To_Do.md`·`README_PATH.md` 잔존. 이미 버려진 것 |
+
+### S7의 보호 범위와 한계
+
+S7 대조는 **사본 목록에 의존하지 않는다** — `pwd`와 선언된 작업 루트를 비교할 뿐이므로, 목록에 없는 사본에서도 `STOP`이 나온다. 목록이 불완전해도 보호는 성립한다.
+
+**단, S7을 담고 있는 사본에서만 성립한다.** S7 이전에 동결된 사본은 대조 자체를 하지 않으므로 무방비다. 위 Grok worktree가 그 경우다 — **규칙이 아니라 삭제로만 막을 수 있다**(P2).
+
+### 사본 찾는 법 (폴더명으로 찾지 말 것)
+
+작업 루트 폴더명은 `[extra] Paper-Deep-Dive`다. `-name "Paper-Deep-Dive"`로 찾으면 **놓친다**(2026-07-24 실제 발생). 내용 표식으로 찾는다:
+
+```bash
+find /home/user -name "AI_ROSTER.md" -not -path "*/.git/*" 2>/dev/null
+```
+
+### 삭제됨 (D50, 2026-07-24)
+
+폐기 worktree 2개 — `…/.grok/worktrees/user-fia-cm-haetae/paper` · `…/paper-2`.
+2026-07-21 상태로 **폐지된 `To_Do.md`·`README_PATH.md`가 잔존**해, 거기서 지침을 읽으면 D40 이전 규칙을 현행으로 오인했다. analyst 사본 이탈 사고의 원인.
+삭제 전 확인: 추적 콘텐츠 280여 개는 커밋 `1b810e4`로 복구 가능. **고유 파일 11개는 전부 이미 폐기된 것** — 사용자가 직접 삭제한 `To_Do.md`·`README_PATH.md`·`.Prompt_Engineering/`, D24로 대체된 구 `Marp with LaTeX.css/` 툴킷(폰트·CSS·구 템플릿·구 덱), 파일명이 잘린 PCM-DFA PDF 중복본.
+
+---
 
 ## 로그 (최근)
 
 | 시각 | 내용 |
 |------|------|
-| 2026-07-23 | D37 v3 지침 전면 교정, worktree 동기화 |
-| 2026-07-23 | D38 v3.1 공통 파일 통합자·독해 계층·curator 선행 게이트 교정 |
-| 2026-07-23 | D39 부트스트랩 완료 · DIL-10 자산 카탈로그/공식 artifact/handoff |
-| 2026-07-23 | D35–D36 multi-AI · v2 |
+| 2026-07-24 | **D50** 폐기 worktree 2개 삭제 · 백업 동기화 중단(동결) → **사본 4개 → 2개** · 채팅 키워드 `초기화` 신설 |
+| 2026-07-24 | **D49** S7 신설 — 작업 루트 대조를 세션 절차 0번으로. 본 파일을 역사 → **운영(director 소유)** 승격. 사본 4개 전수 기재(기존 3개만 기록돼 있었음) |
+| 2026-07-24 | **analyst(Grok) 사본 이탈 사고.** 세션 cwd가 폐기 worktree였고 작업 루트와 어긋남 → 답변 칸·HANDOFF 미소비로 보임. 조치: 이후 읽기·쓰기 모두 **작업 루트만** |
+| 2026-07-24 | **D47** 두 명제(자기완결성·단순성) `PROMPT` §0 명문화 |
+| 2026-07-24 | **D41** 자기완결성 S1–S6 도입. D11 절대경로 Canonical 폐기 → 루트 상대경로. `README_PATH.md` 삭제 |
+| 2026-07-24 | **D40** 사용자 접점 역할별 분리 (`To_Do_{Curator,Analyst,Producer}.md`), `To_Do.md` 폐지 |
+| 2026-07-23 | D37 v3 지침 전면 교정 · D38 v3.1 통합자·독해 계층 · D39 부트스트랩 완료 · D35–D36 multi-AI |

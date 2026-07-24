@@ -1,15 +1,18 @@
 # ROADMAP
 
-갱신: 2026-07-23 · D38
+갱신: 2026-07-24 · D42
 
 ## 목표
 
 승인 단위 심층 이해 → 근거 추적 가능 한글 Marp.
 
 ```text
-M0 계약 → M-ARCH 자산 → M1–M3 분석 → M4–M6 Marp → M7 검증 → M8 승인
-         curator         analyst        producer
+M0 계약 → M-ARCH 자산 → H-M1–M3 분석 → H-M4–M6 Marp → H-M7 검증 → H-M8 최종
+          curator        analyst         producer      director     사용자
+                              └── 단계 종료마다 director 승인/반려 ──┘
 ```
+
+`H-` 접두어는 논문별 마일스톤 (`MILESTONES.md`). `M0`·`M-ARCH`·`M-TRACE`는 논문 무관 전역 항목.
 
 ## 논문 순서
 
@@ -31,4 +34,4 @@ M0 계약 → M-ARCH 자산 → M1–M3 분석 → M4–M6 Marp → M7 검증 �
 
 ## 원칙
 
-역할 밖 금지 · ready 전 소비 금지 · 추적 가능 · To_Do 1판단 · 원본 무단 교체 금지 · 부족 시 분할
+역할 밖 금지 · ready 전 소비 금지 · 추적 가능 · 자기 접점 파일 1판단 · 원본 무단 교체 금지 · 부족 시 분할 · 마일스톤 종료는 director 승인

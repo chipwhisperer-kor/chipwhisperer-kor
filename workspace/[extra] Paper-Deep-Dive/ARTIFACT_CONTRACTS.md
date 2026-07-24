@@ -7,7 +7,7 @@
 | 상태 | 소비 |
 |------|------|
 | `draft` | 금지 |
-| `awaiting_approval` | 금지 (To_Do 승인 대기) |
+| `awaiting_approval` | 금지 (게이트 대기 — `gate` 열이 `user` \| `director`) |
 | `ready` | **허용** |
 | `in_progress` | 중복 착수 금지 |
 | `blocked` | 금지 (재개 조건 기록) |
@@ -41,6 +41,16 @@
 
 위치: `Presentation_Marp/<논문>/`.
 
-## 5. 오류
+## 5. → director (단계 승인 패킷)
+
+**호출 시점에만** (`roles/director/ROLE.md`). 단계 종료·규격 개정·충돌 조정 요청 시 `awaiting_approval` + `gate: director`.
+
+필수: 대상 단계·마일스톤 ID · 포함 산출물 목록(단위/자산/슬라이드 ID) · 적용 규격(`ARTIFACT_CONTRACTS` 절) · 근거 체인 샘플 · 미해결 항목.
+
+판정: **승인** → `ready` · **반려** → `blocked` + **사유 + 보완 방향 + 재개 조건**.
+
+director는 내용을 생성·수정하지 않는다. 반려 시 방향만 제시하고 수정은 담당 역할이 수행한다.
+
+## 6. 오류
 
 수신 측: `blocked` + 조건 기록 → **원본 직접 수정 금지** → 송신 역할 회송.

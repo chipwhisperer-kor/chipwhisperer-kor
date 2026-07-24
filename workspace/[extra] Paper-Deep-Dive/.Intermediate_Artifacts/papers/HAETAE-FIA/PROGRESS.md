@@ -60,3 +60,4 @@
 | 2026-07-23 | 동료 피드백 팩트체크: sparse $c$ → NTT 생략? **전제 OK / 결론 NG**. `REFS/DIL-11-FACTCHECK-sparse-c-NTT.md`. 슬라이드 미변경·사용자 확인 대기 |
 | 2026-07-23 | 답변: FIPS NTT(c) 명시 시 슬라이드 추가 → presentation에 「표준: sparse $c$ 이어도 NTT(c)」 1장. FIPS Alg 7 L16–18 |
 | 2026-07-23 | 답변: 1장 과함 → 전용 슬라이드 삭제, Alg 7 NTT 호출 표 하단에 1줄만 유지 |
+| 2026-07-24 | **작업 루트 재동기화** — 답변 칸(상황 파악) 처리 · `HO-20260724-01` done · D40–D48 숙지. sparse-c-NTT 게이트 대기. DIL-10 미착수 |

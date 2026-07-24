@@ -16,6 +16,6 @@
 
 ## 입출력
 
-- in: analyst `ready` 패킷, 자산/이미지 읽기, Template  
+- in: analyst `ready` 패킷, 자산/이미지 읽기, Template, `To_Do_Producer.md` 답변 칸  
 - out: `Presentation_Marp/<논문>/presentation.md`, `images/`  
-- write: `Presentation_Marp/**`, `roles/producer/**`  
+- write: `Presentation_Marp/**`, `roles/producer/**`, `To_Do_Producer.md`  

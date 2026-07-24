@@ -16,6 +16,6 @@
 
 ## 입출력
 
-- in: `ready` 자산, `Papers/` 읽기, To_Do 승인  
+- in: `ready` 자산, `Papers/` 읽기, `To_Do_Analyst.md` 승인  
 - out: `.Intermediate_Artifacts/papers/<paper_id>/**`, `analyst→producer` handoff  
-- write: `.Intermediate_Artifacts/papers/**`, `roles/analyst/**` only
+- write: `.Intermediate_Artifacts/papers/**`, `roles/analyst/**`, `To_Do_Analyst.md` only
