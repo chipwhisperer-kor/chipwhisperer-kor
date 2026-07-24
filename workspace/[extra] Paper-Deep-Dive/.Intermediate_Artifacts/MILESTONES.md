@@ -46,10 +46,8 @@ P-001–013 approved · P-014 deferred · P-015–073 pending
 
 아카이브 done · 본문 deferred (D9)
 
-## 포인터
+## 현재 위치
 
-- 사용자: sparse-c-NTT 한 줄
-- curator: DIL-10 자산 완료
-- analyst: `HO-20260723-11` ready; 사용자 게이트 후 DIL-10
-- producer: 대기
-- director: 미호출 (다음 관여 = D25 deep-dive 종료 또는 H-M5 완료 시 단계 판정)
+여기 두지 않는다 — **각 역할의 `To_Do_<Role>.md` `지금 상태`와 `HANDOFF.md`가 SSOT**다 (P1).
+
+이전의 「포인터」 섹션은 그 둘을 요약해 두었다가 매번 낡았다. 요약본은 갱신 주체가 불분명해 반드시 뒤처지므로 **섹션째 제거**한다 (D52 · P2 규칙보다 구조).

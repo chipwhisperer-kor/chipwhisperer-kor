@@ -9,9 +9,9 @@
 | | |
 |--|--|
 | 역할 | `producer` = Agy (`AI_ROSTER.md`) |
-| 진행 | 대기 — 소비 가능한 analyst `ready` 없음 |
+| 진행 | 대기 (재부트스트랩 완료) — 소비 가능한 `ready` 없음 |
 | 받은 handoff | 없음 |
-| 대기 | analyst의 DIL-10 분석 승인 |
+| 대기 | analyst의 DIL-10/12 분석 승인 |
 
 ---
 

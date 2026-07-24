@@ -30,14 +30,15 @@
 
 ---
 
-## 사본 목록 (2026-07-24 — **4개**)
+## 사본 목록 (2026-07-24 정리 후 — 활성 **2개**)
 
 | 사본 | 절대경로 | 상태 |
 |------|----------|------|
 | **작업 루트** | `/home/user/chipwhisperer-kor/workspace/[extra] Paper-Deep-Dive` | **유일하게 유효** |
 | 동결 백업 | `/home/user/fia_cm_haetae/Collabo_HB/Paper-Deep-Dive` | 2026-07-24 시점 **동결**. 동기화 중단(D50) · 작업 금지. `작업루트=` 줄을 담고 있어 **S7이 STOP 처리 → 자기 보호됨** |
-| ⚠️ **Grok 활성 worktree** | `/home/user/.grok/worktrees/user-chipwhisperer-kor/2026-07-24-214ec02b/workspace/[extra] Paper-Deep-Dive` | **위험 · 처리 미정.** 오늘 10:16 스냅숏, 등록된 worktree(detached `19efcf7`). D40+ 구조라 **현행처럼 보이지만** S7 이전 지침이라 **대조 자체를 하지 않는다** |
-| 휴지통 | `/home/user/.local/share/Trash/files/[extra] Paper-Deep-Dive` | 2026-07-22 · 폐지된 `To_Do.md`·`README_PATH.md` 잔존. 이미 버려진 것 |
+| 휴지통 | `/home/user/.local/share/Trash/files/[extra] Paper-Deep-Dive` | 2026-07-22 · 폐지된 `To_Do.md`·`README_PATH.md` 잔존. 이미 버려진 것 · **아래 검색 명령으로는 안 잡힌다**(`AI_ROSTER.md` 이전 시기 사본) |
+
+Grok worktree(`…/user-chipwhisperer-kor/2026-07-24-214ec02b/…`)는 **D52로 삭제**했다.
 
 ### S7의 보호 범위와 한계
 
@@ -65,6 +66,8 @@ find /home/user -name "AI_ROSTER.md" -not -path "*/.git/*" 2>/dev/null
 
 | 시각 | 내용 |
 |------|------|
+| 2026-07-24 | **D52** 첫 `초기화` 실행 — Grok worktree 삭제 → **활성 사본 2개**. `초기화`가 문서 모순 2건 검출 |
+| 2026-07-24 | **D51** 사본 전수 조사 오류 정정 (폴더명 검색 → 내용 표식 검색) |
 | 2026-07-24 | **D50** 폐기 worktree 2개 삭제 · 백업 동기화 중단(동결) → **사본 4개 → 2개** · 채팅 키워드 `초기화` 신설 |
 | 2026-07-24 | **D49** S7 신설 — 작업 루트 대조를 세션 절차 0번으로. 본 파일을 역사 → **운영(director 소유)** 승격. 사본 4개 전수 기재(기존 3개만 기록돼 있었음) |
 | 2026-07-24 | **analyst(Grok) 사본 이탈 사고.** 세션 cwd가 폐기 worktree였고 작업 루트와 어긋남 → 답변 칸·HANDOFF 미소비로 보임. 조치: 이후 읽기·쓰기 모두 **작업 루트만** |

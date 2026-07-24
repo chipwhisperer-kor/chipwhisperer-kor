@@ -81,10 +81,11 @@ Paper-Deep-Dive/                    # ← 프로젝트 루트. 모든 경로는 
 ├── roles/{curator,analyst,producer,director}/
 ├── Papers/                         # curator
 ├── .Intermediate_Artifacts/
+│   ├── SYNC.md                     # ★ 운영 · director 단독 — 작업 루트 선언(S7). 매 세션 제일 먼저
 │   ├── papers/                     # analyst 단독
 │   ├── HANDOFF.md · MILESTONES.md · ROADMAP.md          # 공유(행 규칙)
 │   ├── DECISIONS.md · CROSS_CHECK.md                    # director 단독
-│   └── COMMS/ · SYNC.md · ROSTER_STATE.md · ARCHITECTURE_AUDIT_*.md   # 역사
+│   └── COMMS/ · ROSTER_STATE.md · ARCHITECTURE_AUDIT_*.md            # 역사
 ├── Presentation_Marp/              # producer
 └── style_enhancer.py               # producer 보조 (루트에서 실행, 제자리 덮어쓰기)
 ```
