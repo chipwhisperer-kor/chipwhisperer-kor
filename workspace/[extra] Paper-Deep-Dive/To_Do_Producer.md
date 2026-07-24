@@ -6,12 +6,11 @@
 
 ## 지금 상태
 
-| | |
-|--|--|
-| 역할 | `producer` = Agy (`AI_ROSTER.md`) |
-| 진행 | 대기 (재부트스트랩 완료) — 소비 가능한 `ready` 없음 |
-| 받은 handoff | 없음 |
-| 대기 | analyst의 DIL-10/12 분석 승인 |
+1. **role_id / 서비스**: `producer` / Agy
+2. **단독 쓰기 경로**: `Presentation_Marp/**`, `roles/producer/**`, `To_Do_Producer.md`, `style_enhancer.py`
+3. **소비 가능한 `ready` handoff**: 없음
+4. **차단 요인·질문**: 없음
+5. **작업 상태 확인**: 작업 루트(`/home/user/chipwhisperer-kor/workspace/[extra] Paper-Deep-Dive`) 대조 OK. 어떠한 연구 작업이나 발표자료 수정 작업도 아직 착수하지 않고 대기 중입니다.
 
 ---
 
