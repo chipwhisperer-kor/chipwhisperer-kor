@@ -375,9 +375,17 @@ $$
 \hat{w}[j+\mathrm{len}]\leftarrow\hat{w}[j],\qquad
 \hat{w}[j]\leftarrow\hat{w}[j]
 $$
-<div class="takeaway">전 *stage* 적용 시 출력 $\hat{w}[i]=w_0$ ($\forall i$)</div>
+<div class="takeaway">
 
-<div class="takeaway">*entropy collapse* (입력 첫 계수 반복)</div>
+전 *stage* 적용 시 출력 $\hat{w}[i]=w_0$ ($\forall i$)
+
+</div>
+
+<div class="takeaway">
+
+*entropy collapse* (입력 첫 계수 반복)
+
+</div>
 
 
 | 층위 | 내용 | 성격 |
@@ -741,7 +749,11 @@ sc[i] + y[i], & i=0 \\
 sc[i], & 1 \le i < n
 \end{cases}
 $$
-<div class="takeaway">$sc$ 의 **거의 모든 계수**가 $z^*$ 에 노출.</div>
+<div class="takeaway">
+
+$sc$ 의 **거의 모든 계수**가 $z^*$ 에 노출.
+
+</div>
 
 첫 계수는 추측 후 $\ell_\infty(s)$ 범위로 진위 판별 ([11]).
 
@@ -1258,6 +1270,224 @@ Dilithium2: 대략 **~512** faulty signatures (abstract)
 
 ---
 
+<!-- source: DIL-10-U1 | §1 -->
+## [10] 심층 분석 1 — 논문이 푸는 문제 (연구 배경)
+
+**출처:** [10] Abstract 및 §1
+
+| 항목 | 내용 |
+|------|------|
+| 대상 모드 | *randomized* / *hedged Dilithium* (NIST 기본 모드) |
+| 배경 | *deterministic DFA*는 잘 알려짐; *randomized* FI는 가정이 강하거나 한정됨 |
+| 두 가지 공격 | **(1)** $z$ 계산 덧셈 *skip* 확장 <br> **(2)** 공개 행렬 $\mathbf{A}$ (*ExpandA*) 계수 *fault* |
+| 공통 핵심 | **Correction** — 서명 시도 후 오류 서명을 보정하여 비밀값 회수 |
+| 실증 | *simulated faults* + ARM *clock glitches* |
+
+---
+
+<!-- source: DIL-10-U1 | §3 -->
+## [10] 심층 분석 1 — Correction vs 고전 DFA
+
+**출처:** [10] §3 Attack Intuition; Fig.1–2
+
+고전 *DFA* (차분 오류 분석):
+* 동일한 $y$를 전제로 **정상 서명**과 **오류 서명**의 차분을 이용.
+* *randomized* 모드에서는 동일 $y$ 재현이 어려움.
+
+**Correction 절차 (본 논문):**
+1. 서명 루틴 **1회** 호출 + 단일 표적 *fault* → (*verify* 실패하는 오류 서명 획득)
+2. 선택한 중간값 후보로 서명(또는 검증 입력)을 **수정**
+3. **verify 성공**할 때까지 후보 탐색 → 검증 성공 시 그 보정값 = 키 관련 정보
+4. 다수 방정식 수집 후 선형대수/격자 축소로 $s_1$ 복구
+
+---
+
+<!-- source: DIL-10-U1 | 공격자 모델 -->
+## [10] 심층 분석 1 — 공격자 모델
+
+**출처:** [10] §3
+
+| 가정 | 비고 |
+|------|------|
+| 물리 접근 · *sign* 트리거 · $pk$ 공개 | 일반적인 물리적 공격 모델 |
+| 서명당 **단일** 표적 *fault* | 이론 분석의 전제 조건 |
+| *rejection loop* **최종 반복**에 *fault* | 분석 단순화용 가정 (실제로는 첫 시도 *fault* 시 성공 확률로 비용 보정: Dilithium2 기준 $\approx 0.23$) |
+
+---
+
+<!-- source: DIL-10-U1 | FIPS 204 대응 (Sign) -->
+## [10] 심층 분석 1 — FIPS 204 대응표 (Sign)
+
+**출처:** [10] Alg 2.1; FIPS 204 Alg 7
+
+| 논문 Alg 2.1 | FIPS 204 Alg 7 | 비고 |
+|--------------|----------------|------|
+| `A := ExpandA(ρ)` | **L5** $\hat{\mathbf{A}}\leftarrow\mathrm{ExpandA}(\rho)$ | **공격 2 타겟** |
+| `rnd` · $\rho'$ | L7 $\rho''\leftarrow H(K\|\mathit{rnd}\|\mu)$ | *hedged* (난수) / *det* ($0^{32}$) |
+| `z := y + c s1` | **L17–20** $\mathbf{z}\leftarrow\mathbf{y}+\langle\langle c s_1\rangle\rangle$ | **공격 1 타겟** |
+
+* 논문의 $\tilde{c}$, $c$ 표기 혼용은 FIPS L15-16의 *SampleInBall*로 리맵핑 가능.
+
+---
+
+<!-- source: DIL-10-U1 | FIPS 204 대응 (Verify) -->
+## [10] 심층 분석 1 — FIPS 204 대응표 (Verify)
+
+**출처:** [10] Alg 2.2; FIPS 204 Alg 8
+
+| 논문 Alg 2.2 | FIPS 204 Alg 8 | 비고 |
+|--------------|----------------|------|
+| ExpandA | L5 | 검증측 **정상 A** (공격 2 서명측 A'와 불일치) |
+| UseHint / $Az-ct_1 2^d$ | L9–10 | 공격 2: 보정 항 $?$ 탐색 공간 |
+| accept 조건 | L12–13 $\|\mathbf{z}\|_\infty$ · $\tilde{c}=\tilde{c}'$ | **Correction oracle** (공개 *verify*) |
+
+<div class="takeaway">
+
+*Correction* 의 성공 판정기는 공개된 **Verify** 전체. 공격 1은 **Alg 7 L20**의 계수를 왜곡하고, $\mathbf{z}$를 보정하여 검증을 통과시킨다.
+
+</div>
+
+---
+
+<!-- source: DIL-10-U1 | 공격 1 진입 -->
+## [10] 심층 분석 1 — 공격 1 진입 (Skipping fault + Case II)
+
+**출처:** [10] §2.2 Skipping Fault; §4.1
+
+*대상:* $z = y + c\cdot s_1$ 의 **한 성분 $j$, 한 계수 $i$** 덧셈
+*수단:* *instruction skip* 등으로 하나의 합을 $0$ 또는 상수로 교란
+
+오류 결과 $z'_j[i]$에 따라:
+* **Case I:** $(c s_1)_j[i]$ 만 남음 → 기존 *DFA* 방식으로 즉시 선형식 도출
+* **Case II:** $y_j[i]$ 만 남음 → **기존 *DFA*는 *randomized* 에서 막힘.** *Correction*이 이를 우회.
+
+---
+
+<!-- source: DIL-10-U1 | Correction 열거 -->
+## [10] 심층 분석 1 — Correction이 Case II를 여는 방식
+
+**출처:** [10] §3 Fig.1; §4.1
+
+오류 서명 $(\tilde{c}, z', h)$ 에서 표적 계수만 $\alpha$만큼 수정:
+$$ (z'')_j[i] \;=\; (z')_j[i] + \alpha, \quad \alpha \in \{0,\pm1,\pm2,\ldots\} $$
+
+1. $\mathrm{verify}(\tilde{c},z'',h)=\mathrm{accept}$ 가 되는 $\alpha$ 탐색
+2. 찾은 $\alpha$를 $(c\cdot s_1)_j[i]$ 로 채택
+3. $c\leftarrow\mathrm{SampleInBall}(\tilde{c})$ 후, $(s_1)_j$ 에 대한 **선형식 1개** 획득
+4. $256$개의 독립식 확보 후 성분별 비밀키 $s_1$ 복구
+
+---
+
+<!-- source: DIL-10-U1 | 공격 2 예고 -->
+## [10] 심층 분석 1 — 공격 2 한 줄 예고 (ExpandA)
+
+**출처:** [10] §3 Fig.2; §5
+
+* 타겟: FIPS Alg 7 **L5** · Alg 32 **ExpandA** — **공개 행렬 $A$의 한 계수 fault**
+* 공격자는 $\Delta A$ 를 앎. 서명 측은 $A'$를 사용하여 서명 → 검증 실패.
+* 서명 자체를 고치지 않고, 검증식에 $? \approx \Delta A\cdot y$ 꼴을 열거하여 $y$ 정보를 획득, 종국에 $s_1$ 복구.
+* 의의: *side-channel*에 덜 민감한 공개 연산(ExpandA)도 FI의 치명적 타겟이 될 수 있음.
+
+---
+
+<!-- source: DIL-10-U1 | 비판적 점검 -->
+## [10] 심층 분석 1 — 비판적 점검 (표준 및 구현)
+
+| 항목 | 판정 |
+|------|------|
+| 단순화식 $z=y+cs_1$ vs FIPS NTT 경로 | **대수적으로 동치** (기본 경로 대상) |
+| 서명 필드 $c$ vs $\tilde{c}$ | *SampleInBall* 리맵으로 선형식 구성 가능 |
+| “최종 *rejection* 루프 *fault*” 가정 | 논문이 비용 보정법 제시 (분석 수치 $\neq$ 실제 주입 횟수) |
+| 공개 $A$ *fault*의 파급력 | ExpandA 보호 공백 지적은 설득력 있음 |
+
+---
+
+<!-- source: DIL-10-U2 | 공격 1 심화 -->
+## [10] 심층 분석 1 — 공격 1 심화 (Skipping-fault Correction)
+
+**출처:** [10] §4 Skipping Fault Correction Attack
+
+* **FI 대상 연산:** FIPS Alg 7 **L20** $\mathbf{z}\leftarrow\mathbf{y}+\langle\langle c s_1\rangle\rangle$
+* **오류 모델:** 한 성분 $j$, 한 계수 $i$에서 덧셈 *skip* → $z'_j[i]=y_j[i]$
+* **분포 특성:** $(cs_1)_j[i]$ 는 0 근처에 집중되는 분포(예: Dilithium2 $N(0,80)$) 형태.
+* **Correction 절차:**
+  - 오류 서명 확보 후, $z'$의 표적 계수에 작은 값 $\alpha=0,1,-1,2,-2\dots$ 를 순차적으로 더함.
+  - $\mathrm{verify}$ 통과 시 $\alpha^\star$ 채택 → $s_1$ 선형식 유도.
+* **비용:** $\ell n$ 개의 서로 다른 오류 서명 필요 (Dilithium2 기준 ~1024개). 탐색 상한(bound $b$)은 작아 복잡도에 영향 미미.
+
+---
+
+<!-- source: DIL-10-U2 | 대응 기법과 우회 -->
+## [10] 심층 분석 1 — 대응 기법과 우회 (공격 1)
+
+**출처:** [10] §4.3 Countermeasures
+
+| 대응 기법 | 논문 요지 (우회 가능성) |
+|-----------|------------------------|
+| **Shuffling** (덧셈 순서) | 표적 위치 불명 $\to$ 모든 계수에 보정 시도. 런타임 증가하나 복구 가능. (fault 수 $\approx +10-14\%$) |
+| **Masking** | 부분 *skip* 시 거부율 급증 $\to$ 탐지 여지. 셔플+마스킹 시 주입 난이도 상승. |
+| **STV** (Sign-Then-Verify) | 정상 *Correction* 원천 차단. 비효과 오류($(cs_1)=0$)만 수집하여 우회 가능하나 비용 큼(>20 주입/1건). |
+| **NTT-domain addition** | $z$ 덧셈을 NTT 영역에서 수행. *skip* 공격 차단 효과는 있으나 타 경로([11]) 취약점 노출 경고. |
+
+---
+
+<!-- source: DIL-10-U3 | 공격 2 -->
+## [10] 심층 분석 2 — 공격 2 (ExpandA 계수 Fault)
+
+**출처:** [10] §5 Correction Attack with a Fault in A
+
+* **FI 대상 연산:** FIPS Alg 7 **L5** $\hat{\mathbf{A}}\leftarrow\mathrm{ExpandA}(\rho)$ 
+* **오류 모델:** 공개 행렬 $\mathbf{A}$ 의 생성 과정에서 **한 행렬 성분·한 계수** 오류 $\Delta\hat{A}$ 주입. (공격자는 주입 차분값을 알아야 함)
+* **공개성 의의:** ExpandA는 비밀을 다루지 않아 부채널 보호가 누락되기 쉬움.
+* **Correction 과정:**
+  - 서명자는 $A'$로 오류 서명 생성. 검증자는 정상 $A$ 사용 $\to$ 검증 실패.
+  - 검증식에서 $\Delta A \cdot y$ 보정항을 전수 탐색하여 $y$ 도출.
+  - $y$ 와 오류 서명 차분을 이용해 종국에 비밀키 $s_1$ 복구.
+
+---
+
+<!-- source: DIL-10-U3 | 격자 가속 및 대응 -->
+## [10] 심층 분석 2 — 격자 가속 및 대응 (공격 2)
+
+**출처:** [10] §5.2 ~ §5.4
+
+* **격자 가속 (Lattice Reduction):**
+  - 전 계수 *fault* 불필요. $s_1$ 의 **절반** 계수만 회수하고, 나머지는 LWE/격자 문제(BKZ)로 해결.
+  - Dilithium2 기준 필요 fault 수: 1024 $\to$ **~512** 절감.
+* **대응 기법 고려:**
+  - ExpandA는 서명 연산의 큰 비중을 차지하여 고비용 대응(STV 등) 적용이 매우 어려움.
+  - 셔플링(행+열) 적용 시 오탐 증가 및 필요 fault 수 최대 29배 증가.
+
+---
+
+<!-- source: DIL-10-U4 | 공격 비교 -->
+## [10] 종합 비교 — 두 공격 요약
+
+**출처:** [10] §6 Practical Evaluation
+
+| 항목 | 공격 1 (Skip + $z$) | 공격 2 (Fault + $\mathbf{A}$) |
+|------|--------------------|-----------------------------|
+| **FIPS 타겟** | Alg 7 **L20** | Alg 7 **L5** / Alg 32 |
+| **비밀 관여** | $c\cdot s_1$ 직접 연산 | 공개 행렬 확장 (보호 취약) |
+| **Dil2 최소 오류서명**| **~1024** ($\ell n$) | **~512** (격자 절반 적용) |
+| **오프라인 탐색** | 작은 값 ($\sim 2\beta$) | $q$ (전체) |
+| **실측 여부** | [RJH+19] 연구 인용 | **ChipWhisperer + STM32 실측** (논문 기여) |
+
+---
+
+<!-- source: DIL-10-U4 | 논문 대비 -->
+## [10] 종합 비교 — 선행 FI 공격 대비
+
+**출처:** [10] 논문 정리 및 교차 참조 분석
+
+| 선행 연구 | 핵심 타겟 및 특징 | [10]과의 관계 |
+|-----------|------------------|--------------|
+| **[11] NTT** | NTT twiddle zeroization. 주로 *deterministic* 모드 및 구현 가정. | **다른 관점**. NTT 영역 덧셈은 [10] 공격 1을 막으나 [11] 공격에 노출됨. |
+| **[9] ExpandMask** | $y$ 생성 시 nonce skip. *MLWE* $\to$ *RLWE* 격자. | **다른 경로** (L11 타겟). |
+| **[10] Correction** | L20 덧셈 skip, L5 $\mathbf{A}$ 계수 결함. | **rand/hedged 특화**. 이중 서명 DFA 없이 단일 실행 오류 서명으로 키 복구 증명. |
+
+---
+
 <!-- source: REF-12 -->
 ## [12] 개요
 
@@ -1447,7 +1677,11 @@ FI는 연산 흐름·내부 데이터를 왜곡하여 비밀 추출·검증 우�
 구조적으로 Dilithium과 유사함에도 **전체 서명 과정**에 대한 종합 FI 분석은 아직 보고되지 않음.
 
 특히 **온라인/오프라인 기반 랜덤화 서명**은 공식 구현·하드웨어 검증이 부족해 현실적 분석에 제약이 있다. 
-<div class="takeaway">본 연구가 **deterministic** *HAETAE* 를 대상으로 하는 동기와 연결.</div>
+<div class="takeaway">
+
+본 연구가 **deterministic** *HAETAE* 를 대상으로 하는 동기와 연결.
+
+</div>
 
 
 ---

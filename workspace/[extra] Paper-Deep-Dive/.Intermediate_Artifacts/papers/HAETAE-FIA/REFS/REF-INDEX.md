@@ -16,7 +16,7 @@
 | REF-07 | [7] | Boneh et al. EUROCRYPT’97 | **있음** | pending | |
 | REF-08 | [8] | SoK fault adversary models | **있음** | pending | |
 | REF-09 | [9] | From MLWE to RLWE DFA Dilithium | **있음** | approved 요약; **deep in_progress** (U1–U2 slides) | P-009; Marp; D25 |
-| REF-10 | [10] | Correction FA Dilithium | **있음** | approved 요약; **deep pending** (순서 3) | P-009; Marp; D25 |
+| REF-10 | [10] | Correction FA Dilithium | **있음** | approved 요약; **deep U1–U4 approved** | P-009; Marp; D25; `DIL-10-U1`–`U4.md`; HO-06–09 |
 | REF-11 | [11] | NTT twiddle FI | **있음** | approved 요약; **deep U1–U5 done** | P-009; Marp; DIL-11 |
 | REF-12 | [12] | Single-trace FI ML-DSA | **있음** | approved 요약; **deep pending** (순서 4) | P-009; Marp; D25 |
 | REF-13 | [13] | DFA AES (Dusart) | **있음** | pending | |

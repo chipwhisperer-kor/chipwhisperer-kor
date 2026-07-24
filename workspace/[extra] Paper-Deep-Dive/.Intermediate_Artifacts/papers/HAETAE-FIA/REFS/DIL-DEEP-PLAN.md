@@ -46,9 +46,13 @@ HAETAE 본문 코어(P-014+)에 들어가기 **전에**, 레퍼런스 **[9]–[1
 | **DIL-11-U4** | Verification-Bypass | **done** |
 | **DIL-11-U5** | [11] 정리 | **done** (slide) |
 | **DIL-09-U1** | ExpandMask · nonce++ skip | **done** (slides) |
-| **DIL-09-U2** | $\Delta z$ · MLWE→RLWE | pending |
+| **DIL-09-U2** | $\Delta z$ · MLWE→RLWE | done partial (slides) |
+| **DIL-10-U1** | Correction 개념 · FIPS Alg7/8 대응 · 공격1 진입 | **approved** · HO-20260724-06 |
+| **DIL-10-U2** | 공격1 심화 (Alg 4.1–4.3·대응) | **approved** · HO-20260724-07 |
+| **DIL-10-U3** | 공격2 ExpandA/ΔA · 격자 512 | **approved** · HO-20260724-08 |
+| **DIL-10-U4** | 실증 Table1·CW · [9]/[11] 대비 | **approved** · HO-20260724-09 |
 
-이후 [9]→[10]→[12] 동일 골격.
+이후 [12] 동일 골격.
 
 ## 5. D23과의 관계
 

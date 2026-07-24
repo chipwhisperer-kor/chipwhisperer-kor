@@ -61,3 +61,6 @@
 | 2026-07-23 | 답변: FIPS NTT(c) 명시 시 슬라이드 추가 → presentation에 「표준: sparse $c$ 이어도 NTT(c)」 1장. FIPS Alg 7 L16–18 |
 | 2026-07-23 | 답변: 1장 과함 → 전용 슬라이드 삭제, Alg 7 NTT 호출 표 하단에 1줄만 유지 |
 | 2026-07-24 | **작업 루트 재동기화** — 답변 칸(상황 파악) 처리 · `HO-20260724-01` done · D40–D48 숙지. sparse-c-NTT 게이트 대기. DIL-10 미착수 |
+| 2026-07-24 | 답변 `승인` → sparse-c-NTT 한 줄 **approved**. `HO-20260723-11` 소비(done) · 자산 hash 일치. **DIL-10-U1** draft (`REFS/DIL-10-U1.md`) G1 대기 |
+| 2026-07-24 | 답변 `승인` → **DIL-10-U1 approved** · producer `HO-20260724-06` ready. **DIL-10-U2** draft (Alg 4.1–4.3·대응) G1 대기 |
+| 2026-07-24 | 답변: **[10] 한정 전체 작업 승인** (+후속 세부교정·Analyst↔Producer 협업) → U2–U4 작성·approved · `HO-20260724-07`–`09` ready · DIL-10 심층 **done** |

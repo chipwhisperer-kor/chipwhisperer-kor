@@ -22,7 +22,7 @@
 | H-M2 인덱스 | done | analyst | 73단위 |
 | H-M3 본문 | blocked | analyst | P-014+, D25 |
 | H-M4 그림 | pending | producer | |
-| H-M5 REF | in_progress | 순차 | [11] done, [9] partial, [10][12] 대기 |
+| H-M5 REF | in_progress | 순차 | [11] done, [9] partial, **[10] deep done**, [12] 대기 |
 | H-M6 Marp | in_progress | producer | 레거시분 |
 | H-M7 교차검증 | pending | 역할별 근거 → **director 판정** | `CROSS_CHECK.md` |
 | H-M8 최종 | pending | 사용자 | director 단계 승인 후 |
@@ -33,10 +33,11 @@
 |------|------|
 | DIL-11 U1–U5 | done (레거시) |
 | DIL-09 U1–U2 | done partial (레거시) |
-| DIL-10 자산 패킷 | done → `HO-20260723-11` ready |
-| sparse-c-NTT 1줄 | **awaiting_approval** (`To_Do_Analyst.md` 1건) |
-| DIL-10 분석 | blocked (NTT 사용자 게이트) |
-| DIL-12 | pending |
+| DIL-10 자산 패킷 | done (`HO-20260723-11` done) |
+| sparse-c-NTT 1줄 | **approved** |
+| DIL-10-U1–U4 | **approved** ([10] 전체 작업 승인) · producer `HO-20260724-06`–`09` ready |
+| DIL-10 분석 | **done** (심층 단위 완료 · 사용자 후속 세부 교정 가능) |
+| DIL-12 | pending (자산 `HO-20260724-04` ready · 다음 착수 후보) |
 
 ### 본문
 
