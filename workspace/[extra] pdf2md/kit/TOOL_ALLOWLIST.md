@@ -28,7 +28,7 @@
 
 ## 버킷 C — 제외
 
-로컬 OCR 전부 · 로컬 NN pdf2md · 대량 비전 전사 · 정규본 자동 merge
+로컬 OCR 전부 · 로컬 NN pdf2md · 대량 비전 전사 · 이미지 AI 분석 · pdfimages/page-render PNG 사이드카 · 정규본 자동 merge
 
 ---
 

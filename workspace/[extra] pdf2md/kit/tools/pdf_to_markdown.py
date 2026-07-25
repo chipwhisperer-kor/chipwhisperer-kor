@@ -23,8 +23,9 @@ from pathlib import Path
 
 XHTML = "http://www.w3.org/1999/xhtml"
 NS = {"x": XHTML}
-VISUAL_RE = re.compile(
-    r"\b(?:Fig(?:ure)?\.?\s*\d+|Table\s+(?:[IVXLCDM]+|\d+)|Algorithm\s+\d+)\b",
+# Figure captions only (pixels omitted by policy). Table / Algorithm are text objects — not figures.
+FIGURE_CAPTION_RE = re.compile(
+    r"^(?:Fig(?:ure)?\.?\s*[\dA-Za-z().-]+|그림\s*[\dA-Za-z().-]+)\b",
     re.IGNORECASE,
 )
 HEADING_RE = re.compile(r"^(?:[IVXLCDM]+\.\s+|\d+(?:\.\d+)+\s+)")
@@ -82,12 +83,18 @@ def tool_version() -> str:
 
 
 def raster_images_by_page(source: Path) -> dict[int, int]:
-    proc = subprocess.run(
-        ["pdfimages", "-list", str(source)],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
+    """Optional diagnostic only — never stores pixels. Missing pdfimages → empty."""
+    try:
+        proc = subprocess.run(
+            ["pdfimages", "-list", str(source)],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError:
+        return {}
+    if proc.returncode != 0:
+        return {}
     counts: dict[int, int] = {}
     for line in proc.stdout.splitlines():
         fields = line.split()
@@ -126,6 +133,14 @@ def pdfinfo_preflight(source: Path) -> dict[str, object]:
     }
 
 
+_XML_ILLEGAL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\ufffe\uffff]")
+
+
+def sanitize_poppler_bbox_xml(raw: str) -> str:
+    """Strip characters illegal in XML 1.0 (Poppler sometimes emits them)."""
+    return _XML_ILLEGAL.sub("", raw)
+
+
 def parse_bbox(source: Path) -> tuple[list[tuple[float, list[Block]]], int, int]:
     with tempfile.TemporaryDirectory(prefix="pdf-md-") as temp_dir:
         bbox_path = Path(temp_dir) / "bbox.html"
@@ -133,7 +148,8 @@ def parse_bbox(source: Path) -> tuple[list[tuple[float, list[Block]]], int, int]
             ["pdftotext", "-bbox-layout", str(source), str(bbox_path)],
             check=True,
         )
-        root = ET.parse(bbox_path).getroot()
+        raw = bbox_path.read_text(encoding="utf-8", errors="replace")
+        root = ET.fromstring(sanitize_poppler_bbox_xml(raw))
 
     pages: list[tuple[float, list[Block]]] = []
     total_words = 0
@@ -263,28 +279,38 @@ def format_source_block(block: Block) -> str:
     return text
 
 
-def page_issues(blocks: list[Block], raster_images: int) -> tuple[list[str], int]:
+def page_issues(blocks: list[Block]) -> tuple[list[str], int]:
+    """Issues that block verification. Figure pixels are omitted by policy — not an issue.
+
+    Table / Algorithm text is preserved via the text layer; they are not treated as figures.
+    Raster counts are diagnostic only (metadata), never conversion issues.
+    """
     text = "\n".join(block.text for block in blocks)
-    visual_labels = sorted(set(VISUAL_RE.findall(text)))
     private_chars = sum(1 for char in text if unicodedata.category(char) == "Co")
     replacement_chars = text.count("\ufffd")
     issues: list[str] = []
-    if visual_labels:
-        issues.append(
-            "VISUAL_NOT_TRANSCRIBED — PDF의 시각 본문을 의미 변환하지 않음; "
-            f"텍스트 표식: {', '.join(visual_labels)}"
-        )
-    if raster_images:
-        issues.append(
-            "RASTER_IMAGE_NOT_TRANSCRIBED — "
-            f"페이지 내 임베디드 래스터 이미지={raster_images}; 시각 내용은 source PDF에만 있음"
-        )
     if private_chars or replacement_chars:
         issues.append(
             "GLYPH_MAPPING — 수식·기호 손상 가능성; "
             f"private-use={private_chars}, replacement={replacement_chars}"
         )
     return issues, private_chars + replacement_chars
+
+
+def format_block_with_figure_policy(block: Block, page_number: int) -> list[str]:
+    """Emit text blocks; for figure captions, keep caption + page cite (no image file)."""
+    formatted = format_source_block(block)
+    lines = [formatted, ""]
+    compact = re.sub(r"\s+", " ", block.text.strip())
+    if FIGURE_CAPTION_RE.match(compact):
+        lines.extend(
+            [
+                f"> [FIGURE omitted — image not stored; caption/text above; "
+                f"cite source PDF page {page_number}]",
+                "",
+            ]
+        )
+    return lines
 
 
 def render_markdown(
@@ -320,7 +346,7 @@ def render_markdown(
     for page_number, (width, raw_blocks) in enumerate(pages, start=1):
         blocks = ordered_blocks(width, raw_blocks)
         page_raster_images = raster_images.get(page_number, 0)
-        issues, glyph_chars = page_issues(blocks, page_raster_images)
+        issues, glyph_chars = page_issues(blocks)
         issue_count += len(issues)
         glyph_issue_chars += glyph_chars
         emitted_block_count += len(blocks)
@@ -331,13 +357,18 @@ def render_markdown(
         for issue in issues:
             body.extend([f"> CONVERSION-ISSUE: {issue}", ""])
         for block in blocks:
-            body.extend([format_source_block(block), ""])
+            body.extend(format_block_with_figure_policy(block, page_number))
         page_summaries.append(
             {
                 "page": page_number,
                 "blocks": len(blocks),
                 "issues": len(issues),
                 "raster_images": page_raster_images,
+                "figure_captions": sum(
+                    1
+                    for b in blocks
+                    if FIGURE_CAPTION_RE.match(re.sub(r"\s+", " ", b.text.strip()))
+                ),
             }
         )
 
@@ -351,6 +382,7 @@ def render_markdown(
     metadata = {
         "converter": "kit/tools/pdf_to_markdown.py",
         "profile": "deterministic-bbox-v1",
+        "figure_policy": "omit-pixels-keep-caption-and-pdf-page",
         "pdftotext": version,
         "pdfinfo_pages": preflight["pages"],
         "converted_at": conversion_date,
@@ -367,6 +399,7 @@ def render_markdown(
         "consumed_source_blocks": consumed_source_blocks,
         "emitted_blocks": emitted_block_count,
         "embedded_raster_images": sum(raster_images.values()),
+        "images_stored": 0,
         "conversion_issues": issue_count,
         "glyph_issue_chars": glyph_issue_chars,
         "verification": verification,
@@ -378,8 +411,12 @@ def render_markdown(
     title = source.stem
     markdown = (
         f"# {title}\n\n"
-        "> 기계적 PDF 파생본입니다. 원문과 최종 인용 기준은 source PDF입니다. "
-        "요약·교정·보완·해석을 포함하지 않습니다.\n\n"
+        "> 기계적 PDF 파생본입니다. **단일 PDF → 단일 MD**. "
+        "그림(픽셀)은 저장하지 않으며, 캡션 등 텍스트 층 내용과 "
+        "페이지 표식(PDF_PAGE) 및 figure-omission 표기로 source PDF 페이지를 가리킵니다. "
+        "표·알고리즘 등 복사 가능 객체는 텍스트로 유지합니다. "
+        "요약·교정·보완·해석·이미지 AI 분석을 포함하지 않습니다. "
+        "최종 인용 기준은 source PDF 페이지입니다.\n\n"
         "<!-- PDF_TO_MARKDOWN_METADATA\n"
         f"{metadata_lines}\n"
         "-->\n\n"

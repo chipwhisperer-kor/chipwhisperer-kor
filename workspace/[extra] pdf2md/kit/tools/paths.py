@@ -51,7 +51,11 @@ def mirror_md_path(source: Path) -> Path:
 
 
 def mirror_asset_dir(source: Path) -> Path:
-    """Sidecar asset directory next to mirrored md (path without .md)."""
+    """Legacy sidecar path next to mirrored md (path without .md).
+
+    Text-only policy does **not** store images here. Kept for purge/cleanup of
+    old visual-assets trees and queue_entry diagnostics only.
+    """
     md = mirror_md_path(source)
     return md.with_suffix("")
 
@@ -78,7 +82,6 @@ def queue_entry(source: Path) -> dict:
         "source": rel,
         "key": pdf_rel_key(source),
         "output_md": md.as_posix(),
-        "asset_dir": mirror_asset_dir(source).as_posix(),
         "md_exists": md.is_file(),
         "bytes": source.stat().st_size if source.is_file() else None,
     }

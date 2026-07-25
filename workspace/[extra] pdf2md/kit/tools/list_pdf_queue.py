@@ -77,7 +77,7 @@ def main() -> None:
     for e in show:
         flag = "DONE" if e["md_exists"] else "PENDING"
         print(f"[{flag}] {e['source']}")
-        print(f"        -> {e['output_md']}")
+        print(f"        -> {e['output_md']}")  # text-only: single MD, no image sidecar
 
 
 if __name__ == "__main__":

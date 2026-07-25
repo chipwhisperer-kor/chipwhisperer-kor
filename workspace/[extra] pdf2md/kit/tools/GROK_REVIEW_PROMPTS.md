@@ -39,7 +39,8 @@
 할 일:
 1) 읽기 순서(2단 열), 잘린 문장, 표·수식·캡션 누락·손상 가능성이 있는 곳만 나열한다.
 2) 각 항목을 CONVERSION-ISSUE 후보 형식으로 쓴다:
-   - page, kind (ORDER|TABLE|EQUATION|VISUAL|GLYPH|OTHER), detail, confidence (low|med|high)
+   - page, kind (ORDER|TABLE|EQUATION|FIGURE_CAPTION|GLYPH|OTHER), detail, confidence (low|med|high)
+     (FIGURE_CAPTION = 캡션/교차참조 텍스트 문제; 픽셀 추출 권고 금지)
 3) 본문 Markdown 전체를 다시 쓰지 마라. 이슈 목록만.
 4) “고친 최종본”을 제시하지 마라.
 ```
@@ -61,7 +62,7 @@
 1) draft와 PDF를 대조해 불일치(숫자, 표 셀, 수식, 문단 순서, 캡션)만 지적한다.
 2) 표는 Markdown 표 초안, 수식은 LaTeX 초안을 **PDF에 보이는 내용만** 제안할 수 있다.
 3) PDF에 없는 설명·각주·해석을 추가하지 마라.
-4) 그림/그래프는 재서술하지 말고 “시각 자산 추출·링크 유지”만 권고한다.
+4) 그림/그래프 픽셀은 다루지 않는다. 캡션·본문 교차참조를 유지하고 출처는 source PDF 페이지로 남긴다. 이미지 AI 분석·비전 전사를 하지 마라.
 5) 마지막에 checklist:
    - [ ] 숫자·단위 대조
    - [ ] 표 행·열

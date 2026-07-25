@@ -17,8 +17,7 @@ Papers_pdf/
    `README.md`, `.csv`, 기타 비PDF는 **배제**한다 (토큰·컨텍스트 낭비 방지).
 2. 원본 PDF는 source of record다. 교체·삭제하지 않는다.
 3. 패키지 루트 **상대경로**만 사용한다. 호스트 절대경로 금지.
-4. 변환 미러: `Papers_pdf/<rel>.pdf` → `Papers_md/<rel>.md`  
-   시각 자산 폴더: `Papers_md/<rel>/` (필요 시).
+4. 변환 미러: `Papers_pdf/<rel>.pdf` → `Papers_md/<rel>.md` (**단일 PDF → 단일 MD**, 이미지 사이드카 없음).
 5. 큐 목록: `python3 kit/tools/list_pdf_queue.py`  
    미변환만: `python3 kit/tools/list_pdf_queue.py --pending-only`
 6. 참고문헌 묶음 메모(사람용): `kit/REF_FOLDERS.md`

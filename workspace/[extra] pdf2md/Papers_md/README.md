@@ -5,8 +5,7 @@
 
 ```text
 Papers_md/
-  <rel>.md                 # Papers_pdf/<rel>.pdf 와 1:1 미러
-  <rel>/                   # 해당 논문 시각 자산·MANIFEST (필요 시)
+  <rel>.md                 # Papers_pdf/<rel>.pdf 와 1:1 미러 (유일한 산출물)
 ```
 
 예:
@@ -19,7 +18,9 @@ Papers_md/
 ## 규칙
 
 1. PDF가 아닌 파일은 여기에 “원본”으로 두지 않는다. 변환 대상은 오직 `Papers_pdf/**/*.pdf`.
-2. 이미지 링크는 MD 기준 상대경로: 자산이 `Papers_md/<rel>/file.png`이면 링크는 그에 맞게.
-3. 최종 인용은 항상 대응 **source PDF 페이지** (`kit/PDF_TO_MARKDOWN.md`).
-4. 리서치 갭 분석 시 **`Papers_md`의 `.md` (및 명시적으로 첨부한 자산)** 만 컨텍스트에 넣고, `Papers_pdf` 안의 README·비PDF·미변환 잡파일은 넣지 않는다.
-5. 규격: `kit/PDF_TO_MARKDOWN.md`
+2. **단일 PDF → 단일 MD.** 이미지 사이드카 디렉터리(`Papers_md/<rel>/*.png`)를 두지 않는다.
+3. **그림:** 픽셀을 저장하지 않는다. 캡션·본문 언급 등 텍스트와 source PDF **페이지** 표기만 유지한다. 이미지 AI 분석 금지.
+4. **표·알고리즘:** 그림이 아니다. 텍스트 층 내용을 최선을 다해 유지한다.
+5. 최종 인용은 항상 대응 **source PDF 페이지** (`kit/PDF_TO_MARKDOWN.md`).
+6. 리서치 갭 분석 시 **`Papers_md`의 `.md`만** 컨텍스트에 넣고, `Papers_pdf` 안의 README·비PDF·미변환 잡파일은 넣지 않는다.
+7. 규격: `kit/PDF_TO_MARKDOWN.md`
