@@ -1,0 +1,7 @@
+# TVLA Python port — minimal deps only (KISS).
+# h5py   : read full trace groups from HDF5 into RAM
+# numpy  : sums, Welch t-statistic
+# matplotlib : optional plot in run_tvla.py
+h5py>=3.10
+numpy>=1.26
+matplotlib>=3.8
