@@ -1,7 +1,7 @@
 # ----------------------------------------------------------------------------
 # ChipWhisperer 개발 환경 이미지
 #
-# 이 이미지는 ChipWhisperer(부채널/오류주입 분석) 작업을 위한 Python 3.9 기반
+# 이 이미지는 ChipWhisperer(부채널/오류주입 분석) 작업을 위한 Python 3.12 기반
 # 개발 환경이며, 아래 두 가지 방식으로 동시에 접속하여 개발할 수 있습니다.
 #
 #   1) 웹브라우저 접속
@@ -19,7 +19,15 @@
 # USB로 연결된 ChipWhisperer 하드웨어에 접근하기 위해 컨테이너는 root로 동작하며,
 # 실행 시 privileged 권한과 USB 장치 매핑(/dev/bus/usb)이 필요합니다.
 # ----------------------------------------------------------------------------
-FROM python:3.9-bookworm
+# 파이썬 버전은 3.12 가 상한이다. chipwhisperer 6.0.0 이 numpy<=1.26.4 를 요구하는데
+# numpy 1.26.4 에는 cp313 휠이 없어서, 3.13 이상에서는 설치 자체가 성립하지 않는다.
+# (3.9 는 2025-10 EOL. setuptools 는 83 부터 3.10+ 를 요구하는 등 생태계가 이미 이탈했다.)
+#
+# 3.12 에서 stdlib distutils 가 제거된 것은 이 이미지에 영향이 없다. 런타임에 distutils
+# 를 쓰는 곳은 unicorn 의 파이썬 2 전용 모듈뿐이라 py3 에서는 로드되지 않고, sdist 를
+# 컴파일해야 하는 패키지는 fastdtw 하나인데 확장 빌드가 실패하면 순수 파이썬으로
+# 자동 폴백한다. 아래 build-essential 은 그 폴백 이전 단계를 위해 유지한다.
+FROM python:3.12-bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PIP_NO_CACHE_DIR=1 \

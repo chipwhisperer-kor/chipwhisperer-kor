@@ -1,3 +1,6 @@
+# 버전 제약이 붙은 줄에만 그 이유를 적는다. 나머지는 미지정이며,
+# 실제로 설치된 조합은 같은 폴더의 requirements.lock 에 기록된다.
+
 chipwhisperer
 ipykernel
 notebook
@@ -19,7 +22,16 @@ Cython
 ECPy
 fastdtw
 libusb1
+
+# numpy 는 여기서 고정하지 않는다. chipwhisperer 6.0.0 이 자기 메타데이터로
+# numpy<=1.26.4 를 요구하므로 pip 가 알아서 1.26.4 를 고른다 (최신은 2.x).
+# 같은 제약을 여기 또 적으면 정의가 두 곳이 되고, chipwhisperer 가 numpy 2 를
+# 지원하게 됐을 때 이 줄이 그것을 막는 걸림돌이 된다.
+#
+# 참고: 이 상한이 곧 파이썬 상한이다. numpy 1.26.4 에는 cp313 휠이 없어서
+# 3.13 이상에서는 설치가 성립하지 않는다.
 numpy
+
 pyserial
 bokeh
 jupyter_bokeh
@@ -29,7 +41,29 @@ nbparameterise
 holoviews
 phoenixAES
 pyusb
-setuptools
+
+# setuptools 82.0.0 에서 pkg_resources 가 삭제됐는데, chipwhisperer 6.0.0 은
+# capture/trace/TraceWhisperer.py 에서 그것을 import 한다. 이 모듈은 `import
+# chipwhisperer` 만으로 함께 로드되므로, 82 이상이 깔리면 TraceWhisperer 를 쓰지
+# 않는 노트북까지 전부 첫 줄에서 죽는다.
+#
+# python:3.9 이미지는 setuptools 를 기본 탑재(79.0.1)해서 이 줄이 "already satisfied"
+# 로 무시됐지만, python:3.12 이미지는 setuptools 를 탑재하지 않으므로 이제 이 줄이
+# 실제 설치 버전을 결정한다. 상한을 푸는 조건은 chipwhisperer 가 pkg_resources 를
+# importlib.resources 로 옮기는 것이다 (unicorn 은 이미 그렇게 했다).
+#
+# 이 저장소에서 버전을 고정하는 유일한 패키지다. 나머지는 최신을 따라간다.
+#
+# 알아둘 부작용: 80.0 부터는 pkg_resources import 시 UserWarning 을 띄우고 이는 기본
+# 필터에서도 보이므로, 노트북 첫 셀에 영문 경고가 한 번 찍힌다 (동작에는 문제 없음).
+# 경고까지 없애려면 setuptools==79.0.1 로 낮추면 되지만, 그만큼 최신에서 멀어진다.
+setuptools<82
+
 lief
 unicorn
 capstone
+
+# SCALib. 3.9 시절에는 0.6.1+ 가 Python 3.10 을 요구해서 0.6.0 이 강제였지만,
+# 3.12 에서는 그 제약이 없으므로 고정하지 않는다.
+# 이전에는 노트북 셀의 %pip 로만 설치돼 rebuild 하면 사라졌다. 정의를 여기 한 곳에 둔다.
+scalib

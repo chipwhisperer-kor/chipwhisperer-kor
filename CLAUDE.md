@@ -12,7 +12,9 @@ ChipWhisperer 기반 부채널 분석(SCA)·오류주입(FA)을 가르치기 위
 
 ## 실행 모델 — 모든 것은 컨테이너 안에서 돈다
 
-개발은 VMware **Ubuntu 게스트**에서 이뤄진다 (문서에서 "host"는 물리 PC가 아니라 이 게스트 = Docker 호스트를 가리킨다). `setup/docker-compose.yml`은 `workspace/`를 컨테이너의 `/workspace`에 bind-mount하고 `privileged` + `/dev/bus/usb` 매핑으로 ChipWhisperer 하드웨어에 접근한다. 노트북 실행과 펌웨어 빌드는 **컨테이너 안에서** 하는 것을 전제로 한다 — Python 3.9, `chipwhisperer`, `gcc-arm-none-eabi`, `gcc-avr`는 컨테이너에만 있고 호스트에는 보통 없다.
+개발은 VMware **Ubuntu 게스트**에서 이뤄진다 (문서에서 "host"는 물리 PC가 아니라 이 게스트 = Docker 호스트를 가리킨다). `setup/docker-compose.yml`은 `workspace/`를 컨테이너의 `/workspace`에 bind-mount하고 `privileged` + `/dev/bus/usb` 매핑으로 ChipWhisperer 하드웨어에 접근한다. 노트북 실행과 펌웨어 빌드는 **컨테이너 안에서** 하는 것을 전제로 한다 — Python 3.12, `chipwhisperer`, `gcc-arm-none-eabi`, `gcc-avr`는 컨테이너에만 있고 호스트에는 보통 없다.
+
+파이썬 버전은 3.12가 상한이다. chipwhisperer 6.0.0이 `numpy<=1.26.4`를 요구하는데 numpy 1.26.4에는 cp313 휠이 없다. 또한 chipwhisperer가 `capture/trace/TraceWhisperer.py`에서 `pkg_resources`를 import하고 이 모듈은 `import chipwhisperer`만으로 로드되므로, `setuptools<82` 핀(pkg_resources는 82.0.0에서 삭제됨)이 필수다. 두 제약 모두 `setup/cw-build/requirements.txt`에 이유와 함께 적혀 있다.
 
 ```bash
 cd setup/
@@ -73,7 +75,7 @@ make PLATFORM=CW308_STM32F3 CRYPTO_TARGET=NONE SS_VER=SS_VER_2_1
 - **`[extra] Paper-Deep-Dive/`** — **자체 `CLAUDE.md`·`AGENTS.md`·`PROMPT.md`가 있고, 그 디렉터리 안에서는 이 파일보다 우선한다.** 역할별 단독 쓰기 소유가 엄격한 4역할 문서 파이프라인이며, Claude는 `director` 역할에 바인딩되어 `Papers/**`, `.Intermediate_Artifacts/papers/**`, `Presentation_Marp/**`에 쓰면 안 된다. 사본이 여러 개 존재하고 낡은 사본도 안에서 보면 구별되지 않으므로 `.Intermediate_Artifacts/SYNC.md`를 제일 먼저 확인한다.
 - **`[extra] pdf2md/`** — 논문 PDF 아카이브 → Markdown → 리서치 갭 파이프라인. 그 프로젝트 루트에서 실행: `python3 kit/tools/list_pdf_queue.py --pending-only`, `pdf_to_markdown.py`, `run_candidates.py`, `diff_candidates.py`, `curate_to_verified.py`. 설계상 **텍스트 전용** — OCR도, 이미지 추출도 하지 않는다. 규격은 `kit/PDF_TO_MARKDOWN.md`, 허용 도구는 `kit/TOOL_ALLOWLIST.md`.
 - **`[extra] PRE-SCA/`** — ARM 펌웨어(tiny-AES)를 Unicorn/Capstone으로 에뮬레이션하는 pre-silicon SCA/FI 실험. 하드웨어가 필요 없는 유일한 프로젝트다. `[naive] PRE-SCA/`는 스크립트 버전으로 `python3 main.py`(또는 N회 반복 `./run_main.sh <N>`)로 실행하며, 설정은 전부 `config.py`에 있다. `config.py`는 자기 snake_case 변수명이 `elfParser`·`emul`·`logger`에서 이름으로 참조되니 리팩터링 시 바꾸지 말라고 경고한다. 노트북 결과는 `nb_output/`에 쌓인다.
-- **`[extra] TVLA/`** — tiny-AES-c 빌드를 대상으로 한 SCALib 기반 TVLA(누출 평가) 실험. 빌드 산출물이 함께 들어 있고 재구성이 진행 중이므로 경로가 고정이라고 가정하기 전에 `git status`를 확인한다.
+- **`[extra] SCALib/`** — SCALib 0.6.4의 기능을 **기능 하나당 노트북 하나**로 보이는 예제 모음(SNR·Quantizer·Ttest·MTtest·CPA·LDA·MultiLDA·RLDA·SASCA·KeyRank). tiny-AES-c AES-128을 CW308+STM32F3에서 돌려 **실측한 파형**을 쓴다. **하드웨어가 필요한 노트북은 `0.0.Dataset_Collect.ipynb` 하나뿐**이고, 그것이 만든 `traces/scalib_dataset.h5`를 나머지 10개가 읽는다(그 파일은 GB 단위라 커밋하지 않는다). 파형 길이는 상수가 아니라 `scope.adc.trig_count`로 정해 AES 연산 전체(키 스케줄+10라운드)를 담는다. AES 상수와 데이터셋 로더는 `scalib_common.py` 한 곳에만 정의되어 있다.
 - **`[extra] Presentation_Marp/`** — Marp 발표자료. `0. Template/presentation.md`가 템플릿이자 문법 레퍼런스다(`marp: true`, `size: "16:9"`, `lang: ko`, `math: mathjax`; 클래스 `lead`, `divider`, `small`, `tiny`, `code-small`, `code-tiny`). `marp` 바이너리는 설치되어 있지 않다 — 슬라이드는 에디터 확장에서 미리보기만 하며 여기서 빌드하지 않는다.
 
 ## 실무 메모

@@ -1,0 +1,2 @@
+# scalib_common.py 를 import 하면 생긴다. 인터프리터 버전에 묶이므로 추적하지 않는다.
+__pycache__/

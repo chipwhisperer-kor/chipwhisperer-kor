@@ -10,7 +10,7 @@ ChipWhisperer 한국어 튜토리얼 & Docker 개발 환경
 <br/>
 
 ![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)
-![Python](https://img.shields.io/badge/Python-3.9-3776AB?logo=python&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
 ![VS Code](https://img.shields.io/badge/VS_Code-code--server%20%C2%B7%20Dev%20Containers-007ACC?logo=visualstudiocode&logoColor=white)
 ![ChipWhisperer](https://img.shields.io/badge/ChipWhisperer-SCA%20%C2%B7%20FI-4B0082)
@@ -60,7 +60,7 @@ ChipWhisperer 한국어 튜토리얼 & Docker 개발 환경
 | 구성 요소 | 설명 |
 |-----------|------|
 | 🇰🇷 **한국어 튜토리얼** | SCA·FA·TraceWhisperer·Husky 와이어태핑 등 단계별 Jupyter 노트북 |
-| 🐳 **Docker 환경** | Python 3.9 + ChipWhisperer + Jupyter + code-server 일괄 제공 |
+| 🐳 **Docker 환경** | Python 3.12 + ChipWhisperer + Jupyter + code-server 일괄 제공 |
 | 🔧 **펌웨어·HAL** | `workspace/base/` — STM32F3, XMEGA, AVR 등 타겟 보드 빌드 자료 |
 | 📊 **발표 자료** | `[extra] Presentation_Marp/` — Marp 슬라이드 발표 자료 |
 | 🔬 **연구 프로젝트** | `[extra] PRE-SCA/` — Unicorn 에뮬레이션 기반 사전(pre-silicon) 분석 실험 |
