@@ -221,25 +221,25 @@
  202              	.Letext0:
 DEFINED SYMBOLS
                             *ABS*:00000000 hal.c
-     /tmp/cczQA5LL.s:19     .text.led_ok:00000000 $t
-     /tmp/cczQA5LL.s:25     .text.led_ok:00000000 led_ok
-     /tmp/cczQA5LL.s:39     .text.led_error:00000000 $t
-     /tmp/cczQA5LL.s:45     .text.led_error:00000000 led_error
-     /tmp/cczQA5LL.s:57     .text._close:00000000 $t
-     /tmp/cczQA5LL.s:63     .text._close:00000000 _close
-     /tmp/cczQA5LL.s:76     .text._fstat:00000000 $t
-     /tmp/cczQA5LL.s:82     .text._fstat:00000000 _fstat
-     /tmp/cczQA5LL.s:94     .text._getpid:00000000 $t
-     /tmp/cczQA5LL.s:100    .text._getpid:00000000 _getpid
-     /tmp/cczQA5LL.s:112    .text._isatty:00000000 $t
-     /tmp/cczQA5LL.s:118    .text._isatty:00000000 _isatty
-     /tmp/cczQA5LL.s:130    .text._kill:00000000 $t
-     /tmp/cczQA5LL.s:136    .text._kill:00000000 _kill
-     /tmp/cczQA5LL.s:148    .text._lseek:00000000 $t
-     /tmp/cczQA5LL.s:154    .text._lseek:00000000 _lseek
-     /tmp/cczQA5LL.s:166    .text._read:00000000 $t
-     /tmp/cczQA5LL.s:172    .text._read:00000000 _read
-     /tmp/cczQA5LL.s:184    .text._write:00000000 $t
-     /tmp/cczQA5LL.s:190    .text._write:00000000 _write
+     /tmp/ccysuvtU.s:19     .text.led_ok:00000000 $t
+     /tmp/ccysuvtU.s:25     .text.led_ok:00000000 led_ok
+     /tmp/ccysuvtU.s:39     .text.led_error:00000000 $t
+     /tmp/ccysuvtU.s:45     .text.led_error:00000000 led_error
+     /tmp/ccysuvtU.s:57     .text._close:00000000 $t
+     /tmp/ccysuvtU.s:63     .text._close:00000000 _close
+     /tmp/ccysuvtU.s:76     .text._fstat:00000000 $t
+     /tmp/ccysuvtU.s:82     .text._fstat:00000000 _fstat
+     /tmp/ccysuvtU.s:94     .text._getpid:00000000 $t
+     /tmp/ccysuvtU.s:100    .text._getpid:00000000 _getpid
+     /tmp/ccysuvtU.s:112    .text._isatty:00000000 $t
+     /tmp/ccysuvtU.s:118    .text._isatty:00000000 _isatty
+     /tmp/ccysuvtU.s:130    .text._kill:00000000 $t
+     /tmp/ccysuvtU.s:136    .text._kill:00000000 _kill
+     /tmp/ccysuvtU.s:148    .text._lseek:00000000 $t
+     /tmp/ccysuvtU.s:154    .text._lseek:00000000 _lseek
+     /tmp/ccysuvtU.s:166    .text._read:00000000 $t
+     /tmp/ccysuvtU.s:172    .text._read:00000000 _read
+     /tmp/ccysuvtU.s:184    .text._write:00000000 $t
+     /tmp/ccysuvtU.s:190    .text._write:00000000 _write
 
 NO UNDEFINED SYMBOLS

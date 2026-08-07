@@ -690,29 +690,29 @@
  470              		.file 7 "<built-in>"
 DEFINED SYMBOLS
                             *ABS*:00000000 simpleserial-base.c
-     /tmp/cckaYVtG.s:19     .text.my_init:00000000 $t
-     /tmp/cckaYVtG.s:25     .text.my_init:00000000 my_init
-     /tmp/cckaYVtG.s:159    .text.my_init:00000068 $d
-     /tmp/cckaYVtG.s:165    .text.my_update:00000000 $t
-     /tmp/cckaYVtG.s:171    .text.my_update:00000000 my_update
-     /tmp/cckaYVtG.s:228    .text.my_update:00000038 $d
-     /tmp/cckaYVtG.s:233    .text.my_final:00000000 $t
-     /tmp/cckaYVtG.s:239    .text.my_final:00000000 my_final
-     /tmp/cckaYVtG.s:288    .text.my_final:0000001c $d
-     /tmp/cckaYVtG.s:293    .text.get_key:00000000 $t
-     /tmp/cckaYVtG.s:299    .text.get_key:00000000 get_key
-     /tmp/cckaYVtG.s:317    .text.get_pt:00000000 $t
-     /tmp/cckaYVtG.s:323    .text.get_pt:00000000 get_pt
-     /tmp/cckaYVtG.s:356    .text.reset:00000000 $t
-     /tmp/cckaYVtG.s:362    .text.reset:00000000 reset
-     /tmp/cckaYVtG.s:375    .text.startup.main:00000000 $t
-     /tmp/cckaYVtG.s:381    .text.startup.main:00000000 main
-     /tmp/cckaYVtG.s:435    .text.startup.main:00000038 $d
-     /tmp/cckaYVtG.s:461    .bss:000002df global_len
-     /tmp/cckaYVtG.s:457    .bss:000001ea global_ret
-     /tmp/cckaYVtG.s:453    .bss:000000f5 global_p
-     /tmp/cckaYVtG.s:449    .bss:00000000 global_k
-     /tmp/cckaYVtG.s:450    .bss:00000000 $d
+     /tmp/cc5UrhmS.s:19     .text.my_init:00000000 $t
+     /tmp/cc5UrhmS.s:25     .text.my_init:00000000 my_init
+     /tmp/cc5UrhmS.s:159    .text.my_init:00000068 $d
+     /tmp/cc5UrhmS.s:165    .text.my_update:00000000 $t
+     /tmp/cc5UrhmS.s:171    .text.my_update:00000000 my_update
+     /tmp/cc5UrhmS.s:228    .text.my_update:00000038 $d
+     /tmp/cc5UrhmS.s:233    .text.my_final:00000000 $t
+     /tmp/cc5UrhmS.s:239    .text.my_final:00000000 my_final
+     /tmp/cc5UrhmS.s:288    .text.my_final:0000001c $d
+     /tmp/cc5UrhmS.s:293    .text.get_key:00000000 $t
+     /tmp/cc5UrhmS.s:299    .text.get_key:00000000 get_key
+     /tmp/cc5UrhmS.s:317    .text.get_pt:00000000 $t
+     /tmp/cc5UrhmS.s:323    .text.get_pt:00000000 get_pt
+     /tmp/cc5UrhmS.s:356    .text.reset:00000000 $t
+     /tmp/cc5UrhmS.s:362    .text.reset:00000000 reset
+     /tmp/cc5UrhmS.s:375    .text.startup.main:00000000 $t
+     /tmp/cc5UrhmS.s:381    .text.startup.main:00000000 main
+     /tmp/cc5UrhmS.s:435    .text.startup.main:00000038 $d
+     /tmp/cc5UrhmS.s:461    .bss:000002df global_len
+     /tmp/cc5UrhmS.s:457    .bss:000001ea global_ret
+     /tmp/cc5UrhmS.s:453    .bss:000000f5 global_p
+     /tmp/cc5UrhmS.s:449    .bss:00000000 global_k
+     /tmp/cc5UrhmS.s:450    .bss:00000000 $d
 
 UNDEFINED SYMBOLS
 simpleserial_put
