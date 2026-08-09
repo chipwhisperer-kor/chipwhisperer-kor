@@ -64,6 +64,22 @@ ChipWhisperer 한국어 튜토리얼 & Docker 개발 환경
 | 🔧 **펌웨어·HAL** | `workspace/base/` — STM32F3, XMEGA, AVR 등 타겟 보드 빌드 자료 |
 | 📊 **발표 자료** | `[extra] Presentation_Marp/` — Marp 슬라이드 발표 자료 |
 | 🔬 **연구 프로젝트** | `[extra] PRE-SCA/` — Unicorn 에뮬레이션 기반 사전(pre-silicon) 분석 실험 |
+| 📐 **데이터셋 규약** | `GLOSSARY.md`·`SCHEMA.md` — 부채널 용어와 파형 데이터셋 스키마 (아래 참고) |
+
+### 📐 용어와 데이터셋 규약
+
+이 저장소가 만드는 파형 데이터셋은 모두 같은 규약을 따릅니다. 부채널 분야에는 아직 공표된
+표준 데이터셋 스키마가 없어, [OPTIMIST](https://optimist-ose.org/) 워크숍의 용어·평가 기준과
+ISO/IEC 17825:2024 의 시험 요건을 근거로 직접 정의했습니다.
+
+| 문서 | 내용 |
+|------|------|
+| [`GLOSSARY.md`](GLOSSARY.md) | 용어 정본. OPTIMIST·ISO/IEC 17825 용어와 이 저장소가 정한 용어를 출처별로 구분해 정의합니다. **정의는 영문**(원문 뉘앙스 보존), 표제는 `English(한글)` 병기 |
+| [`SCHEMA.md`](SCHEMA.md) | 파형 데이터셋 HDF5 스키마. 레이아웃·필수 메타데이터·명명 규약과 **각 필드가 왜 필요한지의 근거** |
+
+핵심만 보면: HDF5 파일 하나가 데이터셋 한 벌이고, 측정 조건은 루트 attrs 에,
+데이터는 `/<subset>/` 아래 `trace`·`key`·`plaintext`·`ciphertext` 배열로 들어갑니다.
+준수 여부는 `scalib_common.validate_dataset()` 으로 검사할 수 있습니다.
 
 ### 🗺 아키텍처 한눈에 보기
 

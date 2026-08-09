@@ -66,20 +66,41 @@ make PLATFORM=CW308_STM32F3 CRYPTO_TARGET=NONE SS_VER=SS_VER_2_1
 
 ## 파형 저장
 
-수집 결과는 `workspace/traces/*.h5`(`h5py` HDF5)에 저장된다. 캡처 루프가 확장할 수 있도록 `maxshape=(None, ...)`로 만든 행 정렬 데이터셋 4개를 쓴다: `i_k`(키), `i_p`(평문), `o`(타겟 출력), `t`(파형 샘플). 시각화는 matplotlib이 아니라 `output_notebook()`을 쓰는 Bokeh다. 파형 파일은 용량이 크므로 요청받지 않는 한 커밋에 넣지 않는다.
+**모든 파형 데이터셋은 저장소 루트의 `SCHEMA.md`를 따른다.** 용어는 `GLOSSARY.md`가 정본이며, 새 문서·주석·설명을 쓸 때 그 용어를 그대로 쓴다(정의는 영문, 파생 문서는 한글).
+
+핵심만 요약하면: HDF5 파일 하나가 Dataset 한 벌(Target 1개 × Channel 1개)이고, 측정 조건은 **루트 HDF5 attrs**에, 실제 데이터는 `/<subset>/` 아래 행 정렬 배열 `trace`·`key`·`plaintext`·`ciphertext`(+선택 `mask`)로 둔다. subset 이름은 자유지만 `role`은 `SCHEMA.md` §4.1 목록에서 고른다. 캡처 루프가 확장할 수 있도록 `maxshape=(None, ...)`로 만든다.
+
+주의할 함정 두 가지: OPTIMIST의 **Attributes**(`trace` 등)는 HDF5에서 *배열*로, OPTIMIST의 **Metadata**는 HDF5 *attrs*로 저장되어 이름이 엇갈린다(`GLOSSARY.md` §6). 그리고 **모르는 메타데이터는 추정치로 채우지 않는다** — 비워 두고 검증기가 "부분 준수"로 보고하게 둔다(`SCHEMA.md` §5.3).
+
+준수 여부는 `scalib_common.validate_dataset(target=…)` 또는 `validate_dataset(path=…)`로 검사한다. 수집 직후 자동 호출된다.
+
+시각화는 matplotlib이 아니라 `output_notebook()`을 쓰는 Bokeh다. 파형 파일은 용량이 크므로 요청받지 않는 한 커밋에 넣지 않는다.
+
+현재 상태: `[extra] SCALib`의 h5 2개는 **완전 준수**, 튜토리얼 `workspace/traces/*.h5`는 스키마 제정 이전 수집분이라 **부분 준수**(복원 불가능한 측정 조건 4개 누락).
 
 ## `[extra]` 프로젝트 — 각자가 자기 규칙을 갖는다
 
 `[extra]` 접두사가 붙은 디렉터리는 공식 튜토리얼 경로와 무관한 연구·부속 프로젝트다. 각각 자기완결적으로 작성되어 있으므로 손대기 전에 그 프로젝트의 README를 먼저 읽고, 경로는 **그 프로젝트 루트 기준 상대경로**로 유지한다(여러 프로젝트가 호스트 절대경로를 명시적으로 금지한다).
 
 - **`[extra] Paper-Deep-Dive/`** — **자체 `CLAUDE.md`·`AGENTS.md`·`PROMPT.md`가 있고, 그 디렉터리 안에서는 이 파일보다 우선한다.** 역할별 단독 쓰기 소유가 엄격한 4역할 문서 파이프라인이며, Claude는 `director` 역할에 바인딩되어 `Papers/**`, `.Intermediate_Artifacts/papers/**`, `Presentation_Marp/**`에 쓰면 안 된다. 사본이 여러 개 존재하고 낡은 사본도 안에서 보면 구별되지 않으므로 `.Intermediate_Artifacts/SYNC.md`를 제일 먼저 확인한다.
-- **`[extra] pdf2md/`** — 논문 PDF 아카이브 → Markdown → 리서치 갭 파이프라인. 그 프로젝트 루트에서 실행: `python3 kit/tools/list_pdf_queue.py --pending-only`, `pdf_to_markdown.py`, `run_candidates.py`, `diff_candidates.py`, `curate_to_verified.py`. 설계상 **텍스트 전용** — OCR도, 이미지 추출도 하지 않는다. 규격은 `kit/PDF_TO_MARKDOWN.md`, 허용 도구는 `kit/TOOL_ALLOWLIST.md`.
 - **`[extra] PRE-SCA/`** — ARM 펌웨어(tiny-AES)를 Unicorn/Capstone으로 에뮬레이션하는 pre-silicon SCA/FI 실험. 하드웨어가 필요 없는 유일한 프로젝트다. `[naive] PRE-SCA/`는 스크립트 버전으로 `python3 main.py`(또는 N회 반복 `./run_main.sh <N>`)로 실행하며, 설정은 전부 `config.py`에 있다. `config.py`는 자기 snake_case 변수명이 `elfParser`·`emul`·`logger`에서 이름으로 참조되니 리팩터링 시 바꾸지 말라고 경고한다. 노트북 결과는 `nb_output/`에 쌓인다.
-- **`[extra] SCALib/`** — SCALib 0.6.4의 기능을 **기능 하나당 노트북 하나**로 보이는 예제 모음(SNR·Quantizer·Ttest·MTtest·CPA·LDA·MultiLDA·RLDA·SASCA·KeyRank). tiny-AES-c AES-128을 CW308+STM32F3에서 돌려 **실측한 파형**을 쓴다. **하드웨어가 필요한 노트북은 `0.0.Dataset_Collect.ipynb` 하나뿐**이고, 그것이 만든 `traces/scalib_dataset.h5`를 나머지 10개가 읽는다(그 파일은 GB 단위라 커밋하지 않는다). 파형 길이는 상수가 아니라 `scope.adc.trig_count`로 정해 AES 연산 전체(키 스케줄+10라운드)를 담는다. AES 상수와 데이터셋 로더는 `scalib_common.py` 한 곳에만 정의되어 있다.
+- **`[extra] SCALib/`** — SCALib 0.6.4의 기능을 **기능 하나당 노트북 하나**로 보이되, **Normal AES(`tiny-AES-c`) ∥ Masked AES(`masked-aes-c`) 이중 타겟**을 단계마다 나란히 비교하는 예제 모음(SNR·Quantizer·Ttest·MTtest·CPA·LDA·MultiLDA·RLDA·SASCA·KeyRank). CW308+STM32F3에서 **실측한 파형**을 쓴다. **하드웨어가 필요한 노트북은 `0.0.Dataset_Collect_tiny-AES-c.ipynb`와 `0.1.Dataset_Collect_masked-aes-c.ipynb` 둘**이고, 그것이 만든 `traces/scalib_dataset_{tiny-AES-c,masked-aes-c}.h5`를 분석 노트북 10개가 읽는다(GB 단위라 커밋하지 않는다). 파형 길이는 상수가 아니라 `scope.adc.trig_count`로 정해 AES 연산 전체(키 스케줄+10라운드)를 담는다.
+
+  경로·타겟 레지스트리·AES 상수·데이터셋 로더는 `scalib_common.py`(`TARGETS`, `load_group(target=…)`, `group_len`) 한 곳에만, 수집 공용 로직은 `dataset_collect_lib.py` 한 곳에만 있다. **분석 로직은 노트북이 직접 보여 준다** — 교육 목적이라 공용 모듈로 빼지 않는다.
+
+  수집 중 캡처는 반드시 `Bench.capture()`(`dataset_collect_lib.py`)로 한다. 장시간 수집은 USB 단절과 Husky 먹통으로 깨지므로 단순 재시도 3회 → 재연결 2회 → **Husky 펌웨어 재기록 1회** 순으로 스스로 복구하고, 복구 뒤 측정 설정과 마스크 시드를 되돌린다. 사람이 다시 눌러 줄 필요가 없어야 한다. Husky 펌웨어 손상은 **버전을 정상값으로 보고하면서** `cw.scope()` 만 `Unknown hwInfoVer` 로 실패하는 형태로 나타나며, USB 전원 차단이나 물리적 재삽입으로는 낫지 않고 재기록만 듣는다.
+
+  이 서브프로젝트 고유의 세 가지 규칙:
+  1. **관점 분리** — Masked h5에는 연구용 마스크 `mask (n,10)`이 들어 있다. **공격자 관점 셀은 절대 `mask`를 참조하지 않는다.** 쓰는 절은 "연구자" 로 제목을 분리한다.
+  2. **비교는 암호화 구간에서만** — `masked-aes-c`는 `CipherMasked`만 보호하고 `KeyExpansion`은 벤더 원본 비마스킹인데, 펌웨어가 키 스케줄을 트리거 안에서 돌린다. 전 구간 비교는 이 공통 누설에 지배된다(전 구간 TVLA `|t|`가 Normal 114 / Masked 116으로 차이가 없어 보인다). `1.0`이 평문 의존 누설 시작점 `enc_start`를 실측해 `nb_output/poi_*.npz`에 저장하고 `2.0`–`6.0`이 그 이후만 본다.
+  3. **장수는 목표치가 아니라 실보유량** — `N_PROFILING` 같은 상수는 수집 목표다. 분석은 `group_len()`으로 실제 장수를 읽고, 타겟 간 비교는 양쪽을 같은 예산으로 맞춘다.
+
+  Masked 데이터셋은 현재 **임시(`provisional=1`)** 상태다(profiling 18,520장, 편향된 마스크 RNG로 수집). 배경과 폐기 조건은 그 프로젝트 README §7에 있다. 커스텀 프로토콜은 공통 `0x81 k/p/l`·`0x82 c`·`0x83 r`에 더해 Masked 전용 `0x81 's'`(마스크 시드)·`0x83 'm'`(마스크 회수)이 있다.
 - **`[extra] Presentation_Marp/`** — Marp 발표자료. `0. Template/presentation.md`가 템플릿이자 문법 레퍼런스다(`marp: true`, `size: "16:9"`, `lang: ko`, `math: mathjax`; 클래스 `lead`, `divider`, `small`, `tiny`, `code-small`, `code-tiny`). `marp` 바이너리는 설치되어 있지 않다 — 슬라이드는 에디터 확장에서 미리보기만 하며 여기서 빌드하지 않는다.
 
 ## 실무 메모
 
 - 경로에 공백·한글·`[...]`가 들어 있다. 셸 명령에서는 항상 따옴표로 감싼다.
+- 루트의 **`gitignore/`는 로컬 전용 보관함**이다. 루트 `.gitignore`가 `/gitignore/`로 통째로 제외하므로 그 안의 파일은 git에 전혀 나타나지 않는다. 커밋하면 안 되지만 작업에는 필요한 것을 여기 둔다 — 현재는 저작권 보호 문서인 ISO/IEC 17825:2024 원문(`ISO_IEC17825_2024_EN.pdf`)이 있다. **새로 클론한 사람에게는 이 디렉터리가 없으므로**, 여기 있는 파일에 의존하는 문서는 로컬 전용임을 밝히고 원본 출처(URL)를 함께 적는다.
 - 이 저장소의 1차 소스는 노트북이다. JSON을 직접 고치기보다 노트북으로 편집(NotebookEdit)하고, 한국어 마크다운 셀과 그것이 설명하는 코드 셀을 함께 갱신한다.
 - 컨테이너는 root로 동작하며 호스트 파일을 마운트하므로, 컨테이너 안에서 만든 파일은 호스트에서 root 소유가 된다. 이 UID 불일치로 git이 막히지 않도록 Dockerfile이 `git config --global --add safe.directory '*'`를 설정해 둔다.

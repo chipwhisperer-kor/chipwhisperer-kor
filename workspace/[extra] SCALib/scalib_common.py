@@ -1,13 +1,15 @@
 """[extra] SCALib 예제 노트북 공용 정의.
 
-10개 노트북이 모두 같은 AES 상수와 같은 데이터셋을 쓴다. 그 정의를 각 노트북에
-복사하면 값을 고칠 때 고칠 곳이 10군데가 된다. 그래서 **정의는 여기 한 곳**에 두고,
-각 노트북은 그 의미를 자기 문맥에서 다시 설명한다.
-(AGENTS.md 원칙 1-2 "같은 정보를 두 곳에 기록하지 않는다",
- 원칙 3과의 충돌은 "의미는 반복해도 되지만 정의는 반복하지 않는다"로 해소)
+Normal AES(tiny-AES-c)와 Masked AES(masked-aes-c) 두 타겟이 같은 AES 상수·
+같은 그룹 규약을 쓰고, 데이터셋·POI 경로만 타겟마다 다르다. 그 정의를 노트북에
+복사하면 고칠 곳이 폭발하므로 **정의는 여기 한 곳**에 둔다.
+(AGENTS.md 원칙 1-2, 원칙 3과의 충돌은 "의미는 반복해도 정의는 반복하지 않는다")
 
-여기 있는 것은 **데이터와 규약**뿐이다. 분석 로직은 각 노트북이 직접 보여준다 —
-그것이 노트북의 주제이기 때문이다.
+여기 있는 것은 **데이터와 규약**뿐이다. 분석 로직은 각 노트북이 직접 보여준다.
+
+데이터셋의 온디스크 구조는 저장소 루트의 SCHEMA.md 를 따른다. 용어는 GLOSSARY.md 가 정본이다.
+필드 이름을 여기 상수로 두는 이유는, 스키마가 바뀌었을 때 고칠 곳이 이 파일 하나가 되게
+하기 위함이다 — 노트북은 load_group() 이 돌려주는 dict 키만 알면 된다.
 """
 
 from pathlib import Path
@@ -15,11 +17,93 @@ from pathlib import Path
 import h5py
 import numpy as np
 
-# ── 데이터셋 ────────────────────────────────────────────────
-DATASET = Path(__file__).parent / "traces" / "scalib_dataset.h5"
+# ── 스키마 (SCHEMA.md) ──────────────────────────────────────
+SCHEMA = "sca-hdf5"
+SCHEMA_VERSION = "1.0"
+
+# Attributes(OPTIMIST) = HDF5 배열 이름. GLOSSARY.md §6.1 의 용어 충돌에 주의한다.
+F_TRACE = "trace"
+F_KEY = "key"
+F_PLAINTEXT = "plaintext"
+F_CIPHERTEXT = "ciphertext"
+F_MASK = "mask"
+
+# 루트 Metadata 중 필수 (SCHEMA.md §3)
+REQUIRED_METADATA = (
+    "schema", "schema_version",
+    "target_name", "target_device", "target_clock_hz",
+    "iut_algorithm", "iut_implementation", "iut_countermeasure",
+    "channel_type", "channel_probe",
+    "sample_rate_hz", "sample_resolution_bits", "samples_per_trace",
+    "sample_dtype", "sample_scale",
+    "trigger_source", "trigger_semantics",
+    "alignment",
+    "acquisition_start", "tool_chain",
+)
+
+# Subset Metadata 중 필수 (SCHEMA.md §4)
+REQUIRED_SUBSET_METADATA = ("role", "n_records", "key_mode", "pt_mode")
+
+# 허용되는 subset role (SCHEMA.md §4.1)
+SUBSET_ROLES = (
+    "exploration", "profiling", "attack",
+    "leakage-detection-fixed", "leakage-detection-random",
+)
+
+# 이 서브프로젝트의 subset 이름 → role
+SUBSET_ROLE_MAP = {
+    "explore": "exploration",
+    "profiling": "profiling",
+    "attack": "attack",
+    "tvla_fk": "leakage-detection-fixed",
+    "tvla_rk": "leakage-detection-random",
+}
+
+# ── 경로 루트 ──────────────────────────────────────────────
+_ROOT = Path(__file__).parent
+TRACES = _ROOT / "traces"
+NB_OUTPUT = _ROOT / "nb_output"
+
+# ── 타겟 레지스트리 (단일 공급원) ───────────────────────────
+# 키 = 라이브러리 디렉터리 이름. 펌웨어·수집 노트북·h5·POI 파일명과 같은 축.
+TARGETS = {
+    "tiny-AES-c": {
+        "label": "Normal AES (tiny-AES-c)",
+        "short": "Normal",
+        "dataset": TRACES / "scalib_dataset_tiny-AES-c.h5",
+        "poi": NB_OUTPUT / "poi_tiny-AES-c.npz",
+        "has_masks": False,
+        "cipher_attr": "AES-128-ECB (tiny-AES-c)",
+    },
+    "masked-aes-c": {
+        "label": "Masked AES (masked-aes-c)",
+        "short": "Masked",
+        "dataset": TRACES / "scalib_dataset_masked-aes-c.h5",
+        "poi": NB_OUTPUT / "poi_masked-aes-c.npz",
+        "has_masks": True,
+        "cipher_attr": "AES-128-ECB (masked-aes-c, MASKED=1)",
+    },
+}
+
+TARGET_IDS = tuple(TARGETS.keys())
+
+# 수집 프로토콜 상수 — 0.0 / 0.1 이 같은 시드·장수를 쓰도록 한곳에 둔다.
+# 기존 Normal 데이터셋과 같은 입력 벡터를 쓰려면 이 값을 바꾸지 않는다.
+#
+# N_* 는 **수집 목표치**다. 실제로 파일에 몇 장이 들어 있는지의 정본은 h5 자신이며,
+# 분석 노트북은 이 상수가 아니라 group_len() 으로 실보유 장수를 읽는다.
+# 수집이 중간에 끊겨 목표에 못 미치는 파일이 있을 수 있기 때문이다.
+SEED = 1234
+N_EXPLORE = 5000
+N_PROFILING = 100000
+N_ATTACK = 10000
+N_TVLA = 1000
+BATCH = 500  # HDF5 스트리밍 배치 크기
+AES_BLOCK = 16
+MASK_LEN = 10  # mask[0..9]; Masked i_m 한 행
 
 # ── AES-128 상수 ────────────────────────────────────────────
-# SubBytes 치환표. 타겟 펌웨어(tiny-AES-c)가 쓰는 것과 같은 표준 S-box 다.
+# SubBytes 치환표. 양 타겟 펌웨어가 쓰는 것과 같은 표준 S-box 다.
 SBOX = np.array([
     0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76,
     0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59, 0x47, 0xf0, 0xad, 0xd4, 0xa2, 0xaf, 0x9c, 0xa4, 0x72, 0xc0,
@@ -42,7 +126,17 @@ SBOX = np.array([
 # 해밍 가중치표. HW[v] = v 의 1비트 개수. 전력 누설 모델의 기본형이다.
 HW = np.array([bin(i).count("1") for i in range(256)], dtype=np.uint8)
 
-AES_BLOCK = 16
+
+def require_target(target):
+    """타겟 id 를 검사하고 TARGETS 항목(dict)을 돌려준다.
+
+    실패 조건: 모르는 id 이면 KeyError. 기본값으로 조용히 한 타겟만 도는
+    함정을 막기 위해 호출측이 target 을 반드시 넘기게 한다.
+    """
+    if target not in TARGETS:
+        raise KeyError(
+            "알 수 없는 target=%r. 사용 가능: %s" % (target, list(TARGETS)))
+    return TARGETS[target]
 
 
 def sbox_out(plaintext, key):
@@ -53,75 +147,235 @@ def sbox_out(plaintext, key):
 
     부채널 공격이 겨냥하는 가장 흔한 중간값이다. 평문 한 바이트와 키 한 바이트에만
     의존하므로, 키를 바이트 단위로 나누어 추측할 수 있다(분할 정복).
+    Masked 구현에서도 **공격자 관점** 라벨은 이 값이다(마스크는 모른다).
     """
     return SBOX[np.bitwise_xor(np.asarray(plaintext, dtype=np.uint8),
                                np.asarray(key, dtype=np.uint8))]
 
 
-def open_dataset(path=None):
-    """데이터셋을 열어 h5py.File 을 돌려준다 (with 문으로 쓴다).
+def open_dataset(target):
+    """타겟 데이터셋을 열어 h5py.File 을 돌려준다 (with 문으로 쓴다).
 
-    실패 조건: 파일이 없으면 FileNotFoundError 를 내며, 무엇을 먼저 실행해야
-    하는지 안내한다. 예제 노트북은 데이터셋 없이는 아무것도 할 수 없다.
+    실패 조건: 파일이 없으면 FileNotFoundError 와 수집 노트북 안내.
     """
-    p = Path(path) if path else DATASET
+    spec = require_target(target)
+    p = spec["dataset"]
     if not p.is_file():
+        collect = ("0.0.Dataset_Collect_tiny-AES-c.ipynb"
+                   if target == "tiny-AES-c"
+                   else "0.1.Dataset_Collect_masked-aes-c.ipynb")
         raise FileNotFoundError(
             "데이터셋이 없다: %s\n"
-            "먼저 0.0.Dataset_Collect.ipynb 를 실행해 트레이스를 수집한다 "
-            "(ChipWhisperer 하드웨어 필요, 약 77분)." % p)
+            "먼저 %s 를 실행해 트레이스를 수집한다 "
+            "(ChipWhisperer 하드웨어 필요)." % (p, collect))
     return h5py.File(p, "r")
 
 
-def load_group(group, n=None, samples=None, path=None):
+def load_group(group, target, n=None, samples=None):
     """데이터셋의 한 그룹을 메모리로 읽는다.
 
     입력
         group   : 'explore' | 'profiling' | 'attack' | 'tvla_rk' | 'tvla_fk'
-        n       : 앞에서 몇 장만 읽을지. None 이면 전부.
-                  profiling 전량은 100,000 x 33,172 int16 = 약 6.6 GB 이므로
-                  필요한 만큼만 읽는 것이 좋다.
-        samples : 샘플 축 슬라이스. POI 구간만 읽어 메모리를 아낄 때 쓴다.
-        path    : 데이터셋 경로 (기본 traces/scalib_dataset.h5)
+        target  : 'tiny-AES-c' | 'masked-aes-c'  (필수)
+        n       : 앞에서 몇 장만. None 이면 전부.
+        samples : 샘플 축 슬라이스. POI 구간만 읽을 때.
 
     출력 (dict)
-        k, p, o : (n, 16) uint8   키·평문·암호문
-        t       : (n, ns) int16   전력 파형 (SCALib 이 요구하는 dtype 그대로)
-        attrs   : dict            측정 조건 (ns, adc_mul, fixed_key 등)
+        k, p, o : (n, 16) uint8
+        t       : (n, ns) int16
+        m       : (n, 10) uint8 또는 None
+                  Masked 데이터셋의 i_m. Normal 이거나 없으면 None.
+                  공격자 관점 분석에서는 쓰지 않는다.
+        attrs   : dict  파일 단위 측정 조건
+        target  : str   호출에 쓴 target id
+        label   : str   표시용 이름
 
-    실패 조건: 그룹 이름이 틀리면 KeyError 를 내며 사용 가능한 이름을 알려준다.
+    실패 조건: 그룹 이름이 틀리면 KeyError.
     """
-    with open_dataset(path) as h5:
+    spec = require_target(target)
+    with open_dataset(target) as h5:
         if group not in h5:
             raise KeyError("그룹 '%s' 가 없다. 사용 가능: %s" % (group, list(h5)))
         g = h5[group]
         sl = slice(None) if n is None else slice(0, n)
         ssl = samples if samples is not None else slice(None)
-        return {
-            "k": g["i_k"][sl],
-            "p": g["i_p"][sl],
-            "o": g["o"][sl],
-            "t": g["t"][sl, ssl],
+        # 반환 dict 의 짧은 키(k/p/o/t/m)는 노트북 편의를 위한 것이고,
+        # 온디스크 이름은 SCHEMA.md 를 따른다. 둘을 잇는 곳이 여기 한 군데다.
+        out = {
+            "k": g[F_KEY][sl],
+            "p": g[F_PLAINTEXT][sl],
+            "o": g[F_CIPHERTEXT][sl],
+            "t": g[F_TRACE][sl, ssl],
+            "m": None,
             "attrs": {key: h5.attrs[key] for key in h5.attrs},
+            "target": target,
+            "label": spec["label"],
         }
+        if F_MASK in g:
+            out["m"] = g[F_MASK][sl]
+        return out
 
 
-def dataset_summary(path=None):
-    """데이터셋의 측정 조건과 그룹 구성을 문자열로 돌려준다.
+def group_len(group, target):
+    """그룹이 실제로 보유한 트레이스 장수. 파형은 읽지 않는다.
 
-    각 노트북 첫머리에서 "무엇을 분석하는 중인지"를 보여주는 데 쓴다.
+    N_PROFILING 같은 목표치를 노트북에 박으면 Masked 처럼 목표에 못 미친 데이터셋에서
+    조용히 IndexError 나 빈 슬라이스가 난다. "있는 만큼" 을 물어보는 창구다.
+
+    실패 조건: 그룹 이름이 틀리면 KeyError.
     """
-    with open_dataset(path) as h5:
-        lines = ["측정 조건"]
-        for key in ("created", "cipher", "platform", "ns", "adc_mul",
-                    "adc_freq", "clk_hz", "gain_db", "trace_scale"):
-            if key in h5.attrs:
-                lines.append("  %-12s %s" % (key, h5.attrs[key]))
-        lines.append("")
-        lines.append("그룹")
-        for name in h5:
+    require_target(target)
+    with open_dataset(target) as h5:
+        if group not in h5:
+            raise KeyError("그룹 '%s' 가 없다. 사용 가능: %s" % (group, list(h5)))
+        return int(h5[group][F_TRACE].shape[0])
+
+
+def load_poi(target):
+    """1.0.SNR 이 저장한 타겟별 POI npz 를 연다.
+
+    출력: np.load 결과 (poi, poi_windows, ...). 파일이 없으면 FileNotFoundError.
+    """
+    spec = require_target(target)
+    p = spec["poi"]
+    if not p.is_file():
+        raise FileNotFoundError(
+            "POI 파일이 없다: %s\n"
+            "1.0.SNR.ipynb 를 먼저 실행한다 (target=%s)." % (p, target))
+    return np.load(p)
+
+
+def validate_dataset(target=None, path=None):
+    """데이터셋이 SCHEMA.md 를 지키는지 검사하고 위반 목록을 돌려준다.
+
+    입력
+        target : 등록된 타겟 id. path 를 주면 무시된다.
+        path   : 임의의 h5 경로. 저장소 밖 파일이나 튜토리얼 파형을 검사할 때 쓴다.
+
+    출력
+        위반 문자열 리스트. **비어 있으면 준수**다.
+
+    왜 예외가 아니라 목록인가: 위반이 여러 개일 때 첫 번째만 보고 고치면 다음 것이
+    또 나온다. 한 번에 다 보여 주는 편이 고치기 쉽다. 그리고 "부분 준수" 를 오류로
+    취급하면 튜토리얼 파형처럼 복원 불가능한 파일을 아예 못 쓰게 된다(SCHEMA.md §5.3).
+    """
+    p = Path(path) if path is not None else require_target(target)["dataset"]
+    if not Path(p).is_file():
+        return ["파일이 없다: %s" % p]
+
+    bad = []
+    with h5py.File(p, "r") as h5:
+        a = h5.attrs
+        if a.get("schema") != SCHEMA:
+            bad.append("루트 attrs: schema 가 %r 이어야 한다 (현재 %r)"
+                       % (SCHEMA, a.get("schema")))
+        for key in REQUIRED_METADATA:
+            if key not in a:
+                bad.append("루트 attrs 누락: %s" % key)
+
+        subsets = [n for n in h5 if isinstance(h5[n], h5py.Group)]
+        if not subsets:
+            bad.append("subset 그룹이 하나도 없다")
+
+        for name in subsets:
             g = h5[name]
-            lines.append("  /%-10s %6d 장 x %d 샘플   키=%s 평문=%s"
-                         % (name, g["t"].shape[0], g["t"].shape[1],
-                            g.attrs.get("key_mode", "?"), g.attrs.get("pt_mode", "?")))
-        return "\n".join(lines)
+            for key in REQUIRED_SUBSET_METADATA:
+                if key not in g.attrs:
+                    bad.append("/%s attrs 누락: %s" % (name, key))
+            role = g.attrs.get("role")
+            if role is not None and role not in SUBSET_ROLES:
+                bad.append("/%s role 이 허용 목록 밖: %r" % (name, role))
+
+            for field in (F_TRACE, F_KEY, F_PLAINTEXT):
+                if field not in g:
+                    bad.append("/%s 필수 배열 누락: %s" % (name, field))
+            if F_TRACE not in g:
+                continue
+
+            # 행 정렬 — 이 규칙이 깨지면 레코드 대응이 무너져 데이터셋 전체가 무효다.
+            rows = {f: g[f].shape[0] for f in g}
+            if len(set(rows.values())) != 1:
+                bad.append("/%s 행 수 불일치: %s" % (name, rows))
+            n_rec = g.attrs.get("n_records")
+            if n_rec is not None and int(n_rec) != g[F_TRACE].shape[0]:
+                bad.append("/%s n_records=%s 인데 trace 는 %d 행"
+                           % (name, n_rec, g[F_TRACE].shape[0]))
+
+            # 루트 Metadata 와 실제 배열이 어긋나면 둘 중 하나가 거짓말이다.
+            if "samples_per_trace" in a and \
+                    int(a["samples_per_trace"]) != g[F_TRACE].shape[1]:
+                bad.append("/%s trace 열 수 %d ≠ samples_per_trace %s"
+                           % (name, g[F_TRACE].shape[1], a["samples_per_trace"]))
+            if "sample_dtype" in a and str(a["sample_dtype"]) != str(g[F_TRACE].dtype):
+                bad.append("/%s trace dtype %s ≠ sample_dtype %s"
+                           % (name, g[F_TRACE].dtype, a["sample_dtype"]))
+            if np.issubdtype(g[F_TRACE].dtype, np.integer) and "sample_scale" not in a:
+                bad.append("/%s trace 가 정수형인데 sample_scale 이 없다 (SCHEMA.md §5.2)"
+                           % name)
+    return bad
+
+
+def require_schema(target=None, path=None):
+    """준수하지 않으면 예외를 던진다. 수집 직후·분석 시작 시 쓴다."""
+    bad = validate_dataset(target, path)
+    if bad:
+        raise RuntimeError(
+            "SCHEMA.md 위반 %d건:\n  - %s" % (len(bad), "\n  - ".join(bad)))
+    return True
+
+
+def dataset_summary(target=None):
+    """측정 조건과 그룹 구성을 문자열로 돌려준다.
+
+    target 이 None 이면 등록된 모든 타겟을 순서대로 요약한다.
+    각 노트북 첫머리에서 '무엇을 분석하는 중인지'를 보여 줄 때 쓴다.
+    """
+    ids = TARGET_IDS if target is None else (target,)
+    blocks = []
+    for tid in ids:
+        spec = require_target(tid)
+        try:
+            with open_dataset(tid) as h5:
+                lines = ["[%s] %s" % (spec["short"], spec["label"]),
+                         "  path         %s" % spec["dataset"]]
+                for key in ("schema_version", "acquisition_start",
+                            "iut_algorithm", "iut_implementation",
+                            "iut_countermeasure", "target_name",
+                            "target_clock_hz", "channel_type", "channel_probe",
+                            "sample_rate_hz", "sample_resolution_bits",
+                            "samples_per_trace", "sample_dtype", "sample_scale",
+                            "trigger_semantics", "alignment"):
+                    if key in h5.attrs:
+                        lines.append("  %-22s %s" % (key, h5.attrs[key]))
+                rec = list(h5.attrs.get("recoveries", []))
+                if rec:
+                    # 수집 중 자동 복구가 있었다는 뜻. 데이터를 의심할 때 첫 단서다.
+                    lines.append("  %-22s %s" % (
+                        "자동복구",
+                        ", ".join(r.decode() if isinstance(r, bytes) else str(r)
+                                  for r in rec)))
+                problems = validate_dataset(tid)
+                lines.append("  %-22s %s" % (
+                    "스키마 준수",
+                    "예" if not problems else "**부분** (%d건) — validate_dataset() 참고"
+                    % len(problems)))
+                lines.append("  Subset")
+                for name in h5:
+                    g = h5[name]
+                    extra = ""
+                    if F_MASK in g:
+                        extra = "  %s%s" % (F_MASK, g[F_MASK].shape)
+                    # 결측을 '?' 로 조용히 넘기지 않는다. 빠진 것은 빠졌다고 읽히게 한다.
+                    missing = [a for a in ("key_mode", "pt_mode") if a not in g.attrs]
+                    mode = ("키=%s 평문=%s" % (g.attrs["key_mode"], g.attrs["pt_mode"])
+                            if not missing
+                            else "!! attrs 없음: %s" % ", ".join(missing))
+                    lines.append(
+                        "    /%-10s [%-24s] %6d 장 x %d 샘플   %s%s"
+                        % (name, g.attrs.get("role", "role 없음"),
+                           g[F_TRACE].shape[0], g[F_TRACE].shape[1], mode, extra))
+                blocks.append("\n".join(lines))
+        except FileNotFoundError as e:
+            blocks.append("[%s] %s\n  (없음) %s" % (
+                spec["short"], spec["label"], e))
+    return "\n\n".join(blocks)
