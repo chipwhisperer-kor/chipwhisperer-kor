@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "physai/experiment_spec/1.0",
+  "title": "실험 명세 (experiment spec)",
+  "description": "AI 가 작성하고 collect·analyze 가 읽는 유일한 입력. 판정 기준을 수집 전에 못박기 위한 계약이며, 이것이 ISO/IEC 17825 §8.4 shall [08.04](통계 시험 전 파라미터 지정) 요구를 구조로 만족시킨다.",
+  "type": "object",
+  "required": ["id", "title", "scope", "iut", "collector", "subsets", "criteria", "analyses", "seed"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[0-9A-Za-z._-]+$",
+      "description": "실행 식별자. runs/<id>/ 와 traces/<id>.h5 의 이름이 된다."
+    },
+    "title": { "type": "string", "description": "사람이 읽을 한 줄 제목" },
+    "rationale": { "type": "string", "description": "왜 이 실험을 하는가. 계획 보고서에 실린다." },
+
+    "scope": {
+      "type": "object",
+      "description": "이 시험이 무엇을 주장하고 무엇을 주장하지 않는가. 보고서의 첫 절이 된다.",
+      "required": ["standard", "assessment_type", "clauses_applied", "security_function",
+                   "csp_classes", "channels", "target_level", "not_claimed"],
+      "additionalProperties": false,
+      "properties": {
+        "standard": { "type": "string", "description": "예: ISO/IEC 17825:2024" },
+        "assessment_type": {
+          "enum": ["pre-assessment"],
+          "description": "이 환경은 적합성 평가가 아니다. 벤더와 시험자가 동일하고, 모듈 경계·승인 기관이 없다."
+        },
+        "clauses_applied": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "security_function": { "type": "string", "description": "예: AES-128-ECB" },
+        "csp_classes": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "channels": {
+          "type": "array", "minItems": 1,
+          "items": { "enum": ["power", "em", "emulated-power", "debug-trace"] }
+        },
+        "target_level": { "enum": [3, 4], "description": "ISO/IEC 17825 Annex A.2(3) / A.3(4)" },
+        "not_claimed": {
+          "type": "array", "items": { "type": "string" }, "minItems": 1,
+          "description": "**비워 둘 수 없다.** 주장하지 않는 것을 적지 않으면 나머지가 전부 주장으로 읽힌다."
+        }
+      }
+    },
+
+    "iut": {
+      "type": "object",
+      "required": ["name", "countermeasure"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "description": "workspace/iut/ 아래 디렉터리 이름" },
+        "countermeasure": { "type": "string", "description": "없으면 \"none\" 이라고 적는다. 비우면 '없음'과 '미기록'을 구분할 수 없다." },
+        "version": { "type": "string" }
+      }
+    },
+
+    "collector": {
+      "type": "object",
+      "required": ["kind"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "enum": ["emulation", "cw_power", "cw_debugtrace"] },
+        "components": {
+          "type": "array",
+          "items": { "enum": ["hw_reg", "hd_reg", "hw_mem", "hd_mem"] },
+          "description": "에뮬레이션 전용. 누설 벡터의 성분. HD 는 언제나 같은 저장소의 명령어 앞뒤 값끼리만 계산한다."
+        },
+        "window": {
+          "type": "object",
+          "description": "관측 구간. 실측 트리거에 대응한다.",
+          "required": ["from_symbol", "to_symbol"],
+          "additionalProperties": false,
+          "properties": {
+            "from_symbol": { "type": "string" },
+            "to_symbol": { "type": "string" },
+            "semantics": { "type": "string", "description": "사람이 읽을 구간 설명. trigger_semantics 로 저장된다." }
+          }
+        }
+      }
+    },
+
+    "subsets": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["name", "role", "n", "key_mode", "pt_mode"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "pattern": "^[0-9A-Za-z_]+$" },
+          "role": {
+            "enum": ["exploration", "profiling", "attack",
+                     "leakage-detection-fixed", "leakage-detection-random",
+                     "timing", "simple-analysis"]
+          },
+          "n": { "type": "integer", "minimum": 1 },
+          "key_mode": { "enum": ["fixed", "random"] },
+          "pt_mode": { "enum": ["fixed", "random"] },
+          "spa_pair_kind": { "enum": ["same-data", "different-data-fixed", "different-data-random"] }
+        }
+      }
+    },
+
+    "criteria": {
+      "type": "object",
+      "description": "판정 기준. **수집 전에** 적어야 한다 — 결과를 본 뒤 임계를 고르는 사후 정당화를 구조로 막는다.",
+      "required": ["security_level", "effect_size_d", "alpha", "beta",
+                   "multiplicity_correction", "t_threshold", "max_acquisition_hours",
+                   "sensitive_leakage_time", "preprocessing", "vendor_info"],
+      "additionalProperties": false,
+      "properties": {
+        "security_level": { "enum": [3, 4] },
+        "effect_size_d": { "type": "number", "exclusiveMinimum": 0, "description": "A.2.3=0.04(L3) / A.3.3=0.01(L4)" },
+        "alpha": { "type": "number", "exclusiveMinimum": 0, "maximum": 1, "description": "위양성률" },
+        "beta": { "type": "number", "exclusiveMinimum": 0, "maximum": 1, "description": "위음성률. 낮게 잡는다 — 누설을 놓치지 않는 것이 우선이다." },
+        "multiplicity_correction": { "enum": ["bonferroni", "none"], "description": "§8.4 shall [08.03] 은 보정을 요구한다. none 은 그 사실을 알고 쓰는 경우만." },
+        "t_threshold": { "type": "number", "exclusiveMinimum": 0, "description": "보정 전 임계. §8.4: 99.99%→3.9, 99.999%→4.5" },
+        "max_acquisition_hours": { "type": "number", "exclusiveMinimum": 0, "description": "A.2.1 / A.3.1" },
+        "sensitive_leakage_time": {
+          "type": "object",
+          "description": "Annex H — 이 경계 **안**의 누설만 fail 로 센다. 경계 밖 누설은 검출하되 별도 목록으로 보고한다.",
+          "required": ["include_round1", "rationale"],
+          "additionalProperties": false,
+          "properties": {
+            "from": { "type": "string", "description": "예: enc_start / 0 / 심볼 이름" },
+            "to": { "type": "string" },
+            "include_round1": {
+              "type": "boolean",
+              "description": "Annex H.2(a) 는 바깥 라운드를 비민감 예시로 든다. 1라운드를 포함시키려면 그 판단을 명시해야 한다."
+            },
+            "rationale": { "type": "string", "description": "**비워 둘 수 없다.** 이 경계가 합/부를 직접 바꾼다." }
+          }
+        },
+        "preprocessing": {
+          "type": "object",
+          "required": ["average_n", "alignment"],
+          "additionalProperties": false,
+          "properties": {
+            "average_n": { "type": "integer", "minimum": 1, "description": "A.2.5 shall [A.01] 은 L3 에서 10 을 요구한다. 1 이면 그 요건 미준수이며 대조표에 그렇게 적힌다." },
+            "alignment": { "enum": ["none", "static", "dynamic"] }
+          }
+        },
+        "vendor_info": {
+          "type": "object",
+          "description": "shall [07.04]. 이 환경은 벤더 = 시험자이므로 스스로 적어 남긴다.",
+          "required": ["algorithms", "design", "susceptible_conditions"],
+          "additionalProperties": false,
+          "properties": {
+            "algorithms": { "type": "string" },
+            "design": { "type": "string" },
+            "susceptible_conditions": { "type": "string" }
+          }
+        }
+      }
+    },
+
+    "analyses": {
+      "type": "array", "minItems": 1,
+      "items": { "enum": ["ta", "spa", "dpa", "soundness", "snr", "cpa"] },
+      "description": "필수 시험은 ta→spa→dpa 이며 analyze 가 그 순서를 강제한다. snr 은 보조, cpa 는 배관 검증용 양성 대조이고 둘 다 판정에 쓰지 않는다."
+    },
+
+    "seed": { "type": "integer", "description": "입력 벡터 생성 시드. 재현의 고정점." }
+  }
+}

@@ -42,13 +42,19 @@ done
 
 | 계층 | Normal | Masked |
 |------|--------|--------|
-| 라이브러리 | `tiny-AES-c/` | `masked-aes-c/` |
+| 라이브러리 | `../iut/tiny-AES-c/` | `../iut/masked-aes-c/` |
 | 펌웨어 | `simpleserial_tiny-AES-c/` | `simpleserial_masked-aes-c/` |
 | 수집 | `0.0.…_tiny-AES-c` | `0.1.…_masked-aes-c` |
 | 데이터셋 | `scalib_dataset_tiny-AES-c.h5` | `scalib_dataset_masked-aes-c.h5` |
 | POI | `poi_tiny-AES-c.npz` | `poi_masked-aes-c.npz` |
 
 경로·라벨 정의의 정본은 `scalib_common.py` 의 `TARGETS` 다.
+
+**암호 라이브러리는 이 서브프로젝트 밖에 있다.** 저장소 공용 트리 `workspace/iut/`
+(IUT = implementation under test, `GLOSSARY.md` 용어)에 한 벌만 두고, 이 프로젝트의 펌웨어
+두 개와 `[extra] Physical-AI-SCA` 의 에뮬레이션 하네스가 **같은 `aes.c` 를 컴파일**한다.
+같은 소스여야 실측 파형과 에뮬레이션 결과를 같은 구현에 대한 관측으로 나란히 놓을 수 있다.
+라이브러리 출처·패치 내역은 `../iut/README.md` 에 있다.
 
 ---
 

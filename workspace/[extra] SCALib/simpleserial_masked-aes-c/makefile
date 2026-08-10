@@ -20,10 +20,12 @@ TARGET = simpleserial-base
 SRC += my_crypt.c
 SRC += simpleserial-base.c
 
-# masked-aes-c (ECB + boolean masking): 상위 폴더 소스를 직접 컴파일한다.
-VPATH += ../masked-aes-c
+# masked-aes-c (ECB + boolean masking): 공용 IUT 트리의 소스를 직접 컴파일한다.
+# 라이브러리는 workspace/iut/ 에 한 벌만 두고 펌웨어·에뮬 하네스가 함께 참조한다.
+# 같은 소스를 컴파일해야 실측 파형과 에뮬레이션 결과를 나란히 비교할 근거가 생긴다.
+VPATH += ../../iut/masked-aes-c
 SRC += aes.c
-EXTRAINCDIRS += ../masked-aes-c
+EXTRAINCDIRS += ../../iut/masked-aes-c
 
 # CBC/CTR 비활성, 마스킹 경로 활성
 CFLAGS += -DCBC=0 -DCTR=0 -DMASKED=1

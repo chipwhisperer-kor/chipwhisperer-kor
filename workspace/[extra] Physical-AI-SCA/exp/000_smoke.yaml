@@ -1,0 +1,72 @@
+id: "000_smoke"
+title: "파이프라인 연기시험 — 소량으로 전 단계를 한 번 돌린다"
+rationale: >
+  판정을 얻으려는 실험이 아니다. 수집→분석→보고→검증 전 단계가 실제로 이어지는지,
+  요건 대조표가 부족한 항목을 제대로 집어내는지 확인하는 용도다. 장수가 Formula (1)
+  요구에 한참 못 미치므로 DPA 는 반드시 `inconclusive` 로 나와야 하며, 그렇게 나오는 것이
+  이 시험의 성공 조건이다 — 부족한 표본으로 판정을 내지 않는다는 규칙이 실제로 동작하는지
+  확인하는 것이기 때문이다.
+
+scope:
+  standard: "ISO/IEC 17825:2024"
+  assessment_type: "pre-assessment"
+  clauses_applied: ["7", "8"]
+  security_function: "AES-128-ECB"
+  csp_classes: ["cryptographic key"]
+  channels: ["emulated-power"]
+  target_level: 3
+  not_claimed:
+    - "어떤 보안 판정도 주장하지 않는다 — 파이프라인 연기시험이다"
+    - "ISO/IEC 19790 적합성 — 모듈 경계·CSP 정의가 이 환경 밖이다"
+    - "독립 시험소 평가 — 벤더와 시험자가 동일하다(자기시험)"
+    - "물리 측정 — 이 채널의 값은 측정치가 아니라 누설 모델의 출력이다"
+    - "장수 충족 — Formula (1) 요구에 한참 못 미친다"
+
+iut:
+  name: "tiny-AES-c"
+  countermeasure: "none"
+
+collector:
+  kind: "emulation"
+  components: ["hw_reg", "hd_reg", "hw_mem", "hd_mem"]
+  window:
+    from_symbol: "AES_init_ctx"
+    to_symbol: "AES_ECB_encrypt"
+    semantics: "AES_init_ctx 진입부터 AES_ECB_encrypt 복귀까지"
+
+subsets:
+  - {name: ta_rk_fp,    role: timing,                    n: 60,  key_mode: random, pt_mode: fixed}
+  - {name: ta_fk_rp,    role: timing,                    n: 60,  key_mode: fixed,  pt_mode: random}
+  - {name: spa_same,    role: simple-analysis,           n: 4,   key_mode: fixed,  pt_mode: fixed,  spa_pair_kind: same-data}
+  - {name: spa_diffkey, role: simple-analysis,           n: 4,   key_mode: random, pt_mode: fixed,  spa_pair_kind: different-data-fixed}
+  - {name: spa_diffpt,  role: simple-analysis,           n: 4,   key_mode: fixed,  pt_mode: random, spa_pair_kind: different-data-random}
+  - {name: tvla_fk,     role: leakage-detection-fixed,   n: 150, key_mode: fixed,  pt_mode: fixed}
+  - {name: tvla_rk,     role: leakage-detection-random,  n: 150, key_mode: fixed,  pt_mode: random}
+  - {name: profiling,   role: profiling,                 n: 300, key_mode: random, pt_mode: random}
+  - {name: attack,      role: attack,                    n: 300, key_mode: fixed,  pt_mode: random}
+
+criteria:
+  security_level: 3
+  effect_size_d: 0.04
+  alpha: 1.0e-5
+  beta: 0.05
+  multiplicity_correction: "bonferroni"
+  t_threshold: 4.5
+  max_acquisition_hours: 6
+  sensitive_leakage_time:
+    from: "0"
+    to: "end"
+    include_round1: true
+    rationale: >
+      연기시험이므로 관측 구간 전체를 민감 경계로 둔다. 판정을 주장하지 않으므로 이 선택이
+      결과의 의미를 바꾸지 않는다. 실제 실험에서는 001·002 처럼 근거를 적는다.
+  preprocessing:
+    average_n: 1
+    alignment: "none"
+  vendor_info:
+    algorithms: "AES-128 ECB (tiny-AES-c, 벤더 원본 무수정)"
+    design: "8비트 S-box 표 참조, state 를 메모리 배열에 두고 in-place 갱신. 대책 없음."
+    susceptible_conditions: "대책이 없으므로 1차 DPA 에 그대로 노출된다."
+
+analyses: ["ta", "spa", "dpa", "soundness", "cpa"]
+seed: 20260810

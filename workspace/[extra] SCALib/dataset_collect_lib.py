@@ -24,7 +24,6 @@ from pathlib import Path
 import h5py
 import numpy as np
 import pandas as pd
-from Crypto.Cipher import AES
 try:
     from tqdm.notebook import trange
 except Exception:  # 스크립트/비노트북 환경
@@ -51,6 +50,10 @@ from scalib_common import (
     F_TRACE,
     validate_dataset,
 )
+# 골든 모델은 저장소 공용 정의를 쓴다. 수집기와 분석기가 서로 다른 참조 구현을 쓰면
+# "타겟이 틀렸다" 와 "참조가 틀렸다" 를 구분할 수 없게 된다.
+# (scalib_common 이 workspace/lib 를 sys.path 에 넣어 주므로 여기서는 그냥 import 한다)
+from aes_ref import aes_ecb_encrypt
 
 # 노트북이 재export 할 수 있도록 재노출
 __all__ = [
@@ -114,11 +117,6 @@ def my_fsr_cmd(target, cmd, scmd, data, payload_only=False, timeout=500):
     if payload_only:
         return response[3 : 3 + response[2]]
     return response
-
-
-def aes_ecb_encrypt(key16, plain16):
-    """호스트 골든 모델: AES-128 ECB 한 블록."""
-    return AES.new(bytes(key16), AES.MODE_ECB).encrypt(bytes(plain16))
 
 
 def target_aes_encrypt(target, key16, plain16):

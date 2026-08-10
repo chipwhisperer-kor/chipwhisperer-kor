@@ -1,0 +1,82 @@
+id: "003_hw_tinyaes"
+title: "실측 전력 파형 — 기존 SCHEMA 1.0 데이터셋으로 분석·보고 파이프라인 검증"
+rationale: >
+  이 실험은 새로 수집하지 않는다. `[extra] SCALib` 이 실장비로 이미 받아 둔
+  `scalib_dataset_tiny-AES-c.h5`(SCHEMA 1.0, CW308+STM32F3 실측)를 그대로 읽어,
+  **실측 채널에서도 같은 분석·보고 파이프라인이 도는지** 확인한다.
+
+  동시에 이 실험의 진짜 소득은 **1.0 데이터셋으로 무엇을 판정할 수 없는지가 드러나는
+  것**이다. 그 파일에는 레코드별 `exec_time` 도, SPA 파형쌍도, `bandwidth_hz` 도,
+  `shunt_ohm` 도 없다. 그래서 필수 시험 3종 중 TA·SPA 는 **수행 자체가 불가능**하고
+  Annex B 요건은 판정할 수 없다. 요건 대조표가 그 사실을 감추지 않고 그대로 보고하는지가
+  이 실험이 확인하려는 것이다.
+
+  **분석만 한다** — `analyze --dataset` 로 기존 파일을 가리킨다. `collect` 를 돌리지
+  않으며, 돌리려 해도 실물 수집기는 실장비가 없어 실행되지 않는다.
+
+scope:
+  standard: "ISO/IEC 17825:2024"
+  assessment_type: "pre-assessment"
+  clauses_applied: ["7", "8"]
+  security_function: "AES-128-ECB"
+  csp_classes: ["cryptographic key"]
+  channels: ["power"]
+  target_level: 3
+  not_claimed:
+    - "ISO/IEC 19790 적합성 — 모듈 경계·CSP 정의가 이 환경 밖이다"
+    - "독립 시험소 평가 — 벤더와 시험자가 동일하다(자기시험)"
+    - "필수 시험 3종의 완수 — 이 데이터셋에는 TA 용 exec_time 도 SPA 용 파형쌍도 없어 둘을 수행하지 못했다"
+    - "Annex B 측정 장비 요건 — bandwidth_hz·shunt_ohm 이 기록되지 않아 판정할 수 없다"
+    - "A.2.5 전처리 — 같은 입력 10회 평균을 적용하지 않았다"
+    - "장수 충족 — TVLA 집단이 Formula (1) 요구에 크게 못 미친다"
+    - "EM (SEMA/DEMA) — 근접 자기장 프로브를 보유하지 않는다"
+    - "Annex H 민감 경계 확정 — 아래 경계는 제안이며 확정은 사람·승인 기관의 몫이다"
+
+iut:
+  name: "tiny-AES-c"
+  countermeasure: "none"
+
+collector:
+  kind: "cw_power"
+
+subsets:
+  - {name: explore,   role: exploration,               n: 5000,   key_mode: random, pt_mode: random}
+  - {name: profiling, role: profiling,                 n: 100000, key_mode: random, pt_mode: random}
+  - {name: attack,    role: attack,                    n: 10000,  key_mode: fixed,  pt_mode: random}
+  - {name: tvla_fk,   role: leakage-detection-fixed,   n: 1000,   key_mode: fixed,  pt_mode: fixed}
+  - {name: tvla_rk,   role: leakage-detection-random,  n: 1000,   key_mode: random, pt_mode: fixed}
+
+criteria:
+  security_level: 3
+  effect_size_d: 0.04
+  alpha: 1.0e-5
+  beta: 0.05
+  multiplicity_correction: "bonferroni"
+  t_threshold: 4.5
+  max_acquisition_hours: 6
+  sensitive_leakage_time:
+    from: "0"
+    to: "end"
+    include_round1: true
+    rationale: >
+      이 데이터셋은 시간 축이고 `sample_map` 이 없어 구간을 명령어로 나눌 수 없다. 그래서
+      관측 구간 전체를 민감 경계로 둔다. 1라운드 포함 판단은 001·002 와 같다 —
+      Annex H.2(a) 는 바깥 라운드를 비민감 예시로 들지만 informative 이며 approval
+      authority 가 대체할 수 있고, 1라운드 SBox 는 분할정복 키 복구의 표준 표적이다.
+      다만 이 트리거는 KeyExpansion 까지 감싸므로(`trigger_semantics` 참고) 앞부분의
+      검출은 키 스케줄 누설이며 CipherMasked 구간의 것과 구분해 읽어야 한다.
+  preprocessing:
+    average_n: 1
+    alignment: "none"
+  vendor_info:
+    algorithms: "AES-128 ECB (tiny-AES-c, kokke/tiny-AES-c 벤더 원본 무수정)"
+    design: >
+      workspace/iut/tiny-AES-c/aes.c 를 CW308+STM32F303 펌웨어로 빌드했다
+      (-Os -mcpu=cortex-m4, -DCBC=0 -DCTR=0). 트리거는 AES_init_ctx(KeyExpansion) +
+      AES_ECB_encrypt 전체를 감싼다. 대책 없음.
+    susceptible_conditions: >
+      대책이 없으므로 1차 DPA 에 그대로 노출된다. 트리거가 키 스케줄을 포함하므로
+      파형 앞부분에서 라운드키 관련 누설도 관측된다.
+
+analyses: ["dpa", "cpa"]
+seed: 1234

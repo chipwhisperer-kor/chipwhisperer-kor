@@ -23,7 +23,15 @@
 | 어떤 메타데이터가 있어야 하는가 | ISO/IEC 17825:2024 Annex B·7.3, OPTIMIST Metadata 정의 |
 | 필드 이름·레이아웃·필수 여부 | **이 문서 (프로젝트 정의)** |
 
-`schema_version` 은 이 문서의 판번호다. 현재 **1.0**.
+`schema_version` 은 이 문서의 판번호다. 현재 **1.1**.
+
+> **1.1 은 필드를 더하기만 했다.** 기존 1.0 데이터셋은 그대로 유효하며, 검증기는
+> 파일에 적힌 판번호의 규칙으로 검사한다. 나중에 만든 규칙으로 옛 파일을 소급
+> 위반 처리하면 "부분 준수" 라는 판정의 뜻이 무너지기 때문이다.
+>
+> 1.1 이 더한 것: 물리 측정이 아닌 채널(`emulated-power`·`debug-trace`), 샘플 축의
+> 정체(`sample_axis`), 샘플 → 명령어 역매핑(`sample_map`), 레코드별 실행시간
+> (`exec_time`), 그리고 ISO/IEC 17825 요건을 **판정할 수 있게 하는** 측정 조건 몇 가지.
 
 ---
 
@@ -56,6 +64,7 @@ Zarr 도 요건을 만족하지만 산출물이 디렉터리라 배포·이동�
 <name>.h5                          ← Dataset 한 벌 = Target 1개 × Channel 1개
  │
  ├─ HDF5 attrs                     ← Metadata (§3)
+ ├─ sample_map  (ns, 3)            ← 샘플 → 명령어 역매핑 [1.1, 명령어 축이면 필수] §3.9
  │
  └─ /<subset>/                     ← Subset: 수집 규약이 같은 Record 묶음
       ├─ HDF5 attrs                ← Subset Metadata (§4)
@@ -63,11 +72,15 @@ Zarr 도 요건을 만족하지만 산출물이 디렉터리라 배포·이동�
       ├─ key         (n, kb)       ← Attribute      [필수]
       ├─ plaintext   (n, pb)       ← Attribute      [필수]
       ├─ ciphertext  (n, cb)       ← Attribute      [선택]
-      └─ mask        (n, mb)       ← Attribute      [선택, 대책 난수]
+      ├─ mask        (n, mb)       ← Attribute      [선택, 대책 난수]
+      └─ exec_time   (n,)          ← Attribute      [1.1, 선택] §4.2
 ```
 
 **행 정렬 규칙:** 한 Subset 안의 모든 배열은 **행 수 n 이 같고, i 번째 행이 같은 Execution
 에 대응**한다. 이 규칙이 깨지면 데이터셋 전체가 무효다. 검증기가 가장 먼저 보는 항목이다.
+
+`sample_map` 만 예외로 **루트에 둔다.** 이것은 레코드가 아니라 **샘플 축**을 설명하는
+배열이라 행 수가 n 이 아니라 ns 이고, 한 파일의 모든 subset 이 같은 값을 공유하기 때문이다.
 
 한 파일에 **Target 이나 Channel 이 다른 데이터를 섞지 않는다.** 파형 길이·측정 조건이
 달라 Metadata 를 파일 단위로 적을 수 없게 되기 때문이다. 다르면 파일을 나눈다.
@@ -116,25 +129,55 @@ Zarr 도 요건을 만족하지만 산출물이 디렉터리라 배포·이동�
 
 | 필드 | 타입 | 뜻 |
 |---|---|---|
-| `channel_type` | str | `"power"` \| `"em"` |
-| `channel_probe` | str | 프로브·션트 구성. 예 `"CW308 SHUNTL, 내장 션트"` |
+| `channel_type` | str | 아래 목록 중 하나 |
+| `channel_probe` | str | 프로브·션트 구성. 예 `"CW308 SHUNTL, 내장 션트"`. 물리 측정이 아니면 그 사실을 적는다 |
 
-선택: `channel_gain_db` (증폭기 게인).
+| `channel_type` | 뜻 | 판번호 |
+|---|---|---|
+| `power` | 전력 소비 | 1.0 |
+| `em` | 전자파 방사 | 1.0 |
+| **`emulated-power`** | 에뮬레이터가 **계산한** 누설 추정치 | 1.1 |
+| **`debug-trace`** | CoreSight 등 디버그 트레이스 이벤트 | 1.1 |
+
+선택: `channel_gain_db`(증폭기 게인), `shunt_ohm`·`shunt_selection_note`(§3.10).
 
 > 근거 — ISO/IEC 17825 는 PA(3.8)와 EMA(3.6)를 다른 공격 클래스로 나눈다. Annex B.5 는
 > 전력이면 션트 저항, 전자파면 근접 자기장 프로브를 요구하므로 프로브 구성이 측정의 일부다.
 
+> **`emulated-power` 는 OPTIMIST 의 Channel 정의(물리량의 측정)에서 벗어난다.**
+> 그 값은 측정치가 아니라 **누설 모델의 출력**이다. 그럼에도 같은 스키마에 담는 이유는,
+> 세 관측(전력·디버그 트레이스·에뮬레이션)이 한 분석기·한 검증기를 통과해야 서로 나란히
+> 놓고 볼 수 있기 때문이다. 대신 **모델을 반드시 밝히게** 했다(§3.9) — 모델을 모르면
+> "안 샌다" 가 무슨 뜻인지 알 수 없다. 이 확장은 표준이 아니라 **이 저장소가 정한 것**이며,
+> 용어상의 어긋남은 `GLOSSARY.md` 의 Channel 항목에 적어 두었다.
+
 ### 3.4 측정 [필수]
 
-| 필드 | 타입 | 뜻 |
-|---|---|---|
-| `sample_rate_hz` | float | 샘플링 속도 |
-| `sample_resolution_bits` | int | ADC 유효 분해능 |
-| `samples_per_trace` | int | `trace` 의 열 수 (= ns) |
-| `sample_dtype` | str | `trace` 의 dtype. 예 `"int16"` |
-| `sample_scale` | float | 정규화 나눗수 (§5.2) |
+| 필드 | 타입 | 뜻 | 필수 조건 |
+|---|---|---|---|
+| `samples_per_trace` | int | `trace` 의 열 수 (= ns) | 항상 |
+| `sample_dtype` | str | `trace` 의 dtype. 예 `"int16"` | 항상 |
+| `sample_scale` | float | 정규화 나눗수 (§5.2) | 항상 |
+| **`sample_axis`** | str | `"time"` \| `"instruction"` — 샘플 축이 무엇인가 | **1.1 부터 항상** |
+| `sample_rate_hz` | float | 샘플링 속도 | `sample_axis="time"` 일 때 |
+| `sample_resolution_bits` | int | ADC 유효 분해능 | `sample_axis="time"` 일 때 |
+| `bandwidth_hz` | float | 측정 대역폭 | **1.1: `channel_type="power"` 일 때** |
 
-선택: `bandwidth_hz`, `synchronous_sampling`(bool).
+선택: `synchronous_sampling`(bool).
+
+> **`sample_axis` 를 왜 새로 두는가.** 에뮬레이션 트레이스에는 **`sample_rate_hz` 가
+> 존재하지 않는다.** 축이 시간이 아니라 명령어 순번이기 때문이다. 그렇다고 아무 값이나
+> 채우면 §5.3 을 어긴다. 그래서 "이 축이 무엇인지" 를 명시하게 하고, 시간축일 때만
+> 속도·분해능을 요구한다. 읽는 쪽은 이 필드를 보고 x 축의 단위를 판단한다.
+>
+> 1.0 파일에는 이 필드가 없다. 그 파일들은 전부 시간축이므로 읽는 쪽이 `"time"` 으로
+> 간주해도 되지만, **검증기는 1.0 파일에 이 필드를 요구하지 않는다.**
+
+> **`bandwidth_hz` 를 1.1 에서 필수로 올린 이유.** ISO/IEC 17825 Annex B.2 가 대역폭을
+> 클럭의 50 %(SW) 이상으로, 샘플레이트를 대역폭의 5배로 요구한다. 대역폭을 적지 않으면
+> 그 요건을 **만족하는지 판정할 수 없다** — 데이터가 좋고 나쁨을 떠나 판정 자체가 불가능해진다.
+> 다만 값을 모를 때는 여전히 비워 둔다(§5.3). 그러면 검증기가 "미기록" 으로 보고하고,
+> 요건 대조표에도 "판정 불가" 로 남는다. 지어낸 값보다 낫다.
 
 > 근거 — **ISO/IEC 17825 Annex B.2·B.3** 이 대역폭(SW 는 클럭의 50% 이상)·샘플레이트
 > (대역폭의 5배)·분해능(8 bit 이상)을 요구한다. 이 값들이 없으면 데이터셋이 그 요건을
@@ -194,6 +237,51 @@ Zarr 도 요건을 만족하지만 산출물이 디렉터리라 배포·이동�
 `fixed_key`·`fixed_pt` 는 **평가용 정답**이라 실제 시험 데이터셋이라면 넣지 않는다.
 이 저장소는 교육용이므로 채점을 위해 남긴다.
 
+### 3.9 에뮬레이션 [1.1, `channel_type="emulated-power"` 일 때 필수]
+
+에뮬레이션 트레이스의 값은 **측정치가 아니라 누설 모델의 출력**이다. 모델과 빌드를 모르면
+"샌다/안 샌다" 가 무슨 뜻인지 알 수 없고 재현도 불가능하므로, 다음을 전부 요구한다.
+
+| 필드 | 타입 | 뜻 |
+|---|---|---|
+| `leakage_model` | str | 예 `"concat(HW(reg), HD(reg,same), HW(mem), HD(mem,same))"` |
+| `leakage_segments` | str | 성분별 샘플 구간. 예 `"hw_reg:0-6051,hd_reg:6051-12102,…"` |
+| `emulator` | str | 예 `"unicorn 2.1.4"` |
+| `instruction_set` | str | 예 `"ARMv7-M Thumb"` |
+| `build_flags` | str | 컴파일·링크 플래그 전문 |
+| `binary_sha256` | str | 에뮬레이션한 ELF 의 SHA-256 |
+| `window_symbols` | str | 관측 구간 안 주요 심볼의 주소. 예 `"AES_init_ctx:0x822d,AES_ECB_encrypt:0x8299"` |
+
+> **`window_symbols` 가 왜 필요한가.** 분석은 구간을 더 잘게 나눠야 할 때가 있다 —
+> 예를 들어 키 스케줄이 끝나고 암호화가 시작되는 지점. 그 경계를 ELF 를 다시 열어
+> 찾게 하면 **데이터셋만으로는 분석할 수 없게 된다.** 심볼 주소를 여기 적어 두면
+> `sample_map` 의 주소 열에서 그 지점의 명령어 인덱스를 바로 찾을 수 있다.
+
+> **`build_flags` 를 왜 필수로 두는가.** 최적화 수준이 전이 누설을 **만들기도 하고 없애기도
+> 한다.** 같은 C 소스라도 `-Os` 와 `-O2` 는 레지스터 할당과 명령어 선택이 달라 서로 다른
+> 구현이 된다. 이 값이 없으면 결과를 재현할 수 없고, 실측 타겟과 같은 것을 봤는지도 알 수 없다.
+
+> **HD 는 같은 저장소의 앞뒤 값끼리만 계산한다** — `HD(R2_before, R2_after)`.
+> 서로 다른 레지스터 쌍(`HD(R2_before, R5_after)`)은 실제 하드웨어에서 전이 누설이
+> 생기는 방식이 아니고, 조합이 폭발해 오탐만 만든다. 모델 문자열에 `same` 을 적어 이
+> 규약을 명시한다.
+
+### 3.10 실행시간·전처리·프로브 [1.1, 선택]
+
+ISO/IEC 17825 의 요건을 **판정 가능하게** 만드는 값들이다. 없으면 위반이 아니라
+"판정 불가(미기록)" 로 보고된다.
+
+| 필드 | 타입 | 뜻 | 관련 요건 |
+|---|---|---|---|
+| `exec_time_unit` | str | `"instruction"` \| `"adc_sample"` \| `"trace_tick"` | §7.3.4 타이밍 분석 |
+| `exec_time_epsilon` | float | 같다고 볼 허용 오차 ε (클럭 1사이클에 해당하는 값) | 판정이 `\|T1−T2\| < ε` 이다 |
+| `preprocessing_average_n` | int | 트레이스 1장에 평균한 실행 횟수 (기본 1) | A.2.5 전처리 |
+| `shunt_ohm` | float | VCC–IUT 사이 저항값 | Annex B.5 |
+| `shunt_selection_note` | str | 그 값을 고른 근거 | Annex B.6 (동작 가능한 최대값) |
+
+> `exec_time` 배열(§4.2)만 있고 `exec_time_unit` 이 없으면 그 숫자가 무엇의 개수인지
+> 알 수 없다. 단위 없는 물리량 필드는 금지다(§5.1).
+
 ---
 
 ## 4. Subset Metadata — 그룹 HDF5 attrs
@@ -206,22 +294,46 @@ Zarr 도 요건을 만족하지만 산출물이 디렉터리라 배포·이동�
 | `pt_mode` | str | ✔ | `"fixed"` \| `"random"` |
 | `seconds` | float | | 이 subset 수집에 걸린 시간 |
 | `mask_seeds` | uint32[] | | 대책 난수 시드 이력 (해당 시) |
+| `spa_pair_kind` | str | | 1.1 — `"same-data"` \| `"different-data-fixed"` \| `"different-data-random"` |
 
 ### 4.1 `role` 값
 
-| 값 | 뜻 |
-|---|---|
-| `exploration` | 누설 위치·측정 조건 탐색용 |
-| `profiling` | 누설 모델 학습용 (키를 안다) |
-| `attack` | 키 복구 평가용 (키 고정) |
-| `leakage-detection-fixed` | 누설 검출의 고정 입력 집단 |
-| `leakage-detection-random` | 누설 검출의 랜덤 입력 집단 |
+| 값 | 뜻 | 판번호 |
+|---|---|---|
+| `exploration` | 누설 위치·측정 조건 탐색용 | 1.0 |
+| `profiling` | 누설 모델 학습용 (키를 안다) | 1.0 |
+| `attack` | 키 복구 평가용 (키 고정) | 1.0 |
+| `leakage-detection-fixed` | 누설 검출의 고정 입력 집단 | 1.0 |
+| `leakage-detection-random` | 누설 검출의 랜덤 입력 집단 | 1.0 |
+| **`timing`** | 실행시간 측정 블록 (ISO/IEC 17825 A.2.4) | 1.1 |
+| **`simple-analysis`** | 소수 파형의 육안·통계 비교용 쌍 (A.2.2) | 1.1 |
 
 Subset **이름은 자유**지만 `role` 은 이 목록에서 고른다. 프로젝트마다 이름이 달라도
 역할로 서로를 알아볼 수 있게 하기 위함이다.
 
 > `role` 이 OPTIMIST 의 *Splitting*(train/valid/test)과 다른 이유는
 > `GLOSSARY.md` §5 의 **Subset** 항목에 적어 두었다.
+
+### 4.2 `exec_time` [1.1, 선택]
+
+`exec_time (n,)` 은 **레코드마다의 실행시간**이다. 단위는 루트의 `exec_time_unit` 이 정한다
+(§3.10).
+
+| 채널 | 무엇을 재나 |
+|---|---|
+| `power` | 트리거 하이 구간의 샘플 수 |
+| `debug-trace` | 대상 함수 진입~복귀 타임스탬프 차 |
+| `emulated-power` | 대상 구간의 명령어 수 |
+
+> **분석 때 만들 수 없는 값이라 수집 때 남겨야 한다.** 파형만 저장하고 이 값을 빠뜨리면
+> 나중에 타이밍 분석을 하려 해도 **사후 산출이 불가능**하다 — 파형은 잘려 있고 트리거
+> 구간의 원래 길이는 이미 사라졌기 때문이다. ISO/IEC 17825 A.2.4 는 타이밍 측정 수집을
+> Annex A 에서 유일하게 `shall collect` 로 요구한다.
+
+> 에뮬레이션의 `exec_time` 은 **명령어 수이지 사이클 수가 아니다.** Unicorn 에는 사이클
+> 모델이 없다(확인: `Uc` 에 사이클 카운터 API 없음). 명령어 수가 **다르면** 데이터 의존
+> 제어흐름이라는 확정 소견이지만, **같아도 constant-time 을 증명하지는 못한다.**
+> 그 확정은 실물 `trig_count` 나 디버그 트레이스의 몫이다.
 
 ---
 
@@ -266,28 +378,49 @@ Subset **이름은 자유**지만 `role` 은 이 목록에서 고른다. 프로�
 
 ## 6. 검증
 
-`workspace/[extra] SCALib/scalib_common.py` 의 `validate_dataset()` 이 이 문서를 코드로
-옮긴 것이다. 검사 항목:
+**`workspace/lib/sca_schema.py` 의 `validate_dataset(path=…)` 이 이 문서를 코드로 옮긴 것이다.**
+저장소 공용 트리에 있는 이유는 세 수집 경로(전력·디버그 트레이스·에뮬레이션)가 **같은
+검증기**를 통과해야 "준수" 의 뜻이 하나로 유지되기 때문이다. 검증기가 프로젝트마다 따로
+있으면 준수 여부도 프로젝트마다 달라진다.
 
-1. `schema` · `schema_version` 존재
-2. §3 의 필수 Metadata 존재
-3. Subset 마다 §4 의 필수 항목 존재, `role` 이 허용 목록 안
-4. `trace` · `key` · `plaintext` 존재
-5. **행 정렬** — 한 subset 안 모든 배열의 행 수 일치, `n_records` 와도 일치
-6. `sample_dtype` · `samples_per_trace` 가 실제 `trace` 와 일치
-7. 정수형 `trace` 인데 `sample_scale` 이 없으면 위반
+`[extra] SCALib/scalib_common.py` 는 이것을 재노출하므로 그 프로젝트의 노트북은
+종전대로 `validate_dataset(target=…)` 를 쓸 수 있다.
+
+검사 항목:
+
+1. `schema` · `schema_version` 존재, 판번호가 아는 값인가
+2. §3 의 필수 Metadata 존재 — **파일에 적힌 판번호의 규칙으로** 검사한다
+3. `channel_type` 이 허용 목록 안 (§3.3)
+4. 1.1: `sample_axis` 존재·허용 목록 안, 축에 따른 조건부 필수 (§3.4)
+5. 1.1: `sample_axis="instruction"` 이면 §3.9 의 에뮬레이션 필드와 루트 `sample_map` 존재
+6. 1.1: `channel_type="power"` 이면 `bandwidth_hz` 존재
+7. Subset 마다 §4 의 필수 항목 존재, `role` 이 허용 목록 안
+8. `trace` · `key` · `plaintext` 존재
+9. **행 정렬** — 한 subset 안 모든 배열의 행 수 일치, `n_records` 와도 일치
+10. `sample_dtype` · `samples_per_trace` 가 실제 `trace` 와 일치
+11. 정수형 `trace` 인데 `sample_scale` 이 없으면 위반
 
 위반 목록을 돌려주며, 비어 있으면 준수다. **수집 직후와 분석 시작 시** 호출한다.
+
+> **1.0 파일에 1.1 규칙을 적용하지 않는다.** 나중에 만든 규칙으로 옛 파일을 소급
+> 위반 처리하면, "부분 준수" 가 *데이터가 부실하다* 는 뜻인지 *스키마가 나중에 바뀌었다* 는
+> 뜻인지 구분할 수 없게 된다. 판번호는 그 구분을 위해 있다.
 
 ---
 
 ## 7. 이 저장소의 데이터셋
 
-| 파일 | 준수 | 비고 |
-|---|---|---|
-| `workspace/[extra] SCALib/traces/scalib_dataset_tiny-AES-c.h5` | 완전 | 비마스킹 AES |
-| `workspace/[extra] SCALib/traces/scalib_dataset_masked-aes-c.h5` | 완전 | 마스킹 AES, `mask` 포함 |
-| `workspace/traces/*.h5` (튜토리얼 1강) | **부분** | §7.1 |
+| 파일 | 판번호 | 준수 | 비고 |
+|---|---|---|---|
+| `workspace/[extra] SCALib/traces/scalib_dataset_tiny-AES-c.h5` | 1.0 | 완전 | 비마스킹 AES |
+| `workspace/[extra] SCALib/traces/scalib_dataset_masked-aes-c.h5` | 1.0 | 완전 | 마스킹 AES, `mask` 포함 |
+| `workspace/traces/*.h5` (튜토리얼 1강) | 1.0 | **부분** | §7.1 |
+| `workspace/[extra] Physical-AI-SCA/traces/*.h5` | 1.1 | 완전 | 에뮬레이션, `sample_map`·`exec_time` 포함 |
+
+> **1.0 데이터셋이 1.1 의 새 필드를 갖추지 못한 것은 위반이 아니다.** 그 파일들은 1.0
+> 데이터셋이고 1.0 을 완전히 지킨다. 다만 ISO/IEC 17825 요건을 판정하려면 1.1 이 요구하는
+> 값(`bandwidth_hz`·`exec_time`·`shunt_ohm` 등)이 필요하므로, **요건 대조표에서는
+> "미기록 → 판정 불가"** 로 보고된다. 스키마 준수와 시험 요건 충족은 다른 축이다.
 
 ### 7.1 튜토리얼 데이터셋이 부분 준수인 이유
 

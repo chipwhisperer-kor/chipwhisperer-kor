@@ -866,30 +866,30 @@
  577              		.file 8 "<built-in>"
 DEFINED SYMBOLS
                             *ABS*:00000000 simpleserial-base.c
-     /tmp/ccEGZZyY.s:19     .text.my_init:00000000 $t
-     /tmp/ccEGZZyY.s:25     .text.my_init:00000000 my_init
-     /tmp/ccEGZZyY.s:229    .text.my_init:000000a0 $d
-     /tmp/ccEGZZyY.s:235    .text.my_update:00000000 $t
-     /tmp/ccEGZZyY.s:241    .text.my_update:00000000 my_update
-     /tmp/ccEGZZyY.s:306    .text.my_update:00000044 $d
-     /tmp/ccEGZZyY.s:311    .text.my_final:00000000 $t
-     /tmp/ccEGZZyY.s:317    .text.my_final:00000000 my_final
-     /tmp/ccEGZZyY.s:382    .text.my_final:00000024 $d
-     /tmp/ccEGZZyY.s:390    .text.get_key:00000000 $t
-     /tmp/ccEGZZyY.s:396    .text.get_key:00000000 get_key
-     /tmp/ccEGZZyY.s:414    .text.get_pt:00000000 $t
-     /tmp/ccEGZZyY.s:420    .text.get_pt:00000000 get_pt
-     /tmp/ccEGZZyY.s:453    .text.reset:00000000 $t
-     /tmp/ccEGZZyY.s:459    .text.reset:00000000 reset
-     /tmp/ccEGZZyY.s:472    .text.startup.main:00000000 $t
-     /tmp/ccEGZZyY.s:478    .text.startup.main:00000000 main
-     /tmp/ccEGZZyY.s:536    .text.startup.main:0000003c $d
-     /tmp/ccEGZZyY.s:563    .bss:000002df global_len
-     /tmp/ccEGZZyY.s:567    .bss:000002e0 global_masks
-     /tmp/ccEGZZyY.s:559    .bss:000001ea global_ret
-     /tmp/ccEGZZyY.s:555    .bss:000000f5 global_p
-     /tmp/ccEGZZyY.s:551    .bss:00000000 global_k
-     /tmp/ccEGZZyY.s:552    .bss:00000000 $d
+     /tmp/cc8gX44b.s:19     .text.my_init:00000000 $t
+     /tmp/cc8gX44b.s:25     .text.my_init:00000000 my_init
+     /tmp/cc8gX44b.s:229    .text.my_init:000000a0 $d
+     /tmp/cc8gX44b.s:235    .text.my_update:00000000 $t
+     /tmp/cc8gX44b.s:241    .text.my_update:00000000 my_update
+     /tmp/cc8gX44b.s:306    .text.my_update:00000044 $d
+     /tmp/cc8gX44b.s:311    .text.my_final:00000000 $t
+     /tmp/cc8gX44b.s:317    .text.my_final:00000000 my_final
+     /tmp/cc8gX44b.s:382    .text.my_final:00000024 $d
+     /tmp/cc8gX44b.s:390    .text.get_key:00000000 $t
+     /tmp/cc8gX44b.s:396    .text.get_key:00000000 get_key
+     /tmp/cc8gX44b.s:414    .text.get_pt:00000000 $t
+     /tmp/cc8gX44b.s:420    .text.get_pt:00000000 get_pt
+     /tmp/cc8gX44b.s:453    .text.reset:00000000 $t
+     /tmp/cc8gX44b.s:459    .text.reset:00000000 reset
+     /tmp/cc8gX44b.s:472    .text.startup.main:00000000 $t
+     /tmp/cc8gX44b.s:478    .text.startup.main:00000000 main
+     /tmp/cc8gX44b.s:536    .text.startup.main:0000003c $d
+     /tmp/cc8gX44b.s:563    .bss:000002df global_len
+     /tmp/cc8gX44b.s:567    .bss:000002e0 global_masks
+     /tmp/cc8gX44b.s:559    .bss:000001ea global_ret
+     /tmp/cc8gX44b.s:555    .bss:000000f5 global_p
+     /tmp/cc8gX44b.s:551    .bss:00000000 global_k
+     /tmp/cc8gX44b.s:552    .bss:00000000 $d
 
 UNDEFINED SYMBOLS
 simpleserial_put

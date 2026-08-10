@@ -40,6 +40,24 @@
 **Channel(채널)**
 The source of a measurement of a physical value over time. `[OPTIMIST]`
 
+> **이 저장소는 Channel 을 물리 측정 밖으로 넓혀 쓴다 — 표준 용어가 아니다.**
+> OPTIMIST 의 정의는 *physical value* 를 *over time* 으로 측정한 것인데,
+> `SCHEMA.md` 1.1 의 `channel_type` 에는 그 정의를 벗어나는 두 값이 있다.
+>
+> | 값 | 정의에서 벗어나는 점 |
+> |---|---|
+> | `emulated-power` | **측정이 아니다.** 에뮬레이터가 누설 모델(HW·HD)로 **계산한** 값이고, 축도 시간이 아니라 명령어 순번이다 |
+> | `debug-trace` | 물리량이 아니라 프로세서가 **보고한 이벤트**다 |
+>
+> 왜 그렇게 하는가: 이 저장소는 한 구현을 세 가지 방식으로 관측하고, 셋을 **같은 분석기와
+> 같은 판정 기준** 위에 놓아야 "가장 약한 고리" 를 찾을 수 있다. 그러려면 세 산출물이
+> 같은 스키마를 따라야 한다. 대신 값의 정체를 숨기지 않는다 — 에뮬레이션 채널은
+> `leakage_model` 과 `sample_axis` 를 **필수로** 적게 해서, 읽는 사람이 그것을 측정치로
+> 오해할 수 없게 했다(`SCHEMA.md` §3.3·§3.4·§3.9).
+>
+> 문서·주석에서 이 두 값을 가리킬 때는 "측정" 이 아니라 **"관측"** 또는 **"산출"** 이라고
+> 적는다. OPTIMIST 의 Channel 을 인용하는 문맥에서는 원 정의를 그대로 쓴다.
+
 **Trigger(트리거)**
 A Channel used to synchronize measurements with specific operations in the Target. `[OPTIMIST]`
 

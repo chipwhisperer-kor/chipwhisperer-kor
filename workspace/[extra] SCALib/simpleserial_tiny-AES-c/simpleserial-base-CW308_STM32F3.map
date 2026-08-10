@@ -682,35 +682,35 @@ LOAD /usr/lib/gcc/arm-none-eabi/12.2.1/thumb/v7e-m/nofp/libgcc.a
  .debug_ranges  0x00000260       0xb0 objdir-CW308_STM32F3/stm32f3_hal.o
  .debug_ranges  0x00000310      0x210 objdir-CW308_STM32F3/stm32f3_hal_lowlevel.o
 
-.debug_line     0x00000000     0x2c61
- .debug_line    0x00000000       0xf5 objdir-CW308_STM32F3/my_crypt.o
- .debug_line    0x000000f5      0x2bd objdir-CW308_STM32F3/simpleserial-base.o
- .debug_line    0x000003b2      0x55e objdir-CW308_STM32F3/aes.o
- .debug_line    0x00000910      0x595 objdir-CW308_STM32F3/simpleserial.o
- .debug_line    0x00000ea5      0x359 objdir-CW308_STM32F3/stm32f3_hal.o
- .debug_line    0x000011fe     0x16ce objdir-CW308_STM32F3/stm32f3_hal_lowlevel.o
- .debug_line    0x000028cc      0x12c /usr/lib/gcc/arm-none-eabi/12.2.1/../../../arm-none-eabi/lib/thumb/v7e-m/nofp/libg_nano.a(lib_a-init.o)
- .debug_line    0x000029f8       0xb9 /usr/lib/gcc/arm-none-eabi/12.2.1/../../../arm-none-eabi/lib/thumb/v7e-m/nofp/libg_nano.a(lib_a-memcpy.o)
- .debug_line    0x00002ab1      0x1b0 /usr/lib/gcc/arm-none-eabi/12.2.1/../../../arm-none-eabi/lib/thumb/v7e-m/nofp/libg_nano.a(lib_a-memset.o)
+.debug_line     0x00000000     0x2c6f
+ .debug_line    0x00000000       0xfc objdir-CW308_STM32F3/my_crypt.o
+ .debug_line    0x000000fc      0x2bd objdir-CW308_STM32F3/simpleserial-base.o
+ .debug_line    0x000003b9      0x565 objdir-CW308_STM32F3/aes.o
+ .debug_line    0x0000091e      0x595 objdir-CW308_STM32F3/simpleserial.o
+ .debug_line    0x00000eb3      0x359 objdir-CW308_STM32F3/stm32f3_hal.o
+ .debug_line    0x0000120c     0x16ce objdir-CW308_STM32F3/stm32f3_hal_lowlevel.o
+ .debug_line    0x000028da      0x12c /usr/lib/gcc/arm-none-eabi/12.2.1/../../../arm-none-eabi/lib/thumb/v7e-m/nofp/libg_nano.a(lib_a-init.o)
+ .debug_line    0x00002a06       0xb9 /usr/lib/gcc/arm-none-eabi/12.2.1/../../../arm-none-eabi/lib/thumb/v7e-m/nofp/libg_nano.a(lib_a-memcpy.o)
+ .debug_line    0x00002abf      0x1b0 /usr/lib/gcc/arm-none-eabi/12.2.1/../../../arm-none-eabi/lib/thumb/v7e-m/nofp/libg_nano.a(lib_a-memset.o)
 
-.debug_str      0x00000000     0x16f6
+.debug_str      0x00000000     0x16fd
  .debug_str     0x00000000      0x1a7 objdir-CW308_STM32F3/my_crypt.o
                                 0x1f0 (size before relaxing)
  .debug_str     0x000001a7      0x10e objdir-CW308_STM32F3/simpleserial-base.o
                                 0x2a7 (size before relaxing)
- .debug_str     0x000002b5       0x9f objdir-CW308_STM32F3/aes.o
-                                0x283 (size before relaxing)
- .debug_str     0x00000354      0x137 objdir-CW308_STM32F3/simpleserial.o
+ .debug_str     0x000002b5       0xa6 objdir-CW308_STM32F3/aes.o
+                                0x28a (size before relaxing)
+ .debug_str     0x0000035b      0x137 objdir-CW308_STM32F3/simpleserial.o
                                 0x338 (size before relaxing)
- .debug_str     0x0000048b      0x73c objdir-CW308_STM32F3/stm32f3_hal.o
+ .debug_str     0x00000492      0x73c objdir-CW308_STM32F3/stm32f3_hal.o
                                 0x944 (size before relaxing)
- .debug_str     0x00000bc7      0x882 objdir-CW308_STM32F3/stm32f3_hal_lowlevel.o
+ .debug_str     0x00000bce      0x882 objdir-CW308_STM32F3/stm32f3_hal_lowlevel.o
                                0x1163 (size before relaxing)
- .debug_str     0x00001449      0x15f /usr/lib/gcc/arm-none-eabi/12.2.1/../../../arm-none-eabi/lib/thumb/v7e-m/nofp/libg_nano.a(lib_a-init.o)
+ .debug_str     0x00001450      0x15f /usr/lib/gcc/arm-none-eabi/12.2.1/../../../arm-none-eabi/lib/thumb/v7e-m/nofp/libg_nano.a(lib_a-init.o)
                                 0x1f5 (size before relaxing)
- .debug_str     0x000015a8       0xad /usr/lib/gcc/arm-none-eabi/12.2.1/../../../arm-none-eabi/lib/thumb/v7e-m/nofp/libg_nano.a(lib_a-memcpy.o)
+ .debug_str     0x000015af       0xad /usr/lib/gcc/arm-none-eabi/12.2.1/../../../arm-none-eabi/lib/thumb/v7e-m/nofp/libg_nano.a(lib_a-memcpy.o)
                                  0xb4 (size before relaxing)
- .debug_str     0x00001655       0xa1 /usr/lib/gcc/arm-none-eabi/12.2.1/../../../arm-none-eabi/lib/thumb/v7e-m/nofp/libg_nano.a(lib_a-memset.o)
+ .debug_str     0x0000165c       0xa1 /usr/lib/gcc/arm-none-eabi/12.2.1/../../../arm-none-eabi/lib/thumb/v7e-m/nofp/libg_nano.a(lib_a-memset.o)
                                 0x1aa (size before relaxing)
 
 .debug_frame    0x00000000      0x62c
