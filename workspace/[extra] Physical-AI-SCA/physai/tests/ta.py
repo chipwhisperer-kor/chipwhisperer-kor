@@ -132,7 +132,7 @@ def run(dataset_path, spec):
         stages      : 단계별 결과
         instrument  : 실행시간을 무엇으로 쟀는가
         cycle_accurate : bool — False 면 "같다"가 constant-time 을 증명하지 못한다
-        requirement : Annex A 의 장수 요건 충족 여부
+        requirement : Annex A 의 트레이스 수 요건 충족 여부
     """
     attrs = S.root_attrs(dataset_path)
     unit = str(attrs.get("exec_time_unit", ""))
@@ -168,7 +168,7 @@ def run(dataset_path, spec):
             continue
         g = S.load_group(dataset_path, sub["name"],
                          fields=[S.F_EXEC_TIME, split_field])
-        # 장수는 **목표치가 아니라 실보유량**으로 센다. spec 의 n 을 믿으면 수집이
+        # 트레이스 수는 **목표치가 아니라 실보유량**으로 센다. spec 의 n 을 믿으면 수집이
         # 중간에 끊긴 데이터셋에서 요건 충족을 거짓으로 보고하게 된다.
         have = int(g[S.F_EXEC_TIME].shape[0])
         if have < need:

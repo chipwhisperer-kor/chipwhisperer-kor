@@ -63,11 +63,11 @@ Zarr 도 요건을 만족하지만 산출물이 디렉터리라 배포·이동�
 ```text
 <name>.h5                          ← Dataset 한 벌 = Target 1개 × Channel 1개
  │
- ├─ HDF5 attrs                     ← Metadata (§3)
+ ├─ HDF5 attrs                     ← Metadata(메타데이터) (§3)
  ├─ sample_map  (ns, 3)            ← 샘플 → 명령어 역매핑 [1.1, 명령어 축이면 필수] §3.9
  │
  └─ /<subset>/                     ← Subset: 수집 규약이 같은 Record 묶음
-      ├─ HDF5 attrs                ← Subset Metadata (§4)
+      ├─ HDF5 attrs                ← Subset metadata(서브셋 메타데이터) (§4)
       ├─ trace       (n, ns)       ← Trace          [필수]
       ├─ key         (n, kb)       ← Attribute      [필수]
       ├─ plaintext   (n, pb)       ← Attribute      [필수]
@@ -96,7 +96,7 @@ Zarr 도 요건을 만족하지만 산출물이 디렉터리라 배포·이동�
 
 ---
 
-## 3. Metadata — 루트 HDF5 attrs
+## 3. Metadata(메타데이터) — 루트 HDF5 attrs
 
 필드마다 **왜 필요한지** 근거를 단다. 근거를 댈 수 없는 필드는 넣지 않는다.
 
@@ -107,7 +107,7 @@ Zarr 도 요건을 만족하지만 산출물이 디렉터리라 배포·이동�
 | `schema` | str | 고정값 `"sca-hdf5"` | 파일만 보고 규약을 알 수 있어야 한다 |
 | `schema_version` | str | 예 `"1.0"` | OPTIMIST: Backward Compatibility·Extensibility |
 
-### 3.2 Target / IUT [필수]
+### 3.2 Target(타겟) / IUT [필수]
 
 | 필드 | 타입 | 뜻 |
 |---|---|---|
@@ -125,7 +125,7 @@ Zarr 도 요건을 만족하지만 산출물이 디렉터리라 배포·이동�
 > 를 명시한다. **`iut_countermeasure` 를 `"none"` 이라도 반드시 적는다** — 비워 두면
 > "대책이 없음" 과 "기록하지 않음" 을 구분할 수 없다.
 
-### 3.3 Channel [필수]
+### 3.3 Channel(채널) [필수]
 
 | 필드 | 타입 | 뜻 |
 |---|---|---|
@@ -184,7 +184,7 @@ Zarr 도 요건을 만족하지만 산출물이 디렉터리라 배포·이동�
 > 만족하는지 **판정할 수 없다.** `synchronous_sampling` 은 타겟 클럭에 동기 샘플링했는지로,
 > Annex B.1 이 "동기 샘플링이면 훨씬 낮은 샘플레이트로도 유효하다" 고 적은 예외에 해당한다.
 
-### 3.5 Trigger [필수]
+### 3.5 Trigger(트리거) [필수]
 
 | 필드 | 타입 | 뜻 |
 |---|---|---|
@@ -284,7 +284,7 @@ ISO/IEC 17825 의 요건을 **판정 가능하게** 만드는 값들이다. 없�
 
 ---
 
-## 4. Subset Metadata — 그룹 HDF5 attrs
+## 4. Subset metadata(서브셋 메타데이터) — 그룹 HDF5 attrs
 
 | 필드 | 타입 | 필수 | 뜻 |
 |---|---|---|---|

@@ -193,7 +193,7 @@ def _annex_a_items(attrs, spec, results, A, level):
                          OK if hours <= lim else NG,
                          evidence="실제 %.2f h" % hours))
 
-    # A.2.3 / A.3.3 + Formula (1) — DPA 장수
+    # A.2.3 / A.3.3 + Formula (1) — DPA 트레이스 수
     r = (results or {}).get("tests", {}).get("dpa", {})
     req = r.get("requirement")
     if req:

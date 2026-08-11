@@ -20,7 +20,7 @@ python3 -m physai.collectors.emulation --selftest --n 10
 | 골든 AES 일치 | 에뮬레이션 환경이 잘못됐다. 하네스 빌드부터 다시 본다 |
 | 마스크 회수 (masked) | 시드 주입 경로가 끊겼다. `vir_IN[32:36]` 규약을 확인한다 |
 | **명령어 수 고정** | `sample_map` 이 성립하지 않는다. 누설 검정을 진행할 수 없다 (TA 는 유효) |
-| 1장당 소요시간 | 목표 장수를 다시 정한다 |
+| Trace 1개당 소요 시간 | 목표 트레이스 수를 다시 정한다 |
 
 ---
 
@@ -56,8 +56,8 @@ python3 -m physai.collectors.emulation --selftest --n 10
 
 ### 적지 않는 것
 
-**필요 장수 N 을 spec 에 적지 않는다.** `spec.required_n()` 이 Formula (1) 로 계산한다.
-장수는 판단이 아니라 α·β·d 의 **결과**이고, 따로 적으면 파라미터와 어긋난다.
+**필요 트레이스 수 N 을 spec 에 적지 않는다.** `spec.required_n()` 이 Formula (1) 로 계산한다.
+트레이스 수는 판단이 아니라 α·β·d 의 **결과**이고, 따로 적으면 파라미터와 어긋난다.
 
 ### subset 구성 — 분석이 요구하는 role
 
@@ -123,7 +123,7 @@ TA → SPA → DPA 순서로 수행한다. **앞이 fail 이어도 뒤를 계속
 
 ### 해석할 때 지킬 것
 
-1. **`inconclusive` 를 `pass` 로 옮기지 않는다.** 장수 부족이나 육안 미결은 "안전" 이 아니다.
+1. **`inconclusive` 를 `pass` 로 옮기지 않는다.** 트레이스 수 부족이나 육안 미결은 "안전" 이 아니다.
 2. **`spa` 의 `inconclusive` 를 "안전" 으로 옮기지 않는다.** 그것은 이 도구가 판정할 수
    없다는 뜻이다. `statistical_verdict` 를 그대로 인용한다.
 3. **경계 밖 검출을 fail 로 세지 않는다.** Annex H 에 따라 별도 목록으로 보고한다.

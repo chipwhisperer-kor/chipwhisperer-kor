@@ -3,7 +3,7 @@
 spec 은 **AI 와 도구 사이의 유일한 접점**이다. AI 가 실험을 설계해 YAML 로 쓰고,
 collect·analyze 가 그것만 읽는다. 사람이 손으로 써도 똑같이 동작한다.
 
-여기서 계산하는 유도값(필요 장수 N, 보정 임계)은 spec 에 적지 않는다 —
+여기서 계산하는 유도값(필요 트레이스 수 N, 보정 임계)은 spec 에 적지 않는다 —
 파라미터의 **결과**이지 판단이 아니기 때문이다. 적어 두면 파라미터와 어긋날 수 있다.
 """
 
@@ -105,7 +105,7 @@ def required_n(criteria):
 
         N = 4 (Z_{α/2} + Z_β)² / d²
 
-    두 subset 을 합친 수다(N = N_A + N_B). 장수는 판단이 아니라 α·β·d 의 **결과**이므로
+    두 subset 을 합친 수다(N = N_A + N_B). 트레이스 수는 판단이 아니라 α·β·d 의 **결과**이므로
     spec 에 적지 않고 여기서 계산해 계획 보고서에 근거와 함께 싣는다.
     """
     a, b, d = criteria["alpha"], criteria["beta"], criteria["effect_size_d"]
@@ -124,8 +124,8 @@ def corrected_threshold(criteria, n_tests):
     |t| > 4.5 를 쓰면 귀무가설이 참이어도 수십 개가 우연히 넘는다.
 
     Bonferroni: per-test 유의수준 α/m 에 해당하는 정규분포 양측 임계를 쓴다.
-    (자유도가 큰 t 분포는 정규분포에 수렴하므로 정규 근사로 충분하다. 표본이
-     수천 이상인 이 시험의 조건에서 그렇다.)
+    (자유도가 큰 t 분포는 정규분포에 수렴하므로 정규 근사로 충분하다. 트레이스가
+     수천 개 이상인 이 시험의 조건에서 그렇다.)
     """
     t0 = float(criteria["t_threshold"])
     kind = criteria["multiplicity_correction"]

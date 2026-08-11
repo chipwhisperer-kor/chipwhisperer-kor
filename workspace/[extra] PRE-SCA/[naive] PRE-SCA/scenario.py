@@ -1,3 +1,10 @@
+"""CSV로 정의한 Fault injection(오류주입) 시나리오를 적용한다.
+
+`Scenario`는 레지스터 변경·비트 반전·명령어 건너뛰기 정보를 CSV에서 읽어 메모리에
+보관한다. 시나리오 파일이 없으면 정상 모드로 계속하고, 파싱 오류는 출력한 뒤 읽은
+항목만 유지한다. 실행 중 Unicorn 레지스터를 변경하는 것이 주요 부작용이다.
+"""
+
 import csv
 import os
 from typing import List, Dict, Any, Optional, Union
@@ -15,9 +22,10 @@ import config
 import setEmulData
 
 class Scenario:
-    """
-    오류 주입(Fault Injection) 시나리오를 관리하고 실행하는 클래스입니다.
-    CSV 파일에서 정의된 시나리오를 로드하여 에뮬레이터 상태를 제어합니다.
+    """CSV 시나리오를 읽어 Unicorn 레지스터와 PC에 적용한다.
+
+    초기화 시 `config.fault_reg_file`을 읽고 각 행을 실행 가능한 값으로 변환한다. 유효하지
+    않은 행은 무시하며, 파일이 없으면 빈 시나리오를 만든다.
     """
 
     # CSV 컬럼 순서 및 레지스터 키 정의
@@ -42,7 +50,7 @@ class Scenario:
 
     @property
     def Fault_list(self) -> List[Dict[str, Any]]:
-        """외부 모듈 호환성을 위한 프로퍼티"""
+        """레거시 외부 모듈이 사용하는 시나리오 목록 속성을 반환한다."""
         return self.fault_list
 
     def _load_scenario_data(self):

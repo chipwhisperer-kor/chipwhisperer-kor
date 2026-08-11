@@ -1,3 +1,11 @@
+"""단순 PRE-SCA의 ARM 에뮬레이션·오류주입 실행기.
+
+`config.py`의 ELF와 CSV 입력을 읽어 Unicorn으로 실행하고, 명령어·레지스터·가상 I/O
+로그를 파일로 쓴다. 파일 생성과 로그 출력이 주요 부작용이며, ELF 심볼이 없거나
+입력 형식이 잘못되면 초기화 또는 실행이 실패한다. 동일 입력을 매 명령어에서 다시 읽는
+레거시 구조이므로 대량 Dataset(데이터셋) 수집용으로 사용하지 않는다.
+"""
+
 import os
 import csv
 import sys
@@ -13,7 +21,7 @@ import logger
 from scenario import Scenario
 
 # -----------------------------------------------------------------------------
-# Helper Functions
+# 공용 도우미
 # -----------------------------------------------------------------------------
 
 def get_log_context() -> Tuple[str, str]:
@@ -34,8 +42,11 @@ def get_log_context() -> Tuple[str, str]:
     return dirname, prefix
 
 def make_io_data_files(uc: Uc, index: int):
-    """
-    에뮬레이션 종료 후 가상 I/O 메모리(VirIN, VirOUT) 내용을 CSV로 저장합니다.
+    """에뮬레이션 종료 후 가상 I/O 메모리를 CSV로 저장한다.
+
+    `uc`의 `vir_IN`·`vir_OUT` 영역을 읽으며, `index > 0`이면 오류주입 결과 파일로
+    명명한다. 로그 경로가 아직 없으면 아무것도 쓰지 않고, 메모리·파일 I/O 실패는
+    출력한 뒤 반환한다.
     """
     log_folder, date_prefix = get_log_context()
     if not date_prefix:
@@ -91,12 +102,13 @@ def inject_input_data(uc: Uc, data_row: List[int]):
     uc.mem_write(setEmulData.vir_in_addr, packed_data)
 
 # -----------------------------------------------------------------------------
-# disassembly Generator (Restored Logic)
+# 디스어셈블리 생성
 # -----------------------------------------------------------------------------
 def make_disassembly_file():
     """
-    Capstone 엔진을 사용하여 바이너리를 디스어셈블하고 disassembly.txt를 생성합니다.
-    중간에 해석 불가능한 데이터가 있어도 건너뛰고 끝까지 생성하도록 로직을 강화했습니다.
+    Capstone으로 바이너리를 해석해 `disassembly.txt`를 생성한다.
+    해석할 수 없는 데이터·패딩은 실행 모드 단위로 건너뛴다. 기존 파일은 덮어쓰며,
+    파일 I/O 또는 Capstone 초기화 실패는 호출자에게 전파된다.
     """
     ref_file_path = 'disassembly.txt'
     if os.path.exists(ref_file_path):
@@ -190,14 +202,12 @@ def make_disassembly_file():
                     virtual_addr += setEmulData.MODE
 
 # -----------------------------------------------------------------------------
-# Emulation Core Logic
+# 에뮬레이션 핵심 로직
 # -----------------------------------------------------------------------------
-sync_ctr = 0  # Global sync counter for input injection
+sync_ctr = 0  # 입력 주입 순서를 맞추는 공용 카운터
 
 def hook_code_trace(uc: Uc, address: int, size: int, user_data: Any):
-    """
-    명령어 실행 추적 훅
-    """
+    """명령어 실행 전 레지스터 상태를 기록하고 종료 주소에서 에뮬레이션을 멈춘다."""
     logger.write_log_regs(uc, address, user_data)
     
     # 종료 주소 도달 시 에뮬레이션 중단
@@ -207,9 +217,7 @@ def hook_code_trace(uc: Uc, address: int, size: int, user_data: Any):
         uc.emu_stop()
 
 def hook_scene_injection(uc: Uc, address: int, size: int, scene: Scenario):
-    """
-    입력 데이터 주입 및 오류 주입(Fault Injection) 훅
-    """
+    """명령어 순서에 맞춰 입력 데이터와 Fault injection(오류주입) 시나리오를 적용한다."""
     global sync_ctr
     
     # 1. 입력 데이터 주입 (Sync Counter 기반)
@@ -247,7 +255,7 @@ def hook_scene_injection(uc: Uc, address: int, size: int, scene: Scenario):
 
     sync_ctr += 1
     
-    # Loop Reset
+    # 다음 실행을 위해 입력 순서 카운터를 초기화한다.
     exit_target = setEmulData.exit_addr_real - (1 if setEmulData.MODE == 2 else 0)
     if address == exit_target:
         sync_ctr = 0
@@ -311,7 +319,7 @@ def run():
     # 2. 시나리오 준비
     scene = Scenario()
     
-    # Fault List 존재 여부에 따라 실행 횟수 결정 (Normal -> Faulty)
+    # 시나리오가 있으면 정상 실행 후 오류주입 항목별로 한 번씩 실행한다.
     run_count = 2 if scene.Fault_list else 1
 
     for i in range(run_count):

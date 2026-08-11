@@ -1,12 +1,21 @@
+"""ELF에서 에뮬레이션에 필요한 심볼·섹션·메모리 배치를 읽는 모듈.
+
+`ElfParser`는 LIEF가 파싱한 ELF 객체를 보관하며 파일 자체는 변경하지 않는다. 파일이
+없거나 LIEF가 파싱하지 못하면 초기화가 실패한다. 일부 레거시 메서드는 호출부 호환을
+위해 실패 시 프로세스를 종료한다.
+"""
+
 import sys
 import os
 import lief
 from typing import List, Dict, Tuple, Any, Optional
 
 class ElfParser:
-    """
-    ELF 바이너리 파일을 파싱하여 에뮬레이션에 필요한 메모리 맵, 함수 주소,
-    코드 세그먼트 정보를 제공하는 클래스입니다.
+    """ELF 메모리 배치와 함수·I/O 심볼 주소를 제공한다.
+
+    입력은 ELF 파일 경로이다. 초기화 과정에서 파일을 읽고 주소순 함수 표를 메모리에
+    구축한다. 파일이 없으면 `FileNotFoundError`, 파싱 결과가 없으면 `ValueError`가
+    발생한다. ELF 파일에는 부작용이 없다.
     """
 
     def __init__(self, elf_file_path: str):
@@ -44,11 +53,7 @@ class ElfParser:
         self.sorted_functions = dict(sorted(self.functions.items(), key=lambda item: item[1]))
 
     def check_mode(self) -> int:
-        """
-        시작 주소를 기반으로 프로세서 모드를 확인합니다.
-        Returns:
-            int: 2 (Thumb mode) or 4 (ARM mode)
-        """
+        """시작 주소의 하위 비트로 실행 모드를 판별하여 Thumb이면 2, ARM이면 4를 반환한다."""
         start_addr = self.get_start_addr()
         # 주소의 최하위 비트가 1이면 Thumb 모드
         return 2 if start_addr % 2 == 1 else 4
@@ -58,23 +63,16 @@ class ElfParser:
         return self.get_func_address('_init')
 
     def get_func_address(self, func_name: str) -> int:
-        """
-        특정 함수의 시작 주소를 반환합니다.
-        존재하지 않을 경우 ValueError를 발생시킵니다.
-        """
+        """함수 시작 주소를 반환하고, 심볼이 없으면 오류를 출력한 뒤 프로세스를 종료한다."""
         addr = self.sorted_functions.get(func_name)
         if addr is None:
-            # 기존 레거시 코드와의 호환성을 위해 sys.stderr 출력 후 종료 패턴 유지 고려
-            # 하지만 리팩토링 원칙상 예외 발생이 더 적절함. 
-            # 호출부에서 처리를 위해 여기서는 명확한 에러 메시지를 남기고 종료.
+            # 호출부가 종료 동작에 의존하므로 레거시 실패 방식을 유지한다.
             sys.stderr.write(f"Error: Function '{func_name}' does not exist in the symbol table.\n")
             sys.exit(1)
         return addr
 
     def get_code(self, address: int) -> bytes:
-        """
-        지정된 주소(파일 오프셋 아님)부터 파일의 끝까지 바이너리 데이터를 읽어옵니다.
-        """
+        """`address`를 파일 오프셋으로 사용해 ELF 끝까지 읽고, 실패하면 프로세스를 종료한다."""
         try:
             with open(self.elf_file_path, "rb") as f:
                 f.seek(address, 0)
@@ -84,7 +82,7 @@ class ElfParser:
             sys.exit(1)
 
     def get_io_addr_data(self) -> Tuple[int, int]:
-        """가상 I/O 변수(vir_IN, vir_OUT)의 주소를 반환합니다."""
+        """가상 I/O 심볼 `vir_IN`·`vir_OUT`의 주소를 반환하고, 실패하면 종료한다."""
         try:
             addr_in = self.elf_binary.get_symbol("vir_IN").value
             addr_out = self.elf_binary.get_symbol("vir_OUT").value
@@ -94,14 +92,14 @@ class ElfParser:
             sys.exit(1)
 
     def get_symbol_len(self, symbol_name: str) -> int:
-        """심볼의 크기(Size)를 반환합니다."""
+        """심볼 크기를 바이트 단위로 반환하며, 심볼이 없으면 0을 반환한다."""
         symbol = self.elf_binary.get_symbol(symbol_name)
         if symbol:
             return symbol.size
         return 0
 
     def get_stack_addr(self) -> int:
-        """스택 포인터(_stack)의 초기 주소를 반환합니다."""
+        """스택 포인터 `_stack`의 초기 주소를 반환하고, 심볼이 없으면 종료한다."""
         try:
             return self.elf_binary.get_symbol("_stack").value
         except AttributeError:
@@ -109,11 +107,7 @@ class ElfParser:
             sys.exit(1)
 
     def section_data_list(self) -> Tuple[List[List[Any]], List[int], List[int], int, int]:
-        """
-        모든 섹션 정보를 추출합니다.
-        Returns:
-            (All Sections, RAM Addresses, Flash Offsets, RAM Size, Flash Size)
-        """
+        """섹션 목록, RAM 주소, Flash 오프셋, RAM·Flash 크기를 순서대로 반환한다."""
         sections_info = []
         ram_addrs = []
         flash_offsets = []
@@ -143,16 +137,13 @@ class ElfParser:
         return sections_info, ram_addrs, flash_offsets, total_ram_size, total_flash_size
 
     def check_list(self, input_list: List[List[Any]]) -> List[List[Any]]:
-        """
-        리스트 내의 인접한 요소들 중 두 번째 항목(주로 주소)이 중복될 경우 제거합니다.
-        (Legacy Logic: Section/Function 리스트 정제용)
-        """
+        """인접 항목의 두 번째 값이 중복되면 뒤 항목을 제거한 새 목록을 반환한다."""
         if not input_list:
             return []
 
         cleaned_list = [input_list[0]]
         
-        # 인접 중복 제거 로직 (O(N))
+        # 인접 중복만 제거하므로 입력은 두 번째 값을 기준으로 미리 정렬되어야 한다.
         for item in input_list[1:]:
             # 이전 항목의 두 번째 요소(Address/Offset)와 현재 항목 비교
             if item[1] != cleaned_list[-1][1]:

@@ -1,3 +1,11 @@
+"""에뮬레이션 명령어와 실행 전·후 레지스터 상태를 CSV로 기록한다.
+
+`TraceLogger`는 메모리 버퍼와 명령어 캐시를 관리하고, 레거시 호출부를 위해 모듈 수준
+함수와 `LOG_MATRIX`를 유지한다. import 시 단일 로거를 생성하며 로그 디렉터리를 만드는
+부작용이 있다. CSV 쓰기에 실패하면 오류를 출력하고 다음 실행을 위해 버퍼를
+초기화한다.
+"""
+
 import os
 import csv
 import datetime
@@ -16,18 +24,20 @@ from config import log_file_name
 import setEmulData
 
 # -----------------------------------------------------------------------------
-# Module Level Constants & Globals (For Compatibility)
+# 모듈 공용 상태 — 레거시 호환용
 # -----------------------------------------------------------------------------
 # emul.py 등 외부 모듈에서 직접 참조하는 전역 변수(LOG_MATRIX)와의 호환성을 위해 유지합니다.
 LOG_MATRIX: List[List[Any]] = []
 
 # -----------------------------------------------------------------------------
-# TraceLogger Class
+# 레지스터 트레이스 로거
 # -----------------------------------------------------------------------------
 class TraceLogger:
-    """
-    에뮬레이션 실행 중 발생하는 레지스터 상태와 명령어 흐름을 기록하는 로거입니다.
-    기존의 전역 변수 의존성을 제거하고 상태를 캡슐화했습니다.
+    """명령어 흐름과 실행 전·후 레지스터 값을 버퍼에 모아 CSV로 저장한다.
+
+    호출부는 `set_file_index()`로 출력 파일을 정한 뒤 명령어마다 `log_state()`를
+    호출한다. 종료 주소에 도달하면 CSV를 쓰고 버퍼를 비운다. 명령어 목록이 없으면
+    opcode와 operand는 `UNKNOWN`으로 기록한다.
     """
     
     REGISTERS = [
@@ -77,7 +87,7 @@ class TraceLogger:
         """setEmulData의 명령어 리스트를 딕셔너리로 변환하여 검색 성능을 O(N)에서 O(1)로 최적화합니다."""
         if not self._is_cache_built and setEmulData.instructions:
             for item in setEmulData.instructions:
-                # item 구조: [address, mnemonic, op_str]
+                # 항목 구조: [주소, 명령어, 피연산자 문자열]
                 self._insn_cache[item[0]] = (item[1], item[2])
             self._is_cache_built = True
 
@@ -103,10 +113,10 @@ class TraceLogger:
         self.current_log_matrix.append(row)
 
         # 3. 'After' 레지스터 업데이트 로직 (이전 행의 뒷부분에 현재 레지스터 값을 붙임)
-        # Logic: 현재 스텝의 레지스터 값(regs)은 이전 스텝(ctr-1) 입장에서의 '실행 후(After)' 값입니다.
+        # 현재 단계의 레지스터 값(regs)은 이전 단계(ctr-1)의 '실행 후' 값이다.
         if self.ctr >= 1:
             # 이전 행(self.ctr)에 현재 레지스터 값들을 추가
-            # self.current_log_matrix[0]은 헤더이므로 index = self.ctr이 이전 데이터 행과 일치
+            # 0번 항목이 헤더이므로 `self.ctr`가 이전 데이터 행의 인덱스와 일치한다.
             self.current_log_matrix[self.ctr].extend(regs)
 
         self.ctr += 1
@@ -131,12 +141,12 @@ class TraceLogger:
 
 
 # -----------------------------------------------------------------------------
-# Singleton Instance
+# 단일 로거 인스턴스
 # -----------------------------------------------------------------------------
 _logger_instance = TraceLogger()
 
 # -----------------------------------------------------------------------------
-# Public API (Facade for compatibility with emul.py)
+# `emul.py`와의 호환을 위한 모듈 API
 # -----------------------------------------------------------------------------
 def make_log_file(i):
     _logger_instance.set_file_index(i)

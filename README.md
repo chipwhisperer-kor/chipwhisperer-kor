@@ -53,7 +53,7 @@ ChipWhisperer 한국어 튜토리얼 & Docker 개발 환경
 > 또한 이 문서에서 **"host"** 는 물리 PC(Windows 등)가 아니라 **VMware Ubuntu 게스트 = Docker가 동작하는 호스트**를 가리킵니다. 즉 *"host VS Code"* 는 **Ubuntu 게스트 안에서 실행하는 VS Code**를 뜻합니다.
 
 > [!TIP]
-> 이름에 **`[extra]`** 가 붙은 디렉터리는 공식 ChipWhisperer 튜토리얼과 **무관한 연구·실험 프로젝트**입니다. 학습 경로와 구분해서 참고하세요.
+> 이름에 **`[extra]`**가 붙은 디렉터리는 공식 ChipWhisperer 튜토리얼과 **무관한 연구·실험 프로젝트**입니다. 정규 학습 경로와 분리해 사용합니다.
 
 ### 🧩 주요 구성
 
@@ -65,29 +65,21 @@ ChipWhisperer 한국어 튜토리얼 & Docker 개발 환경
 | 📊 **발표 자료** | `[extra] Presentation_Marp/` — Marp 슬라이드 발표 자료 |
 | 🔬 **연구 프로젝트** | `[extra] PRE-SCA/` — Unicorn 에뮬레이션 기반 사전(pre-silicon) 분석 실험 |
 | 🧪 **SCALib 예제** | `[extra] SCALib/` — 비마스킹 ∥ 마스킹 AES 이중 타겟 분석 노트북 |
-| 🤖 **AI 사전 진단** | `[extra] Physical-AI-SCA/` — AI 가 실험 설계·수집·분석·보고를 수행하는 환경 (아래 참고) |
+| 🤖 **AI 사전 진단** | `[extra] Physical-AI-SCA/` — AI가 실험 설계·수집·분석·보고를 나누어 수행하는 환경 |
 | 🔐 **검증 대상 구현** | `workspace/iut/` — 암호 라이브러리 한 벌. 펌웨어와 에뮬레이션이 **같은 소스**를 컴파일한다 |
 | 📚 **공용 정의** | `workspace/lib/` — 스키마 검증기·AES 참조 계산. 세 수집 경로가 같은 규약을 쓰게 한다 |
 | 📐 **데이터셋 규약** | `GLOSSARY.md`·`SCHEMA.md` — 부채널 용어와 파형 데이터셋 스키마 (아래 참고) |
 
 ### 🤖 AI 기반 사전 진단 환경 (`[extra] Physical-AI-SCA/`)
 
-한 암호 구현을 **세 가지 방식으로 관측**하고, 그 결과를 하나의 스키마·하나의 판정 규칙
-위에 놓아 **가장 약한 고리**를 드러내는 환경입니다.
-
-| 관측 | 보는 것 | 상태 |
-|---|---|---|
-| 에뮬레이션 (`emulated-power`) | 이론이 끊어 놓은 누설 고리를 **구현이 되살렸는가** | ✅ 동작·검증됨 |
-| 실물 전력 (`power`) | 실제 칩에서 물리적으로 새는가 | 골격만 — **미실행** |
-| 디버그 트레이스 (`debug-trace`) | 실행 흐름이 데이터에 의존하는가 | 골격만 — **미실행** |
-
-AI 는 실험 명세(`exp/*.yaml`)를 쓰고 결과(`results.json`)를 해석합니다. **수치·판정·해시·
-요건 대조표는 전부 도구가 결정적으로 만들며**, LLM 이 없어도 산출물이 나옵니다.
-
-산출물은 셋입니다 — 실험 계획 보고서(**수집 전** 생성), 분석 결과 보고서, 제3자 재현
-가능한 증거 번들. ISO/IEC 17825:2024 를 **준용**하되 **적합성 평가가 아니라 사전
-진단(pre-assessment)** 임을 모든 보고서 첫 절에서 선언합니다 — 그 이유는 그 프로젝트
-README §2 에 있습니다.
+에뮬레이션·실물 전력·디버그 트레이스 관측을 하나의 판정 규칙으로 비교하는
+사전 진단 환경입니다. 현재 실행·검증된 경로는 에뮬레이션뿐이며, 나머지 두 수집기는
+미실행 골격입니다. AI는 실험 명세를 작성하고 결과를 해석하며, 도구가 수치·판정·해시와
+요건 대조표를 결정적으로 생성합니다. 산출물은 수집 전 실험 계획, 분석 보고서, 제3자가
+재현할 수 있는 증거 번들입니다. ISO/IEC 17825:2024를 준용하지만 적합성 평가가 아닌
+사전 진단입니다. 명령과 판정 절차는
+[`workspace/[extra] Physical-AI-SCA/README.md`](workspace/%5Bextra%5D%20Physical-AI-SCA/README.md)에
+덧붙여 설명합니다.
 
 ### 📐 용어와 데이터셋 규약
 
@@ -100,16 +92,16 @@ ISO/IEC 17825:2024 의 시험 요건을 근거로 직접 정의했습니다.
 | [`GLOSSARY.md`](GLOSSARY.md) | 용어 정본. OPTIMIST·ISO/IEC 17825 용어와 이 저장소가 정한 용어를 출처별로 구분해 정의합니다. **정의는 영문**(원문 뉘앙스 보존), 표제는 `English(한글)` 병기 |
 | [`SCHEMA.md`](SCHEMA.md) | 파형 데이터셋 HDF5 스키마. 레이아웃·필수 메타데이터·명명 규약과 **각 필드가 왜 필요한지의 근거** |
 
-핵심만 보면: HDF5 파일 하나가 데이터셋 한 벌이고, 측정 조건은 루트 attrs 에,
-데이터는 `/<subset>/` 아래 `trace`·`key`·`plaintext`·`ciphertext` 배열로 들어갑니다.
+핵심만 보면 HDF5 파일 하나가 Dataset(데이터셋) 한 벌이고, 측정 조건은 루트
+HDF5 attrs에, 데이터는 `/<subset>/` 아래 `trace`·`key`·`plaintext`·`ciphertext`
+HDF5 dataset(배열)에 들어갑니다.
 준수 여부는 `workspace/lib/sca_schema.py` 의 `validate_dataset(path=…)` 로 검사합니다
 (`[extra] SCALib` 의 `scalib_common` 이 이것을 재노출하므로 그 프로젝트 노트북은 종전대로
 `validate_dataset(target=…)` 를 씁니다).
 
-**판번호는 1.1 입니다.** 1.1 은 물리 측정이 아닌 채널(`emulated-power`·`debug-trace`),
-샘플 축의 정체(`sample_axis`), 샘플 → 명령어 역매핑(`sample_map`), 레코드별 실행시간
-(`exec_time`)을 더했습니다. **필드를 더하기만 했으므로 기존 1.0 데이터셋은 그대로
-유효하며**, 검증기는 파일에 적힌 판번호의 규칙으로 검사합니다.
+현재 판번호와 판별 호환 규칙은 `SCHEMA.md` §0에서만 정의합니다. 검증기는
+각 파일에 적힌 판번호의 규칙을 적용하므로 기존 Dataset을 나중 규칙으로 소급 판정하지
+않습니다.
 
 ### 🗺 아키텍처 한눈에 보기
 
@@ -120,7 +112,7 @@ flowchart TB
         B["🌐 브라우저<br/>code-server · localhost:8080"]
         V["🧩 VS Code (host)<br/>Dev Containers: Attach"]
         subgraph CONTAINER["🐳 chipwhisperer-kor 컨테이너 · privileged"]
-          APP["Python 3.9 · ChipWhisperer · Jupyter<br/>ARM/AVR 펌웨어 툴체인"]
+          APP["Python 3.12 · ChipWhisperer · Jupyter<br/>ARM/AVR 펌웨어 툴체인"]
         end
       end
     end
@@ -386,7 +378,7 @@ http://localhost:8080
 > 여기서 **host = VMware Ubuntu 게스트(Docker 호스트)** 입니다. 게스트에 설치한 VS Code에서 **같은 게스트의 컨테이너**에 attach하며, 브라우저 접속(`localhost:8080`)도 게스트 안에서 이뤄집니다. 두 방식 모두 **동일한 VMware Ubuntu 환경**에서 동작하므로, 개발자와 외부 연구자 누구나 같은 환경에서 같은 결과를 재현할 수 있습니다.
 
 > [!WARNING]
-> **보안:** code-server는 `--auth none`으로, 컨테이너는 `privileged`로 동작합니다. **로컬 개발·실습 전용**이며 외부 네트워크에 노출하지 마세요. 자세한 내용은 [보안 주의사항](#-보안-주의사항)을 참고하세요.
+> **보안:** code-server는 `--auth none`으로, 컨테이너는 `privileged`로 동작합니다. **로컬 개발·실습 전용**으로 사용하고 포트 8080을 외부 네트워크에 노출하지 마십시오.
 
 ---
 

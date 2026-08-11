@@ -1,12 +1,14 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+이 문서는 이 저장소에서 작업하는 Claude Code(claude.ai/code)의 프로젝트별 작업 기준이다.
 
 ## 이 저장소의 정체
 
 ChipWhisperer 기반 부채널 분석(SCA)·오류주입(FA)을 가르치기 위한 **한국어 실습 저장소**다. 파이썬 패키지가 **아니다** — `setup.py`도, 테스트 스위트도, 린터도 없다. 산출물은 Jupyter 노트북, `make`로 빌드하는 타겟 펌웨어, 툴체인 전체를 담은 Docker 이미지, 그리고 각자 자기완결적인 `[extra]` 연구·문서 프로젝트들이다.
 
-사용자가 읽는 모든 산문(README, 노트북 마크다운 셀, 코드 주석)은 **한국어**로 쓰여 있다. 수정할 때도 한국어를 유지하고, 기존 한국어 문서를 영어로 바꾸지 않는다.
+프로젝트가 작성한 활성 산문(README, 노트북 Markdown 셀, 코드 주석)은 **한국어 위주**로
+쓴다. 용어 정의문과 코드 식별자·두문자어에는 `GLOSSARY.md`의 언어 규칙을 적용한다.
+상위 프로젝트 원본과 외부 소스의 문구는 임의로 번역하지 않는다.
 
 저장소 루트의 `AGENTS.md`는 모든 에이전트에게 구속력이 있으며 이 파일보다 우선한다. 3원칙 요약: (1) **단일 진실 공급원** — 기억이 아니라 실제 파일을 읽어 확인하고, 하나의 정의는 한 파일에만 둔다. (2) **단순함** — 요청된 문제만 풀고, 선제적 hook·wrapper·config flag를 만들지 않으며, 추상화는 실제 중복 3회 이후에, 불필요해진 코드는 주석 처리가 아니라 삭제한다. (3) **자기완결적 문서** — 배경 지식 없는 독자가 그 설명 하나로 이해할 수 있어야 하므로 *why*(제약, 버린 대안)를 쓰고, 코드와 문서를 같은 작업 안에서 함께 고친다. 사소하지 않은 변경 전에는 `AGENTS.md` 원문을 읽는다.
 
@@ -66,17 +68,21 @@ make PLATFORM=CW308_STM32F3 CRYPTO_TARGET=NONE SS_VER=SS_VER_2_1
 
 ## 파형 저장
 
-**모든 파형 데이터셋은 저장소 루트의 `SCHEMA.md`를 따른다.** 용어는 `GLOSSARY.md`가 정본이며, 새 문서·주석·설명을 쓸 때 그 용어를 그대로 쓴다(정의는 영문, 파생 문서는 한글).
+**모든 파형 Dataset(데이터셋)은 저장소 루트의 `SCHEMA.md`를 따른다.** 용어는
+`GLOSSARY.md`가 정본이다. 정본의 정의문은 영문을 유지하고, 파생 문서·주석·설명은 한국인
+연구자를 독자로 삼아 한글 위주로 쓴다. 코드 식별자와 두문자어는 영문 원형을 유지한다.
 
-핵심만 요약하면: HDF5 파일 하나가 Dataset 한 벌(Target 1개 × Channel 1개)이고, 측정 조건은 **루트 HDF5 attrs**에, 실제 데이터는 `/<subset>/` 아래 행 정렬 배열 `trace`·`key`·`plaintext`·`ciphertext`(+선택 `mask`)로 둔다. subset 이름은 자유지만 `role`은 `SCHEMA.md` §4.1 목록에서 고른다. 캡처 루프가 확장할 수 있도록 `maxshape=(None, ...)`로 만든다.
+핵심 구조는 HDF5 파일 하나가 Dataset 한 벌(Target 1개 × Channel 1개)이라는 것이다.
+측정 조건은 **루트 HDF5 attrs**에, Record(레코드)별 Attributes(어트리뷰트)는
+`/<subset>/` 아래의 HDF5 dataset(배열)에 둔다. 필수·선택 필드와 현재 판번호는
+`SCHEMA.md`에서만 정의한다.
 
 주의할 함정 두 가지: OPTIMIST의 **Attributes**(`trace` 등)는 HDF5에서 *배열*로, OPTIMIST의 **Metadata**는 HDF5 *attrs*로 저장되어 이름이 엇갈린다(`GLOSSARY.md` §6). 그리고 **모르는 메타데이터는 추정치로 채우지 않는다** — 비워 두고 검증기가 "부분 준수"로 보고하게 둔다(`SCHEMA.md` §5.3).
 
 준수 여부는 **`workspace/lib/sca_schema.py`의 `validate_dataset(path=…)`**로 검사한다. 세 수집 경로(실물 전력·디버그 트레이스·에뮬레이션)가 같은 검증기를 통과해야 "준수"의 뜻이 하나로 유지되므로 저장소 공용 트리에 있다. `[extra] SCALib/scalib_common.py`는 이것을 **재노출**하므로 그 프로젝트 노트북 12개는 종전대로 `validate_dataset(target=…)`을 쓴다 — 승격하면서 노트북을 한 줄도 고치지 않기 위한 장치다.
 
-**판번호는 1.1이다.** 1.1은 물리 측정이 아닌 채널(`emulated-power`·`debug-trace`), 샘플 축의 정체(`sample_axis`), 샘플→명령어 역매핑(`sample_map`), 레코드별 실행시간(`exec_time`), 그리고 ISO/IEC 17825 요건을 판정 가능하게 하는 값(`bandwidth_hz`·`shunt_ohm`·`preprocessing_average_n`)을 더했다. **필드를 더하기만 했으므로 기존 1.0 데이터셋은 그대로 유효**하고, 검증기는 파일에 적힌 판번호의 규칙으로 검사한다 — 나중 규칙으로 옛 파일을 소급 위반 처리하면 "부분 준수"가 *데이터가 부실하다*는 뜻인지 *스키마가 나중에 바뀌었다*는 뜻인지 구분할 수 없게 된다.
-
-`[extra] SCALib`의 수집기는 1.1이 요구하는 값을 기록하지 않으므로 계속 **1.0을 적는다**(`scalib_common.SCHEMA_VERSION`). 판번호만 올려 적으면 없는 것을 있다고 주장하는 셈이다.
+검증기는 파일에 적힌 판번호의 규칙을 적용한다. 나중 규칙으로 기존 Dataset을 소급
+판정하지 말고, 수집기는 실제로 기록하는 필드에 맞는 판번호를 써야 한다.
 
 ## 저장소 공용 트리 — `workspace/lib/`·`workspace/iut/`
 
@@ -113,9 +119,9 @@ make PLATFORM=CW308_STM32F3 CRYPTO_TARGET=NONE SS_VER=SS_VER_2_1
   이 서브프로젝트 고유의 세 가지 규칙:
   1. **관점 분리** — Masked h5에는 연구용 마스크 `mask (n,10)`이 들어 있다. **공격자 관점 셀은 절대 `mask`를 참조하지 않는다.** 쓰는 절은 "연구자" 로 제목을 분리한다.
   2. **비교는 암호화 구간에서만** — `masked-aes-c`는 `CipherMasked`만 보호하고 `KeyExpansion`은 벤더 원본 비마스킹인데, 펌웨어가 키 스케줄을 트리거 안에서 돌린다. 전 구간 비교는 이 공통 누설에 지배된다(전 구간 TVLA `|t|`가 Normal 114 / Masked 116으로 차이가 없어 보인다). `1.0`이 평문 의존 누설 시작점 `enc_start`를 실측해 `nb_output/poi_*.npz`에 저장하고 `2.0`–`6.0`이 그 이후만 본다.
-  3. **장수는 목표치가 아니라 실보유량** — `N_PROFILING` 같은 상수는 수집 목표다. 분석은 `group_len()`으로 실제 장수를 읽고, 타겟 간 비교는 양쪽을 같은 예산으로 맞춘다.
+  3. **트레이스 수는 목표치가 아니라 실제 보유량** — `N_PROFILING` 같은 상수는 수집 목표다. 분석은 `group_len()`으로 실제 트레이스 수를 읽고, 타겟 간 비교는 양쪽을 같은 예산으로 맞춘다.
 
-  두 데이터셋 모두 목표 장수를 채웠고(profiling 각 100,000장) `SCHEMA.md` **완전 준수**다. Masked 수집은 자동 복구 경로를 실제로 탔다 — `recoveries` attr에 `reflash`·`reconnect`·`reconnect`가 남아 있다. 마스크 RNG의 벤더 원본 편향(`rand() % 0xFF`)은 `rand() & 0xFF`로 고쳐 해소했다(`workspace/iut/masked-aes-c/aes.c`). 커스텀 프로토콜은 공통 `0x81 k/p/l`·`0x82 c`·`0x83 r`에 더해 Masked 전용 `0x81 's'`(마스크 시드)·`0x83 'm'`(마스크 회수)이 있다.
+  두 Dataset 모두 목표 트레이스 수를 채웠고(profiling 각 100,000개) `SCHEMA.md` **완전 준수**다. Masked 수집은 자동 복구 경로를 실제로 탔다 — `recoveries` attr에 `reflash`·`reconnect`·`reconnect`가 남아 있다. 마스크 RNG의 벤더 원본 편향(`rand() % 0xFF`)은 `rand() & 0xFF`로 고쳐 해소했다(`workspace/iut/masked-aes-c/aes.c`). 커스텀 프로토콜은 공통 `0x81 k/p/l`·`0x82 c`·`0x83 r`에 더해 Masked 전용 `0x81 's'`(마스크 시드)·`0x83 'm'`(마스크 회수)이 있다.
 - **`[extra] Physical-AI-SCA/`** — **AI 가 실험 설계·수집·분석·보고를 수행하는 사전 진단 환경.** 한 암호 구현을 세 방식으로 관측해(에뮬레이션·실물 전력·디버그 트레이스) 하나의 스키마·하나의 판정 규칙 위에 놓는다. **1차 사이클에서 실제로 돌린 것은 에뮬레이션 경로뿐이고, 실물 수집기 2종(`cw_power.py`·`cw_debugtrace.py`)은 골격만 있으며 실행된 적이 없다** — 각 파일 머리말에 명시되어 있다.
 
   ISO/IEC 17825:2024 를 **준용**하되 **적합성 평가가 아니라 사전 진단(pre-assessment)**이다. §1 Scope 가 이 표준을 ISO/IEC 19790 적합성 판정용으로 정하고 24759 와 함께 암호모듈의 정의된 경계에서 쓰도록 하는데, 여기 IUT 는 모듈이 아니라 라이브러리이고 벤더와 시험자가 동일하며 승인 기관이 없다. 그래서 spec 의 `scope.not_claimed` 가 **비울 수 없는 필수 필드**다 — 무엇을 주장하지 않는지 적지 않으면 나머지가 전부 주장으로 읽힌다.

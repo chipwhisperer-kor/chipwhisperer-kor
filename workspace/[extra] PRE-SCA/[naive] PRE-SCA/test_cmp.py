@@ -1,11 +1,14 @@
+"""반복 에뮬레이션의 CSV·디스어셈블리 산출물을 바이너리 단위로 비교한다.
+
+최초 로그 디렉터리를 기준으로 나머지 디렉터리의 파일을 비교하며 파일을 변경하지
+않는다. 접미사와 일치하는 파일이 없거나 둘 이상이면 비교 실패로 보고한다.
+"""
+
 import os
 import glob
 
 def get_file_path_by_suffix(folder, suffix):
-    """
-    폴더 내에서 특정 접미사(suffix)로 끝나는 파일의 전체 경로를 찾습니다.
-    예: 2026-01-22...LogReg.csv 파일을 찾기 위해 사용
-    """
+    """폴더에서 접미사와 일치하는 파일이 하나일 때만 그 경로를 반환한다."""
     # 폴더 내의 모든 파일을 검색하여 suffix로 끝나는지 확인
     search_pattern = os.path.join(folder, "*" + suffix)
     found_files = glob.glob(search_pattern)
@@ -17,8 +20,9 @@ def get_file_path_by_suffix(folder, suffix):
         return None
 
 def compare_files_binary(file_a, file_b):
-    """
-    두 파일을 바이너리('rb')로 읽어서 내용이 완벽히 같은지 비교합니다.
+    """두 파일의 바이트열을 비교하여 같으면 `True`를 반환한다.
+
+    파일 I/O가 실패하면 오류를 출력하고 `False`를 반환하며 파일은 변경하지 않는다.
     """
     try:
         with open(file_a, 'rb') as fa:

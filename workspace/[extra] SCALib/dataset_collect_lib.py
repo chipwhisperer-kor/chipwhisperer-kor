@@ -567,7 +567,7 @@ def run_full_collect(out_path, bench, cipher_attr):
 
 
 def resume_group(h5, name, bench, fixed_key, fixed_pt, batch=BATCH):
-    """그룹이 목표 장수에 못 미치면 모자란 만큼 이어서 채운다."""
+    """그룹이 목표 트레이스 수에 못 미치면 모자란 만큼 이어서 채운다."""
     with_masks = bench.with_masks
     target_n = GROUP_TARGETS[name]
     key_mode, pt_mode, seed = GROUP_MODES[name]

@@ -203,21 +203,21 @@ validate_dataset("masked-aes-c")     # 빈 리스트면 준수
 
 수집 직후 자동으로 호출된다. 두 데이터셋 모두 현재 **완전 준수**다.
 
-### 장수
+### 트레이스 수
 
-| 그룹 | 장수 (두 타겟 동일) |
+| 그룹 | 트레이스 수(두 타겟 동일) |
 |------|------|
 | explore | 5,000 |
 | profiling | 100,000 |
 | attack | 10,000 |
 | tvla_rk / tvla_fk | 1,000 each |
 
-두 타겟이 같은 시드·같은 장수를 쓰므로 입력 벡터가 정렬된다. 다만 분석 노트북은
-목표치 상수(`N_PROFILING`)가 아니라 `group_len(group, target)` 으로 **실보유 장수**를
+두 타겟이 같은 시드·같은 트레이스 수를 쓰므로 입력 벡터가 정렬된다. 다만 분석 노트북은
+목표치 상수(`N_PROFILING`)가 아니라 `group_len(group, target)`으로 **실제 보유한 트레이스 수**를
 읽는다. 수집이 중간에 끊긴 파일을 그대로 분석하면 조용히 어긋나기 때문이다.
 
 수집 로직 정본: `dataset_collect_lib.py`.  
-장수·시드 정본: `scalib_common.py` (`SEED=1234` 등).
+트레이스 수·시드 정본: `scalib_common.py` (`SEED=1234` 등).
 
 ---
 
@@ -269,7 +269,7 @@ validate_dataset("masked-aes-c")     # 빈 리스트면 준수
 `dataset_summary()` 가 출력한다.
 
 > 이 저장소의 Masked 데이터셋(117,000장)이 실제로 이 경로를 탔다. 수집 중 세 번 깨졌고
-> (`reflash`, `reconnect`, `reconnect`) 사람 개입 없이 전부 회복해 목표 장수를 채웠다.
+> (`reflash`, `reconnect`, `reconnect`) 사람 개입 없이 전부 회복해 목표 트레이스 수를 채웠다.
 > `profiling` 그룹의 `mask_seeds` 가 네 개인 것이 그 흔적이다 — 최초 1회 + 복구 3회.
 
 복구 뒤에는 반드시 두 가지를 되돌린다. 빠뜨리면 파형이 조용히 어긋난다.

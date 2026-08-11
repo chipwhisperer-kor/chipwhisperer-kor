@@ -39,7 +39,7 @@ F_MASK = "mask"
 F_EXEC_TIME = "exec_time"          # 1.1 신설 — 레코드별 실행시간 (타이밍 분석 입력)
 F_SAMPLE_MAP = "sample_map"        # 1.1 신설 — 루트 배열 (샘플 → 명령어 역매핑)
 
-# ── 루트 Metadata (SCHEMA.md §3) ───────────────────────────
+# ── 루트 Metadata(메타데이터) (SCHEMA.md §3) ────────────────────────
 # 1.0 의 필수 목록. 1.1 도 이 항목을 그대로 요구한다.
 REQUIRED_METADATA_1_0 = (
     "schema", "schema_version",
@@ -73,7 +73,7 @@ REQUIRED_METADATA_EMULATED = (
 # 1.1 에서 선택 → 필수로 올렸다. 없으면 대역폭 요건을 **판정할 수 없다**.
 REQUIRED_METADATA_POWER_1_1 = ("bandwidth_hz",)
 
-# ── Subset Metadata (SCHEMA.md §4) ─────────────────────────
+# ── Subset metadata(서브셋 메타데이터) (SCHEMA.md §4) ─────────────────
 REQUIRED_SUBSET_METADATA = ("role", "n_records", "key_mode", "pt_mode")
 
 SUBSET_ROLES = (
@@ -265,7 +265,7 @@ def require_schema(path):
 def group_len(path, group):
     """그룹이 실제로 보유한 레코드 수. 파형은 읽지 않는다.
 
-    목표 장수 상수를 분석에 박으면 수집이 중간에 끊긴 파일에서 조용히 어긋난다.
+    목표 트레이스 수를 분석에 박으면 수집이 중간에 끊긴 파일에서 조용히 어긋난다.
     "있는 만큼" 을 물어보는 창구다.
 
     실패 조건: 파일이 없으면 FileNotFoundError, 그룹 이름이 틀리면 KeyError.

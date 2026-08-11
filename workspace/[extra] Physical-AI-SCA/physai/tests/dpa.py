@@ -22,10 +22,10 @@ Fig.1 NOTE 3 — 고차 DPA 와 CPA 는 이 표준의 필수 시험이 아니다
 2차에서 뚫리는 것은 이론적으로 정상이라 결함으로 보고할 수도 없다. **계산하지 않으면
 오보할 일도 없다** — 규칙보다 구조로 막는다.
 
-## 장수가 모자라면 판정하지 않는다
+## 트레이스 수가 모자라면 판정하지 않는다
 
 Formula (1) 이 요구하는 N 에 못 미치면 `inconclusive` 로 보고한다.
-부족한 표본으로 "누설 없음" 이라고 쓰는 것이 이 도구가 낼 수 있는 가장 나쁜 결과다 —
+부족한 트레이스 수로 "누설 없음"이라고 쓰는 것이 이 도구가 낼 수 있는 가장 나쁜 결과다 —
 검정력이 없어서 못 본 것과 정말 없는 것을 구분할 수 없기 때문이다.
 """
 
@@ -46,7 +46,7 @@ def run(dataset_path, spec, threshold_info, n_required, sensitive_window=None):
         sensitive_window : (start, end) 또는 None — Annex H 민감 누설 경계.
                            경계 **밖**의 초과 샘플은 검출하되 fail 로 세지 않는다.
 
-    출력 dict — `verdict`, 초과 샘플 목록, 임계, 장수 충족 여부.
+    출력 dict — `verdict`, 초과 샘플 목록, 임계, 트레이스 수 충족 여부.
     """
     fixed = [s for s in spec["subsets"] if s["role"] == "leakage-detection-fixed"]
     random = [s for s in spec["subsets"] if s["role"] == "leakage-detection-random"]

@@ -320,7 +320,8 @@ The interval of a Trace that covers the cipher proper, excluding preceding key s
 work that shares the same trigger window. Recorded as a sample index. `[PROJECT]`
 
 > 이 개념이 필요한 이유: 트리거가 키 스케줄까지 감싸면 보호되지 않은 구간이 비교를 지배해
-> 대책의 효과가 가려진다. 자세한 근거는 `[extra] SCALib` 의 `1.0.SNR` 과 `2.0.Ttest` 참고.
+> 대책의 효과가 가려진다. `[extra] SCALib`은 이 구분을 적용해 Encryption region을
+> 먼저 실측하고, 이후 분석을 그 구간으로 제한한다.
 
 **Mask share(마스크 셰어)**
 One of the random values a masking countermeasure uses to split a sensitive intermediate value.
