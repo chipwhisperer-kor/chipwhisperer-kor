@@ -26,7 +26,7 @@ import setEmulData
 # -----------------------------------------------------------------------------
 # 모듈 공용 상태 — 레거시 호환용
 # -----------------------------------------------------------------------------
-# emul.py 등 외부 모듈에서 직접 참조하는 전역 변수(LOG_MATRIX)와의 호환성을 위해 유지합니다.
+# `emul.py`가 정상 실행의 주소 순서를 Faulty 실행 주입점과 대조하므로 전역 이름을 유지한다.
 LOG_MATRIX: List[List[Any]] = []
 
 # -----------------------------------------------------------------------------
@@ -55,15 +55,19 @@ class TraceLogger:
               'aFP', 'aIP', 'aSP', 'aLR', 'aPC', 'aCPSR']
 
     def __init__(self):
+        """타임스탬프 로그 디렉터리와 빈 레지스터 버퍼를 만든다.
+
+        import 시 단일 인스턴스가 생성되므로 디렉터리 생성이 부작용이다. 권한·경로 오류는
+        호출자에게 전파되며 CSV는 아직 만들지 않는다.
+        """
         self.ctr: int = 0
         self.current_log_matrix: List[List[Any]] = []
         self.log_file_path: str = ""
         
-        # 명령어 검색 최적화를 위한 캐시 (List -> Dict 변환)
+        # 주소별 조회가 명령어마다 일어나므로 목록을 한 번만 사전으로 바꾼다.
         self._insn_cache: Dict[int, Tuple[str, str]] = {}
         self._is_cache_built: bool = False
 
-        # 로그 디렉토리 생성
         self.timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H_%M_%S")
         self.log_folder = os.path.join("./log", f"{self.timestamp} {log_file_name}")
         os.makedirs(self.log_folder, exist_ok=True)
@@ -71,62 +75,66 @@ class TraceLogger:
         self.reset_buffer()
 
     def reset_buffer(self):
-        """로그 버퍼를 초기화합니다."""
+        """현재 로그를 헤더 한 행으로 되돌리고 명령어 카운터를 0으로 만든다."""
         self.current_log_matrix = [self.HEADER[:]]
         self.ctr = 0
 
     def set_file_index(self, index: int):
-        """실행 차수(Normal/Faulty)에 따라 로그 파일명을 설정합니다."""
+        """실행 차수 0은 정상, 그 외는 Faulty 레지스터 로그 경로로 선택한다.
+
+        경로 문자열만 바꾸며 파일은 쓰지 않는다.
+        """
         filename = f"{self.timestamp} LogReg.csv" if index == 0 else f"{self.timestamp} LogReg_Faulty.csv"
         self.log_file_path = os.path.join(self.log_folder, filename)
 
     def get_log_file_path(self) -> str:
+        """현재 실행 차수에 선택된 레지스터 로그 경로를 반환한다."""
         return self.log_file_path
 
     def _ensure_insn_cache(self):
-        """setEmulData의 명령어 리스트를 딕셔너리로 변환하여 검색 성능을 O(N)에서 O(1)로 최적화합니다."""
+        """공용 디스어셈블 목록을 주소별 `(opcode, operands)` 캐시로 한 번 변환한다."""
         if not self._is_cache_built and setEmulData.instructions:
             for item in setEmulData.instructions:
-                # 항목 구조: [주소, 명령어, 피연산자 문자열]
                 self._insn_cache[item[0]] = (item[1], item[2])
             self._is_cache_built = True
 
     def get_instruction_info(self, address: int) -> Tuple[str, str]:
-        """주소에 해당하는 명령어 정보를 반환합니다."""
+        """주소의 `(opcode, operands)`를 반환하고 캐시에 없으면 UNKNOWN 쌍을 반환한다."""
         self._ensure_insn_cache()
         return self._insn_cache.get(address, ("UNKNOWN", "UNKNOWN"))
 
     def read_registers(self, uc: Uc) -> List[int]:
-        """모든 타겟 레지스터의 값을 읽어옵니다."""
+        """추적 대상 18개 Unicorn 레지스터 값을 헤더와 같은 순서로 반환한다.
+
+        에뮬레이터를 변경하지 않으며 읽기 실패는 Unicorn 예외로 전파된다.
+        """
         return [uc.reg_read(reg) for reg in self.REGISTERS]
 
     def log_state(self, uc: Uc, address: int):
-        """현재 CPU 상태를 버퍼에 기록하고, 종료 조건 시 파일로 저장합니다."""
+        """현재 명령어 실행 전 상태를 버퍼에 추가하고 직전 행의 실행 후 값을 완성한다.
+
+        `_exit` 주소에 도달하면 정상 실행 주소 대조용 `LOG_MATRIX`에 복사하고 현재 파일을
+        덮어쓴 뒤 버퍼를 초기화한다. CSV 쓰기 실패는 오류를 출력하지만 다음 실행을 위해
+        버퍼는 초기화한다. 로거 전역·파일을 변경하고 반환값은 없다.
+        """
         global LOG_MATRIX
 
-        # 1. 현재 상태 캡처
         regs = self.read_registers(uc)
         opcode, op_str = self.get_instruction_info(address)
 
-        # 2. 로그 데이터 구성 [ctr, Address, Opcode, Operands, bR0...bCPSR]
         row = [self.ctr, hex(address), opcode, op_str] + regs
         self.current_log_matrix.append(row)
 
-        # 3. 'After' 레지스터 업데이트 로직 (이전 행의 뒷부분에 현재 레지스터 값을 붙임)
-        # 현재 단계의 레지스터 값(regs)은 이전 단계(ctr-1)의 '실행 후' 값이다.
+        # 현재 hook의 실행 전 값은 직전 명령어의 실행 후 값이기도 하다.
         if self.ctr >= 1:
-            # 이전 행(self.ctr)에 현재 레지스터 값들을 추가
-            # 0번 항목이 헤더이므로 `self.ctr`가 이전 데이터 행의 인덱스와 일치한다.
             self.current_log_matrix[self.ctr].extend(regs)
 
         self.ctr += 1
 
-        # 4. 종료 지점 도달 시 파일 쓰기 및 전역 매트릭스 백업
-        # 주의: Thumb 모드일 경우 exit_addr_real에서 1을 뺀 주소가 실행 주소임
+        # Thumb 실행 주소에는 심볼 주소의 모드 비트가 포함되지 않는다.
         target_exit = setEmulData.exit_addr_real - (1 if setEmulData.MODE == 2 else 0)
         
         if address == target_exit:
-            # 시나리오 검증을 위해 전역 LOG_MATRIX에 백업 (기존 로직 유지)
             LOG_MATRIX.extend(self.current_log_matrix)
             
             try:
@@ -136,7 +144,6 @@ class TraceLogger:
             except IOError as e:
                 print(f"Error writing log file: {e}")
 
-            # 다음 실행을 위해 초기화
             self.reset_buffer()
 
 
@@ -149,18 +156,25 @@ _logger_instance = TraceLogger()
 # `emul.py`와의 호환을 위한 모듈 API
 # -----------------------------------------------------------------------------
 def make_log_file(i):
+    """호환 API: 실행 차수 0은 정상, 그 외는 Faulty 로그 파일명으로 선택한다."""
     _logger_instance.set_file_index(i)
 
 def get_log_file_name():
+    """호환 API: 현재 선택된 레지스터 로그 경로를 반환한다."""
     return _logger_instance.get_log_file_path()
 
 def ret_all_reg(uc):
+    """호환 API: Unicorn의 추적 대상 레지스터 값을 정의된 순서로 반환한다."""
     return _logger_instance.read_registers(uc)
 
 def print_instruction(addr):
+    """호환 API: 주소의 `(opcode, operands)`를 반환하고 없으면 UNKNOWN을 쓴다."""
     return _logger_instance.get_instruction_info(addr)
 
 def write_log_regs(uc, address, scene_data):
-    # scene_data는 현재 로깅 로직 내부에서 직접 사용되지 않으나, 
-    # 호출 시그니처 호환성을 위해 유지합니다.
+    """호환 API: 현재 명령어 실행 전 CPU 상태를 로거 버퍼에 기록한다.
+
+    `scene_data`는 과거 호출 시그니처를 유지하기 위한 인자이며 사용하지 않는다. 종료
+    주소에 도달하면 CSV를 쓰고 버퍼를 초기화한다.
+    """
     _logger_instance.log_state(uc, address)

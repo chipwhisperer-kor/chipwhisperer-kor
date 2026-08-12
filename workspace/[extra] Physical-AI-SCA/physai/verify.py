@@ -6,7 +6,7 @@
 
 1. `manifest.json` 이 있고 읽히는가
 2. 목록의 모든 파일이 존재하고 **sha256 이 일치**하는가
-3. 데이터셋이 **여전히 `SCHEMA.md` 를 지키는가**
+3. Dataset(데이터셋)이 **여전히 `SCHEMA.md`를 지키는가**
 4. 툴체인이 manifest 에 적힌 것과 같은가 (다르면 경고 — 결과가 달라질 수 있다)
 5. spec 이 계약을 지키고, `results.json` 이 그 spec 을 가리키는가
 6. 보고서 3종이 모두 있는가
@@ -32,6 +32,10 @@ REQUIRED_DOCS = ("01_experiment_plan.md", "02_analysis_report.md",
 
 
 def _sha256(p):
+    """파일을 1 MiB씩 읽어 소문자 SHA-256 문자열을 반환한다.
+
+    파일을 변경하지 않으며 읽기 실패는 호출자에게 전파된다.
+    """
     h = hashlib.sha256()
     with open(p, "rb") as f:
         for chunk in iter(lambda: f.read(1 << 20), b""):
@@ -40,6 +44,12 @@ def _sha256(p):
 
 
 def verify(run_id):
+    """실행 ID의 증거 번들을 검증하고 문제·경고·확인 수를 사전으로 반환한다.
+
+    파일 존재·크기·SHA-256, 보고서 구성, 명세 연결, Dataset 스키마를 검사한다. 툴체인
+    차이는 재현 실패가 확인된 것이 아니므로 경고로 분리한다. 모든 파일은 읽기 전용이며,
+    manifest가 없으면 다른 검사를 추측하지 않고 즉시 실패 결과를 반환한다.
+    """
     out_dir = paths.run_dir(run_id)
     problems, warnings, checked = [], [], 0
 
@@ -92,16 +102,16 @@ def verify(run_id):
                             % (results.get("spec_id"), run_id))
         ds = paths.Path(results["dataset"])
 
-    # 4) 데이터셋이 여전히 스키마를 지키는가
+    # 4) Dataset이 여전히 스키마를 지키는가
     if ds is None:
-        problems.append("results.json 이 없어 데이터셋을 찾을 수 없다")
+        problems.append("results.json이 없어 Dataset을 찾을 수 없다")
     elif not ds.is_file():
-        problems.append("데이터셋이 없다: %s (용량 때문에 커밋하지 않는다 — "
+        problems.append("Dataset이 없다: %s (용량 때문에 커밋하지 않는다 — "
                         "재현하려면 collect 를 다시 돌린다)" % ds)
     else:
         bad = S.validate_dataset(path=ds)
         if bad:
-            problems.append("데이터셋 스키마 위반 %d건: %s" % (len(bad), "; ".join(bad[:3])))
+            problems.append("Dataset 스키마 위반 %d건: %s" % (len(bad), "; ".join(bad[:3])))
 
     # 5) 툴체인 (경고)
     now = report_mod._toolchain()
@@ -115,6 +125,11 @@ def verify(run_id):
 
 
 def main(argv=None):
+    """증거 번들 검증 결과를 사람용 로그와 JSON으로 출력한다.
+
+    `--quiet`이면 사람용 로그만 생략한다. 필수 검사가 모두 통과하면 0, 하나라도 실패하면
+    1을 반환하며 증거 파일은 변경하지 않는다.
+    """
     ap = argparse.ArgumentParser(prog="physai.verify")
     ap.add_argument("--run", required=True)
     ap.add_argument("--quiet", action="store_true")

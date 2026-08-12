@@ -10,19 +10,20 @@ import make_TC
 import emul
 
 def main():
-    """입력 벡터를 생성하고 에뮬레이션을 실행한다."""
+    """결정적 입력 CSV를 만든 뒤 정상·오류주입 에뮬레이션을 실행한다.
+
+    CSV·디스어셈블·로그 파일을 생성하거나 덮어쓴다. 키보드 중단은 종료 코드 0, 다른
+    예외는 원인을 출력하고 종료 코드 1로 `sys.exit()`한다. 성공하면 반환값은 없다.
+    """
     try:
-        # 1. 테스트 케이스(Input Data) 생성
         make_TC.make_TC()
 
-        # 2. 에뮬레이션 실행 (Normal -> Faulty)
         emul.run()
 
     except KeyboardInterrupt:
         print("\n[User Abort] Emulation stopped by user.")
         sys.exit(0)
     except Exception as e:
-        # 최상위 레벨 에러 핸들링
         print(f"\n[Fatal Error] Program terminated unexpectedly: {e}")
         sys.exit(1)
 

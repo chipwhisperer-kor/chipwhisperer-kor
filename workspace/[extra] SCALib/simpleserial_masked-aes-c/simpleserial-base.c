@@ -24,7 +24,10 @@
 
 #include "my_crypt.h"
 
-// SS_VER_2_1의 최대 패킷 크기는 249 바이트. 패킷에는 데이터 이외에 정보가 같이 붙어 최대 패킷 크기 사용 불가
+/* SimpleSerial 2.1의 249바이트 프레임에는 명령 정보도 들어가므로 사용자 데이터는
+ * 245바이트로 제한한다. 아래 전역 버퍼는 0x81 입력, 0x82 연산, 0x83 출력 명령 사이의
+ * 상태를 보존한다. 호스트는 'l'에 1바이트 길이를 보내며 그 값은 MAX_DATA_LEN 이하여야
+ * 한다. 이 펌웨어는 잘못된 길이를 별도로 검증하지 않는다. */
 #define MAX_DATA_LEN 245
 #define MASK_LEN 10
 uint8_t global_k[MAX_DATA_LEN] ={0, };
@@ -36,11 +39,11 @@ uint8_t global_len = 0;
 
 uint8_t get_key(uint8_t* k, uint8_t len)
 {
-	// Load key here
 	return 0x00;
 }
 
-//SS_VER_1_1는 사용을 고려하지 않음
+/* SimpleSerial 1.1 콜백은 빌드 호환성만 유지한다. 수집기의 키·평문·길이·마스크 시드
+ * 프로토콜은 SimpleSerial 2.1의 my_init()에서만 완전하게 구현된다. */
 uint8_t get_pt(uint8_t* pt, uint8_t len)
 {
  
@@ -51,37 +54,25 @@ uint8_t get_pt(uint8_t* pt, uint8_t len)
 
 uint8_t reset(uint8_t* x, uint8_t len)
 {
-	// Reset key here if needed
 	return 0x00;
 }
 
 #if SS_VER == SS_VER_2_1
-//SS_VER_2_1 사용이 기본
+/* 0x81 입력 명령: 'k'는 AES 키, 'p'는 평문, 's'는 마스크 난수 시드를 저장한다.
+ * 'l'은 결과 버퍼를 지운 뒤 연산 길이를 저장한다. 반환값 0은 명령 처리 성공을 뜻한다. */
 uint8_t my_init(uint8_t cmd, uint8_t scmd, uint8_t len, uint8_t *buf)
 {
  	if (scmd == (uint8_t)'k') {
-		/**********************************
-		* Start user-specific code here. */
-	
 		for(int i = 0; i<len; i++)
 			global_k[i] = buf[i];
-
-		/* End user-specific code here. *
-		********************************/
 		
 		simpleserial_put(scmd, len, global_k);
 	
 	}
 
 	if (scmd == (uint8_t)'p') {
-		/**********************************
-		* Start user-specific code here. */
-	
 		for(int i = 0; i<len; i++)
 			global_p[i] = buf[i];
-
-		/* End user-specific code here. *
-		********************************/
 		
 		simpleserial_put((char)scmd, len, global_p);
 	
@@ -92,9 +83,7 @@ uint8_t my_init(uint8_t cmd, uint8_t scmd, uint8_t len, uint8_t *buf)
 		 *
 		 * 타겟이 스스로 엔트로피를 만들 수 없어서 이렇게 한다. STM32F303 에는
 		 * TRNG 가 없고, 스택 주소·전역 주소는 매 부팅 같은 값이라 시드가 되지
-		 * 못한다(예전 구현이 그렇게 했다가 재플래시할 때마다 같은 마스크 수열이
-		 * 처음부터 재생됐다 — 수집한 profiling 31,500장 중 고유 마스크가
-		 * 18,520개뿐이었다).
+		 * 못한다. 주소를 시드로 쓰면 재플래시 뒤 같은 마스크 수열이 처음부터 재생된다.
 		 *
 		 * 호스트는 연결·재플래시할 때마다 새 시드를 보내고 그 값을 h5 에 남긴다.
 		 * 재현 가능하면서 재시작마다 달라진다. */
@@ -107,17 +96,10 @@ uint8_t my_init(uint8_t cmd, uint8_t scmd, uint8_t len, uint8_t *buf)
 	}
 
 	if (scmd == (uint8_t)'l') {
-
-		/**********************************
-		* Start user-specific code here. */
-		
 		for(int i = 0; i<MAX_DATA_LEN; i++)
 			global_ret[i] = 0;
 
 		global_len = buf[0];
-
-		/* End user-specific code here. *
-		********************************/
 		
 		simpleserial_put((char)scmd, 1, &global_len);
 		
@@ -126,13 +108,12 @@ uint8_t my_init(uint8_t cmd, uint8_t scmd, uint8_t len, uint8_t *buf)
 	return 0x00;
 
 }
+/* 0x82 'c' 명령: 트리거가 HIGH인 동안에만 AES 연산을 수행한다. 마스크 회수와 UART
+ * 응답은 트리거가 LOW가 된 뒤 처리하므로 수집된 Trace(트레이스)에 섞이지 않는다. */
 uint8_t my_update(uint8_t cmd, uint8_t scmd, uint8_t len, uint8_t *buf)
 {
 
 	if (scmd == (uint8_t)'c') {
-
-		/**********************************
-		* Start user-specific code here. */
 		/* 트리거 구간 = AES 연산만. 마스크 회수 UART 는 트리거 밖에서. */
 		trigger_high();
 		
@@ -140,11 +121,9 @@ uint8_t my_update(uint8_t cmd, uint8_t scmd, uint8_t len, uint8_t *buf)
 
 		trigger_low();
 
-		/* 연구용: 방금 연산의 mask[10] 보관. 호스트는 0x83 'm' 으로 읽는다. */
+		/* 연구자 관점 분석을 위해 방금 연산의 마스크 10바이트를 보관한다. 호스트는
+		 * 0x83 'm'으로 읽으며 공격자 관점 분석에는 이 값을 제공하지 않는다. */
 		MY_AES_get_last_masks(global_masks);
-
-		/* End user-specific code here. *
-		********************************/
 				
 	}
 	simpleserial_put((char)scmd, 1, (uint8_t[]){0x82});	
@@ -152,24 +131,20 @@ uint8_t my_update(uint8_t cmd, uint8_t scmd, uint8_t len, uint8_t *buf)
 	return 0x00;
 
 }
+/* 0x83 출력 명령: 'r'은 직전 AES 결과를 'l'로 지정한 길이만큼 반환하고, 'm'은
+ * 연구자 관점 진단에만 쓰는 직전 마스크 10바이트를 반환한다. 두 값 모두 0x82 'c'
+ * 완료 뒤에만 유효하며 이 함수는 AES를 다시 실행하지 않는다. */
 uint8_t my_final(uint8_t cmd, uint8_t scmd, uint8_t len, uint8_t *buf)
 {
 
 	if (scmd == (uint8_t)'r') {
-
-		/**********************************
-		* Start user-specific code here. */
-
-		/* End user-specific code here. *
-		********************************/
-		
 		simpleserial_put((char)scmd, global_len, global_ret);
 		
 	}
 
 	if (scmd == (uint8_t)'m') {
 		/* 마지막 암호화에 쓰인 마스크 10바이트.
-		 * 공격자가 모르는 값이지만 실험실 h5 수집(i_m)용. */
+		 * 공격자가 모르는 값이므로 연구자 관점 HDF5 `mask` 배열 수집에만 쓴다. */
 		simpleserial_put((char)scmd, MASK_LEN, global_masks);
 	}
 	
@@ -186,7 +161,7 @@ int main(void)
 	init_uart();
 	trigger_setup();
 
-	/* masked-aes-c 는 rand() 로 마스크를 뽑는다. 시드는 **호스트가 0x81 's' 로 준다.**
+	/* masked-aes-c 는 rand() 로 마스크를 뽑는다. 시드는 호스트가 0x81 's'로 준다.
 	 *
 	 * 여기서 부팅 기본 시드를 넣지만 이 값은 매 부팅 동일하다 — 즉 호스트가 's' 를
 	 * 보내지 않으면 리셋할 때마다 완전히 같은 마스크 수열이 재생된다. 그래도 되는
@@ -195,16 +170,8 @@ int main(void)
 	 * 이 MCU 에서 그 주소들은 매 부팅 같은 값이라 사실이 아니었다. */
 	srand(1u);
 
- 	/* Uncomment this to get a HELLO message for debug */
-	/*
-	putch('h');
-	putch('e');
-	putch('l');
-	putch('l');
-	putch('o');
-	putch('\n');
-	*/
-
+	/* 부팅 문자열을 보내지 않는다. 호스트가 첫 바이트부터 SimpleSerial 프레임으로
+	 * 해석하므로 프로토콜 밖의 디버그 출력은 통신을 어긋나게 할 수 있다. */
 	simpleserial_init();
 #if SS_VER != SS_VER_2_1
 	simpleserial_addcmd('p', MAX_DATA_LEN, get_pt);

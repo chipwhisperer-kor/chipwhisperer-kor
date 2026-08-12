@@ -1,4 +1,4 @@
-"""CLI — spec 을 읽어 SCHEMA.md 준수 데이터셋을 만든다.
+"""CLI — spec을 읽어 SCHEMA.md 검증을 통과하는 Dataset(데이터셋)을 만든다.
 
     python3 -m physai.collect --spec exp/001.yaml
 
@@ -23,7 +23,9 @@ from .collectors import emulation
 
 import sca_schema as S          # noqa: E402  (paths 가 workspace/lib 를 넣는다)
 
-BATCH = 200          # HDF5 스트리밍 배치. 메모리를 일정하게 유지한다.
+# HDF5 스트리밍 버퍼의 레코드 수다. 판정 기준이 아니며, 200개씩만 메모리에 보관해
+# 전체 수집량이 늘어도 버퍼 크기가 커지지 않게 한다.
+BATCH = 200
 
 
 def _rng_for(seed, subset_name):
@@ -39,7 +41,11 @@ def _rng_for(seed, subset_name):
 
 
 def _make_inputs(sub, rng, fixed_key, fixed_pt, n):
-    """subset 규약대로 (key, plaintext) n쌍을 만든다."""
+    """Subset의 `key_mode`·`pt_mode`에 따라 키·평문 `n`쌍을 만든다.
+
+    반환값은 각각 `(n, 16)` uint8 배열이다. 알 수 없는 모드는 명세 검증기가 앞에서
+    거부해야 하며 이 함수는 입력 배열이나 난수 생성기 외의 상태를 변경하지 않는다.
+    """
     if sub["key_mode"] == "fixed":
         k = np.repeat(fixed_key[None, :], n, axis=0)
     else:
@@ -51,12 +57,12 @@ def _make_inputs(sub, rng, fixed_key, fixed_pt, n):
     return k, p
 
 
-# SPA 파형쌍(ISO/IEC 17825 A.2.2)도 별도 생성기를 두지 않는다.
+# SPA Trace 쌍(ISO/IEC 17825 A.2.2)도 별도 생성기를 두지 않는다.
 #
 # 한때 `spa_pair_kind` 로 입력을 만드는 함수를 따로 두었는데, 그것이 subset 의
 # `key_mode`/`pt_mode` 를 무시해 **spec 이 "키 랜덤" 이라 선언한 subset 에 고정 키가
 # 들어가는** 버그가 있었다. h5 의 subset attrs 에는 선언값이 적히므로 메타데이터가
-# 거짓이 된다 — 데이터셋에서 가장 나쁜 종류의 결함이다.
+# 거짓이 된다 — Dataset에서 가장 나쁜 종류의 결함이다.
 #
 # `spa_pair_kind` 는 **그 쌍을 어떤 의도로 만들었는지 적는 라벨**일 뿐이고, 입력을
 # 실제로 결정하는 것은 언제나 `key_mode`/`pt_mode` 다. 생성기가 하나뿐이면
@@ -68,7 +74,14 @@ def _make_inputs(sub, rng, fixed_key, fixed_pt, n):
 
 
 def collect_emulation(spec, out_path, verbose=True):
-    """에뮬레이션 수집. spec 의 subset 을 순서대로 채운다."""
+    """명세의 Subset을 순서대로 에뮬레이션해 Dataset을 담은 HDF5 파일을 만든다.
+
+    첫 실행의 누설 모델 산출물에서 Trace 길이를 확인한 뒤 `out_path`를 새로 쓰며, 기존
+    파일이 있으면 h5py의
+    `w` 모드로 덮어쓴다. ELF·심볼·명세·파일 I/O 오류는 호출자에게 전파된다. 반환값은
+    완성된 경로이고, `verbose=True`이면 진행률을 stdout에 출력한다. 이 채널의 값은 물리
+    측정치가 아니라 누설 모델의 산출값이다.
+    """
     iut = spec["iut"]["name"]
     coll = spec["collector"]
     tgt = emulation.EmulationTarget(iut, window=coll.get("window"),
@@ -164,7 +177,12 @@ def collect_emulation(spec, out_path, verbose=True):
 
 
 def _write_root_metadata(h5, spec, tgt, ns):
-    """루트 Metadata (SCHEMA.md §3). **모르는 값은 적지 않는다.**"""
+    """에뮬레이션 Dataset의 루트 HDF5 attrs를 열린 파일에 기록한다.
+
+    입력은 쓰기 가능한 h5py 파일, 검증된 명세, 초기화된 타겟, Trace당 Sample 수다.
+    물리 측정값을 추정하지 않으며, 에뮬레이터에 없는 클럭은 0과 설명을 함께 기록한다.
+    쓰기 실패는 h5py 예외로 전파되고 반환값은 없다.
+    """
     import platform
     import unicorn
 
@@ -218,8 +236,15 @@ def _write_root_metadata(h5, spec, tgt, ns):
 
 
 def main(argv=None):
+    """명세를 검증하고 계획 보고서와 에뮬레이션 Dataset을 생성한다.
+
+    `argv`가 `None`이면 `sys.argv`를 사용한다. 수집 전에 계획 보고서를 기록하고, 현재는
+    `collector.kind=emulation`만 실행한다. 성공 시 JSON 요약을 stdout에 쓰고 스키마 위반이
+    없으면 0, 있으면 1을 반환한다. 실장비 수집기 요청은 미검증 상태와 필요한 절차를
+    설명하는 `SystemExit`로 중단한다.
+    """
     ap = argparse.ArgumentParser(prog="physai.collect",
-                                 description="spec → SCHEMA.md 준수 데이터셋")
+                                 description="spec → SCHEMA.md 검증을 통과하는 Dataset 생성")
     ap.add_argument("--spec", required=True)
     ap.add_argument("--out", default=None, help="생략하면 traces/<spec.id>.h5")
     ap.add_argument("--quiet", action="store_true")
@@ -245,8 +270,10 @@ def main(argv=None):
         collect_emulation(sp, out, verbose=not a.quiet)
     else:
         raise SystemExit(
-            "수집기 '%s' 는 실장비가 필요하고 이번 사이클에서 실행하지 않는다.\n"
-            "  physai/collectors/%s.py 의 머리말을 참고한다." % (kind, kind))
+            "수집기 '%s'는 실장비가 필요하며 아직 CLI에 구현·검증되지 않았다. "
+            "현재 CLI는 collector.kind=emulation만 실행한다. physai/collectors/%s.py의 "
+            "구현도 자동 연결되지 않는다. 실장비 수집은 소량 캡처로 골든 AES 일치와 "
+            "Metadata 기록을 먼저 확인한 뒤 별도로 연결해야 한다." % (kind, kind))
 
     bad = S.validate_dataset(path=out)
     result = {"ok": not bad, "spec": sp["id"], "dataset": str(out),

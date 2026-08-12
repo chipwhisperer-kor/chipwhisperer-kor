@@ -17,8 +17,8 @@ WORKSPACE = PROJECT.parent
 REPO = WORKSPACE.parent
 
 LIB = WORKSPACE / "lib"                     # 저장소 공용 파이썬 정의
-IUT = WORKSPACE / "iut"                     # 암호 라이브러리 (검증 대상)
-SCALIB = WORKSPACE / "[extra] SCALib"       # 실측 데이터셋·수집 라이브러리
+IUT = WORKSPACE / "iut"                     # IUT(테스트 대상 구현) 암호 라이브러리
+SCALIB = WORKSPACE / "[extra] SCALib"       # 실측 Dataset·수집 라이브러리
 PRESCA = WORKSPACE / "[extra] PRE-SCA" / "[naive] PRE-SCA"   # ElfParser
 
 HARNESS = PROJECT / "emul_harness"
@@ -40,7 +40,11 @@ if str(PRESCA) not in sys.path:
 
 
 def harness_elf(iut_name):
-    """에뮬레이션용 ELF 경로. 없으면 빌드 방법을 알려 주는 예외를 낸다."""
+    """IUT 이름에 대응하는 에뮬레이션 ELF의 절대 `Path`를 반환한다.
+
+    파일을 변경하지 않는다. 빌드 산출물이 없으면 실행 가능한 빌드 명령을 포함한
+    `FileNotFoundError`가 발생한다.
+    """
     p = HARNESS_BUILD / ("%s.elf" % iut_name)
     if not p.is_file():
         raise FileNotFoundError(
@@ -50,7 +54,11 @@ def harness_elf(iut_name):
 
 
 def iut_source(iut_name):
-    """검증 대상 암호 라이브러리 디렉터리. 펌웨어도 같은 경로를 컴파일한다."""
+    """IUT(테스트 대상 구현) 소스 디렉터리의 절대 `Path`를 반환한다.
+
+    펌웨어와 에뮬레이션 하네스가 이 한 경로를 함께 컴파일한다. 이름이 없으면 사용 가능한
+    IUT 목록을 담은 `FileNotFoundError`가 발생하며 파일은 변경하지 않는다.
+    """
     p = IUT / iut_name
     if not p.is_dir():
         raise FileNotFoundError(
@@ -60,7 +68,11 @@ def iut_source(iut_name):
 
 
 def run_dir(run_id, create=False):
-    """실행 산출물 디렉터리 runs/<id>/."""
+    """`runs/<run_id>/`의 절대 `Path`를 반환한다.
+
+    `create=True`일 때만 부모 디렉터리까지 생성한다. 생성 실패 시 운영체제 예외가
+    호출자에게 전파되며 기존 파일은 덮어쓰지 않는다.
+    """
     p = RUNS / run_id
     if create:
         p.mkdir(parents=True, exist_ok=True)

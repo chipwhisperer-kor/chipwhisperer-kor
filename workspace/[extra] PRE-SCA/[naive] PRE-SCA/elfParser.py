@@ -19,6 +19,11 @@ class ElfParser:
     """
 
     def __init__(self, elf_file_path: str):
+        """ELF 경로를 읽어 LIEF 객체와 주소순 함수 심볼 캐시를 만든다.
+
+        파일이 없으면 `FileNotFoundError`, LIEF가 파싱하지 못하면 `ValueError`가 발생한다.
+        ELF 파일은 읽기 전용이며 변경하지 않는다.
+        """
         if not os.path.exists(elf_file_path):
             raise FileNotFoundError(f"ELF file not found: {elf_file_path}")
 
@@ -33,7 +38,11 @@ class ElfParser:
         self._initialize_symbol_table()
 
     def _initialize_symbol_table(self) -> None:
-        """ELF 파일에서 심볼(함수) 정보를 추출하고 주소순으로 정렬하여 저장합니다."""
+        """export 함수 심볼을 중복 없는 이름으로 수집해 주소순 캐시에 저장한다.
+
+        export 목록이 없는 ELF는 빈 캐시로 둔다. ELF 객체와 인스턴스 메모리만 읽고
+        호스트 파일은 변경하지 않는다.
+        """
         if not hasattr(self.elf_binary, 'exported_functions'):
             return
 
@@ -41,7 +50,7 @@ class ElfParser:
             name = func.name
             address = func.address
             
-            # 함수명 충돌 방지 (name, name1, name2...)
+            # LIEF가 같은 이름을 두 번 줄 수 있어 뒤 항목에 숫자를 붙여 유실을 막는다.
             duplicate_count = 0
             unique_name = name
             while unique_name in self.functions:
@@ -53,13 +62,16 @@ class ElfParser:
         self.sorted_functions = dict(sorted(self.functions.items(), key=lambda item: item[1]))
 
     def check_mode(self) -> int:
-        """시작 주소의 하위 비트로 실행 모드를 판별하여 Thumb이면 2, ARM이면 4를 반환한다."""
+        """`_init` 주소의 하위 비트로 Thumb이면 2, ARM이면 4를 반환한다.
+
+        `_init` 심볼이 없으면 `get_func_address()`의 레거시 동작에 따라 프로세스를 종료한다.
+        """
         start_addr = self.get_start_addr()
         # 주소의 최하위 비트가 1이면 Thumb 모드
         return 2 if start_addr % 2 == 1 else 4
 
     def get_start_addr(self) -> int:
-        """에뮬레이션 시작 주소(_init)를 반환합니다."""
+        """`_init` 심볼의 시작 주소를 반환하고 없으면 프로세스를 종료한다."""
         return self.get_func_address('_init')
 
     def get_func_address(self, func_name: str) -> int:
@@ -107,7 +119,12 @@ class ElfParser:
             sys.exit(1)
 
     def section_data_list(self) -> Tuple[List[List[Any]], List[int], List[int], int, int]:
-        """섹션 목록, RAM 주소, Flash 오프셋, RAM·Flash 크기를 순서대로 반환한다."""
+        """ELF 섹션 배치와 RAM·Flash 크기 합계를 반환한다.
+
+        반환 순서는 `(섹션 [가상주소, 오프셋, 크기, 이름], RAM 주소, Flash 오프셋,
+        RAM 크기 합, Flash 크기 합)`이다. `가상주소 != 오프셋`을 RAM으로 분류하는 레거시
+        규칙을 유지하며 파일을 변경하지 않는다.
+        """
         sections_info = []
         ram_addrs = []
         flash_offsets = []
@@ -137,7 +154,11 @@ class ElfParser:
         return sections_info, ram_addrs, flash_offsets, total_ram_size, total_flash_size
 
     def check_list(self, input_list: List[List[Any]]) -> List[List[Any]]:
-        """인접 항목의 두 번째 값이 중복되면 뒤 항목을 제거한 새 목록을 반환한다."""
+        """두 번째 값이 같은 인접 항목에서 첫 항목만 남긴 새 목록을 반환한다.
+
+        비어 있으면 빈 목록이다. 인접 중복만 제거하므로 호출자는 두 번째 값을 기준으로
+        정렬된 입력을 제공해야 하며 원본 목록은 변경하지 않는다.
+        """
         if not input_list:
             return []
 

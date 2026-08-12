@@ -53,6 +53,9 @@ def sbox_out(plaintext, key):
     부채널 공격이 겨냥하는 가장 흔한 중간값이다. 평문 한 바이트와 키 한 바이트에만
     의존하므로 키를 바이트 단위로 나누어 추측할 수 있다(분할 정복).
     Masked 구현에서도 **공격자 관점** 라벨은 이 값이다(마스크는 모른다).
+
+    입력은 수정하지 않는다. 두 형상이 브로드캐스트될 수 없으면 NumPy ``ValueError``가
+    발생하며 값은 uint8로 변환되므로 원래 정수의 상위 비트는 버려진다.
     """
     return SBOX[np.bitwise_xor(np.asarray(plaintext, dtype=np.uint8),
                                np.asarray(key, dtype=np.uint8))]
@@ -62,14 +65,20 @@ def aes_ecb_encrypt(key16, plain16):
     """호스트 골든 모델: AES-128 ECB 한 블록.
 
     타겟이 낸 암호문과 대조해 통신·구현이 정상인지 확인하는 데 쓴다.
-    실패 조건: 길이가 16이 아니면 ValueError (pycryptodome).
+    입력을 bytes로 복사하고 16바이트 암호문을 반환하며 외부 상태는 변경하지 않는다.
+    PyCryptodome이 없으면 ``ImportError``, 키나 평문 길이가 16이 아니면 하위 API의
+    ``ValueError``가 발생한다.
     """
     from Crypto.Cipher import AES          # 분석 전용 환경에는 없을 수 있어 지연 import
     return AES.new(bytes(key16), AES.MODE_ECB).encrypt(bytes(plain16))
 
 
 def _xtime(a):
-    """GF(2^8) 에서 2 를 곱한다. MixColumns 의 기본 연산."""
+    """uint8 값마다 GF(2^8)의 2를 곱한 같은 형상의 배열을 반환한다.
+
+    입력은 NumPy 배열로 복사·변환하며 수정하지 않는다. 정수 범위를 벗어난 값은 uint8
+    변환 규칙을 따르고, 배열로 변환할 수 없는 입력은 NumPy 예외를 발생시킨다.
+    """
     a = np.asarray(a, dtype=np.uint8)
     return np.where(a & 0x80, ((a.astype(np.uint16) << 1) ^ 0x1B) & 0xFF,
                     (a.astype(np.uint16) << 1) & 0xFF).astype(np.uint8)
@@ -84,6 +93,9 @@ def key_schedule(key16):
     KeyExpansion 은 두 IUT 모두 **비마스킹**이다(masked-aes-c 도 키 스케줄은 벤더 원본).
     그래서 이 값은 마스킹 여부와 무관하게 SPA 시험(ISO/IEC 17825 §8.3.1 이 지목하는
     key derivation)의 라벨로 쓸 수 있다.
+
+    입력은 수정하지 않는다. 마지막 축이 16이 아니면 배열 대입 과정에서 NumPy 형상 오류가
+    발생한다. 1차원 입력만 ``(11, 16)``으로 축약하고 그 밖에는 배치 축을 유지한다.
     """
     k = np.atleast_2d(np.asarray(key16, dtype=np.uint8))
     n = k.shape[0]
@@ -103,12 +115,21 @@ def key_schedule(key16):
 
 
 def _shift_rows(s):
-    """state (n,16) 을 열 우선(column-major) 배치로 보고 ShiftRows 를 적용한다."""
+    """열 우선 ``(n, 16)`` AES state에 ShiftRows를 적용한 새 배열을 반환한다.
+
+    입력을 변경하지 않는다. 두 번째 축이 16보다 짧거나 2차원 인덱싱을 지원하지 않으면
+    NumPy 인덱싱 예외가 발생한다.
+    """
     idx = np.array([0, 5, 10, 15, 4, 9, 14, 3, 8, 13, 2, 7, 12, 1, 6, 11])
     return s[:, idx]
 
 
 def _mix_columns(s):
+    """열 우선 AES state 배열에 MixColumns를 적용해 새 배열을 반환한다.
+
+    입력은 `(n, 16)` uint8 배열이어야 한다. 입력을 변경하지 않으며, shape이 맞지 않으면
+    NumPy 인덱싱 또는 브로드캐스팅 오류가 호출자에게 그대로 전파된다.
+    """
     out = np.empty_like(s)
     for c in range(4):
         a = s[:, 4 * c:4 * c + 4]
@@ -132,9 +153,9 @@ def intermediates(key16, plain16):
         round<r>   : r 라운드 종료 시 state (r = 1..10)
         roundkey<r>: r 라운드 키 (r = 0..10)
 
-    **이 값들이 "비마스킹 알고리즘의 민감값"이다.** 마스킹이 올바르게 구현되었다면
-    관측(HW·HD)은 이 값들과 통계적으로 독립이어야 한다. 독립이 깨진 지점이
-    곧 구현 결함 후보다 — 그 판정이 `[extra] Physical-AI-SCA` 의 soundness 검정이다.
+    **이 값들은 이 저장소의 soundness 검정이 쓰는 비마스킹 민감값 라벨이다.** 검정은
+    관측한 HW·HD와 이 라벨의 통계적 종속성을 마스킹 구현 결함 후보로 보고한다. 종속성은
+    후보를 좁히는 관측 결과이며, 그 자체만으로 물리 누설이나 공격 가능성을 확정하지 않는다.
 
     부작용 없음. 실패 조건: shape 이 (…,16) 이 아니면 ValueError.
     """

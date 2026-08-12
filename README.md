@@ -66,31 +66,44 @@ ChipWhisperer 한국어 튜토리얼 & Docker 개발 환경
 | 🔬 **연구 프로젝트** | `[extra] PRE-SCA/` — Unicorn 에뮬레이션 기반 사전(pre-silicon) 분석 실험 |
 | 🧪 **SCALib 예제** | `[extra] SCALib/` — 비마스킹 ∥ 마스킹 AES 이중 타겟 분석 노트북 |
 | 🤖 **AI 사전 진단** | `[extra] Physical-AI-SCA/` — AI가 실험 설계·수집·분석·보고를 나누어 수행하는 환경 |
-| 🔐 **검증 대상 구현** | `workspace/iut/` — 암호 라이브러리 한 벌. 펌웨어와 에뮬레이션이 **같은 소스**를 컴파일한다 |
+| 🔐 **테스트 대상 구현(IUT)** | `workspace/iut/` — 암호 라이브러리 한 벌. 펌웨어와 에뮬레이션이 **같은 소스**를 컴파일한다 |
 | 📚 **공용 정의** | `workspace/lib/` — 스키마 검증기·AES 참조 계산. 세 수집 경로가 같은 규약을 쓰게 한다 |
-| 📐 **데이터셋 규약** | `GLOSSARY.md`·`SCHEMA.md` — 부채널 용어와 파형 데이터셋 스키마 (아래 참고) |
+| 📐 **Dataset(데이터셋) 규약** | `GLOSSARY.md`·`SCHEMA.md` — 부채널 용어와 Trace(트레이스) Dataset 스키마 |
 
 ### 🤖 AI 기반 사전 진단 환경 (`[extra] Physical-AI-SCA/`)
 
 에뮬레이션·실물 전력·디버그 트레이스 관측을 하나의 판정 규칙으로 비교하는
-사전 진단 환경입니다. 현재 실행·검증된 경로는 에뮬레이션뿐이며, 나머지 두 수집기는
-미실행 골격입니다. AI는 실험 명세를 작성하고 결과를 해석하며, 도구가 수치·판정·해시와
+사전 진단 환경입니다. 저장된 노트북에는 에뮬레이션의 과거 실행 출력만 있고, 현재 증거
+번들은 없습니다. 나머지 두 수집기는 미실행 골격입니다. AI는 실험 명세를 작성하고 결과를 해석하며, 도구가 수치·판정·해시와
 요건 대조표를 결정적으로 생성합니다. 산출물은 수집 전 실험 계획, 분석 보고서, 제3자가
 재현할 수 있는 증거 번들입니다. ISO/IEC 17825:2024를 준용하지만 적합성 평가가 아닌
-사전 진단입니다. 명령과 판정 절차는
+사전 진단입니다. 실행 순서, 판정 근거, 미실행 경로의 제한은
 [`workspace/[extra] Physical-AI-SCA/README.md`](workspace/%5Bextra%5D%20Physical-AI-SCA/README.md)에
-덧붙여 설명합니다.
+자기완결적으로 정리되어 있습니다.
+
+실행은 서브프로젝트 디렉터리에서 `collect` → `analyze` → `report` → `verify` 순서다.
+
+```bash
+python3 -m physai.collect --spec exp/<id>.yaml
+python3 -m physai.analyze --spec exp/<id>.yaml
+python3 -m physai.report --run <id>
+python3 -m physai.verify --run <id>
+```
+
+`collect` 전에 명세의 판정 기준을 고정하고, 결과를 본 뒤 기준을 바꿔야 한다면 기존 명세를
+덮어쓰지 않고 새 실험 id를 만든다. Trace 수가 기준에 못 미치면 `inconclusive`이며, 실물
+수집기 코드는 실행 증거가 생기기 전까지 동작·준수 주장의 근거로 사용하지 않는다.
 
 ### 📐 용어와 데이터셋 규약
 
-이 저장소가 만드는 파형 데이터셋은 모두 같은 규약을 따릅니다. 부채널 분야에는 아직 공표된
-표준 데이터셋 스키마가 없어, [OPTIMIST](https://optimist-ose.org/) 워크숍의 용어·평가 기준과
+이 저장소가 만드는 Trace Dataset은 모두 같은 규약을 따릅니다. 부채널 분야에는 아직 공표된
+표준 Dataset 스키마가 없어, [OPTIMIST](https://optimist-ose.org/) 워크숍의 용어·평가 기준과
 ISO/IEC 17825:2024 의 시험 요건을 근거로 직접 정의했습니다.
 
 | 문서 | 내용 |
 |------|------|
 | [`GLOSSARY.md`](GLOSSARY.md) | 용어 정본. OPTIMIST·ISO/IEC 17825 용어와 이 저장소가 정한 용어를 출처별로 구분해 정의합니다. **정의는 영문**(원문 뉘앙스 보존), 표제는 `English(한글)` 병기 |
-| [`SCHEMA.md`](SCHEMA.md) | 파형 데이터셋 HDF5 스키마. 레이아웃·필수 메타데이터·명명 규약과 **각 필드가 왜 필요한지의 근거** |
+| [`SCHEMA.md`](SCHEMA.md) | Trace Dataset의 HDF5 스키마. 레이아웃·필수 Metadata·명명 규약과 **각 필드가 왜 필요한지의 근거** |
 
 핵심만 보면 HDF5 파일 하나가 Dataset(데이터셋) 한 벌이고, 측정 조건은 루트
 HDF5 attrs에, 데이터는 `/<subset>/` 아래 `trace`·`key`·`plaintext`·`ciphertext`
@@ -144,10 +157,10 @@ flowchart LR
 
 | 노트북 | 주제 | 대상 |
 |--------|------|------|
-| `1.0.SCA_main.ipynb` | 부채널 분석(SCA) — 파형 수집부터 HDF5 저장까지 | ChipWhisperer 초심자 |
+| `1.0.SCA_main.ipynb` | 부채널 분석(SCA) — 트레이스 수집부터 HDF5 저장까지 | ChipWhisperer 초심자 |
 | `2.0.FA_main.ipynb` | 오류주입 공격(Fault Injection) 입문 | SCA 1강 완료 후 |
 
-> SimpleSerial 통신 검증 → 트리거·샘플 설정 → 파형 수집 → `*.h5` DB 저장·분석
+> SimpleSerial 통신 검증 → 트리거·샘플 설정 → 트레이스 수집 → `*.h5` Dataset 저장·분석
 
 **② TraceWhisperer**
 
@@ -161,8 +174,8 @@ flowchart LR
 
 | 노트북 | 주제 | 대상 |
 |--------|------|------|
-| `1.0.Wiretapping4SCA.ipynb` | 와이어태핑을 통한 SCA 파형 수집 | ChipWhisperer 2대 (Lite + Husky) |
-| `2.0.Wiretapping4FA .ipynb` | 와이어태핑을 통한 FIA 파형 수집 | 1.0 완료 후 |
+| `1.0.Wiretapping4SCA.ipynb` | 와이어태핑을 통한 SCA 트레이스 수집 | ChipWhisperer 2대 (Lite + Husky) |
+| `2.0.Wiretapping4FA .ipynb` | 와이어태핑을 통한 FIA 트레이스 수집 | 1.0 완료 후 |
 
 > Lite(통신·프로그래밍) + Husky(수동 관측) 역할 분리 실험
 
@@ -453,14 +466,16 @@ ibus restart
 
 <br/>
 
-**파일·폴더 권한 일괄 설정** — 접근 권한 문제가 생겼을 때만:
+**프로젝트 파일 소유권 복구** — 컨테이너가 만든 파일이 root 소유라 편집할 수 없을 때만:
 
 ```bash
-sudo chmod -R 777 ~
+ls -ld /path/to/affected/project
+sudo chown -R "$USER":"$(id -gn)" /path/to/affected/project
 ```
 
 > [!CAUTION]
-> 홈 디렉터리 **전체**의 권한을 777로 바꿉니다. SSH 키·인증 파일 등 민감한 파일도 포함되므로 **꼭 필요한 경우에만** 사용하세요.
+> `/path/to/affected/project`를 문제가 생긴 프로젝트 디렉터리로 바꾸십시오. 홈 디렉터리
+> 전체나 저장소 밖 경로에 재귀 명령을 실행하면 SSH 키·인증 파일까지 영향을 받을 수 있습니다.
 
 **네트워크 IP 갱신** — 연결이 끊기거나 IP 할당에 문제가 생겼을 때:
 
@@ -475,10 +490,14 @@ sudo dhclient
 
 <br/>
 
-**백업 (Push)** — 로컬 변경 사항을 GitHub에 업로드:
+**백업 (Push)** — 올릴 변경을 확인한 뒤 필요한 파일만 GitHub에 업로드:
 
 ```bash
-git add . && git commit -m "backup $(date '+%F_%T')" && git push
+git status --short
+git add <올릴-경로>
+git diff --cached
+git commit -m "변경 내용을 설명하는 메시지"
+git push
 ```
 
 **복원 (Pull)** — GitHub 최신 내용을 로컬로:

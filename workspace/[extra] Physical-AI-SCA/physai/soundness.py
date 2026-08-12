@@ -24,7 +24,7 @@
 
 ## 관점 분리
 
-이 모듈은 **연구자 관점**이다 — 키를 알고, Masked 데이터셋이면 마스크도 안다.
+이 모듈은 **연구자 관점**이다 — 키를 알고, Masked Dataset이면 마스크도 안다.
 공격 가능성을 재는 것이 아니라 **설계 명제가 구현에서 지켜졌는지**를 재기 때문이다.
 공격자 관점 수치(키 복구 가능 여부)는 `cpa` 가 따로 낸다.
 """
@@ -98,7 +98,7 @@ def run(dataset_path, spec, subset="profiling", labels=DEFAULT_LABELS,
 
     출력 dict — `verdict`, 라벨별 결과, 결함 후보 목록(주소·성분 포함).
 
-    실패 조건: 데이터셋에 sample_map 이 없으면 KeyError (명령어 축이 아니라는 뜻).
+    실패 조건: Dataset에 sample_map이 없으면 KeyError(명령어 축이 아니라는 뜻).
     """
     rng = np.random.RandomState(int(spec["seed"]) if seed is None else seed)
     smap = S.load_sample_map(dataset_path)          # (ns, 3) segment_id, insn_idx, addr

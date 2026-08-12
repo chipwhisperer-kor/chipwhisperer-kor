@@ -1,6 +1,6 @@
-# SCHEMA — 부채널 신호 데이터셋 스키마
+# SCHEMA — 부채널 Trace(트레이스) Dataset(데이터셋) 스키마
 
-이 저장소가 만드는 모든 파형 데이터셋은 이 스키마를 따른다.
+이 저장소가 만드는 모든 Trace Dataset은 이 스키마를 따른다.
 용어는 [`GLOSSARY.md`](GLOSSARY.md) 를 정본으로 하며, 여기서 쓰는 *Dataset*·*Record*·
 *Attributes*·*Metadata*·*Trace* 는 전부 그 문서의 OPTIMIST 정의다.
 
@@ -207,7 +207,7 @@ Zarr 도 요건을 만족하지만 산출물이 디렉터리라 배포·이동�
 `"none"` 은 정렬을 하지 않았다는 뜻이다(트리거 동기만으로 정렬된 경우 포함).
 
 > 근거 — **ISO/IEC 17825 A.2.6·A.3.6** 에서 정렬 여부가 합/부 판정을 직접 바꾼다.
-> 저장된 파형이 원본인지 후처리본인지 모르면 그 판정을 재현할 수 없다.
+> 저장된 트레이스가 원본인지 후처리본인지 모르면 그 판정을 재현할 수 없다.
 
 ### 3.7 이력 [필수]
 
@@ -231,7 +231,7 @@ Zarr 도 요건을 만족하지만 산출물이 디렉터리라 배포·이동�
 |---|---|---|
 | `schema_note` | str | 준수와 관련해 사람이 읽어야 할 사정. **부분 준수 파일은 이 필드로 이유를 남긴다** |
 | `fixed_key` | uint8[] | 이 데이터셋에서 "고정" 으로 쓴 키. 교육용 채점 기준 |
-| `fixed_pt` | uint8[] | 위와 같은 목적의 고정 평문 |
+| `fixed_pt` | uint8[] | 교육용 분석에서 정답 대조에 쓰는 고정 평문 |
 | `recoveries` | str[] | 수집 중 자동 복구가 일어난 이력 |
 
 `fixed_key`·`fixed_pt` 는 **평가용 정답**이라 실제 시험 데이터셋이라면 넣지 않는다.
@@ -325,8 +325,8 @@ Subset **이름은 자유**지만 `role` 은 이 목록에서 고른다. 프로�
 | `debug-trace` | 대상 함수 진입~복귀 타임스탬프 차 |
 | `emulated-power` | 대상 구간의 명령어 수 |
 
-> **분석 때 만들 수 없는 값이라 수집 때 남겨야 한다.** 파형만 저장하고 이 값을 빠뜨리면
-> 나중에 타이밍 분석을 하려 해도 **사후 산출이 불가능**하다 — 파형은 잘려 있고 트리거
+> **분석 때 만들 수 없는 값이라 수집 때 남겨야 한다.** 트레이스만 저장하고 이 값을 빠뜨리면
+> 나중에 타이밍 분석을 하려 해도 **사후 산출이 불가능**하다 — 트레이스는 잘려 있고 트리거
 > 구간의 원래 길이는 이미 사라졌기 때문이다. ISO/IEC 17825 A.2.4 는 타이밍 측정 수집을
 > Annex A 에서 유일하게 `shall collect` 로 요구한다.
 
@@ -372,7 +372,7 @@ Subset **이름은 자유**지만 `role` 은 이 목록에서 고른다. 프로�
 
 - `trace` 는 **행 방향 청킹**한다(레코드 단위 접근이 지배적이므로).
 - 수집 중 확장을 위해 `maxshape=(None, ns)` 로 만든다.
-- 압축은 선택이다. 파형은 압축률이 낮아 대개 얻는 것이 적다.
+- 압축은 선택이다. 트레이스는 압축률이 낮아 대개 얻는 것이 적다.
 
 ---
 
@@ -408,27 +408,33 @@ Subset **이름은 자유**지만 `role` 은 이 목록에서 고른다. 프로�
 
 ---
 
-## 7. 이 저장소의 데이터셋
+## 7. Dataset 생성 경로와 현재 파일 상태
 
-| 파일 | 판번호 | 준수 | 비고 |
+| 경로 | 판번호 | 현재 저장소 상태 | 생성 후 확인할 조건 |
 |---|---|---|---|
-| `workspace/[extra] SCALib/traces/scalib_dataset_tiny-AES-c.h5` | 1.0 | 완전 | 비마스킹 AES |
-| `workspace/[extra] SCALib/traces/scalib_dataset_masked-aes-c.h5` | 1.0 | 완전 | 마스킹 AES, `mask` 포함 |
-| `workspace/traces/*.h5` (튜토리얼 1강) | 1.0 | **부분** | §7.1 |
-| `workspace/[extra] Physical-AI-SCA/traces/*.h5` | 1.1 | 완전 | 에뮬레이션, `sample_map`·`exec_time` 포함 |
+| `workspace/[extra] SCALib/traces/scalib_dataset_tiny-AES-c.h5` | 1.0 | 현재 checkout에 없음 | 수집 노트북 완료 후 검증기 통과 |
+| `workspace/[extra] SCALib/traces/scalib_dataset_masked-aes-c.h5` | 1.0 | 현재 checkout에 없음 | `mask` 포함, 수집 노트북 완료 후 검증기 통과 |
+| `workspace/traces/20260427_143337_SCA_DB.h5` | 1.0 | 파일 있음, 기존 문서 기준 부분 준수 | §7.1의 미기록 Metadata 유지 |
+| `workspace/[extra] Physical-AI-SCA/traces/*.h5` | 1.1 | 현재 checkout에 없음 | 에뮬레이션이면 `sample_map`·`exec_time` 포함 후 검증기 통과 |
 
-> **1.0 데이터셋이 1.1 의 새 필드를 갖추지 못한 것은 위반이 아니다.** 그 파일들은 1.0
-> 데이터셋이고 1.0 을 완전히 지킨다. 다만 ISO/IEC 17825 요건을 판정하려면 1.1 이 요구하는
+생성 대상 경로가 있다는 사실과 현재 파일이 존재한다는 사실은 다르다. 커밋되지 않은 대용량
+Dataset이나 노트북의 과거 실행 출력만 보고 현재 파일의 준수를 주장하지 않는다. 실제 파일을
+만든 직후 `workspace/lib/sca_schema.py`의 검증기를 통과한 결과만 현재 상태로 보고한다.
+
+> **1.0 Dataset이 1.1의 새 필드를 갖추지 못한 것은 위반이 아니다.** 그 파일들은 1.0
+> Dataset이고 1.0을 완전히 지킨다. 다만 ISO/IEC 17825 요건을 판정하려면 1.1이 요구하는
 > 값(`bandwidth_hz`·`exec_time`·`shunt_ohm` 등)이 필요하므로, **요건 대조표에서는
 > "미기록 → 판정 불가"** 로 보고된다. 스키마 준수와 시험 요건 충족은 다른 축이다.
 
-### 7.1 튜토리얼 데이터셋이 부분 준수인 이유
+### 7.1 튜토리얼 Dataset이 부분 준수인 이유
 
 `workspace/traces/20260427_143337_SCA_DB.h5` 는 스키마를 세우기 전에 다른 사람이 받은
 파일이다. 레이아웃과 필드명은 맞췄지만 **당시 기록되지 않은 측정 메타데이터는 복원할 수
 없다** — 게인, 프로브 구성, 분해능 등. §5.3 대로 **추정해서 채우지 않고 비워 두었다.**
 
-튜토리얼 수집 코드는 스키마를 따르도록 고쳤으므로, **앞으로 받는 파형은 완전 준수**다.
+튜토리얼 수집 코드는 1.0 스키마 필드를 기록하도록 작성되어 있다. 다만 스코프와 측정 조건에
+맞는 Metadata를 수집 전에 확인해야 하며, 새 Dataset의 준수 여부는 생성 직후 검증기 결과로
+판정한다.
 
 ---
 
@@ -438,21 +444,21 @@ Subset **이름은 자유**지만 `role` 은 이 목록에서 고른다. 프로�
 
 | 구 | 현 | 위치 |
 |---|---|---|
-| `i_k` | `key` | HDF5 dataset |
-| `i_p` | `plaintext` | HDF5 dataset |
-| `o` | `ciphertext` | HDF5 dataset |
-| `t` | `trace` | HDF5 dataset |
-| `i_m` | `mask` | HDF5 dataset |
-| `ns` | `samples_per_trace` | 루트 attrs |
-| `trig_count` | `trigger_samples` | 루트 attrs |
-| `adc_freq` | `sample_rate_hz` | 루트 attrs |
-| `clk_hz` | `target_clock_hz` | 루트 attrs |
-| `gain_db` | `channel_gain_db` | 루트 attrs |
-| `trace_scale` | `sample_scale` | 루트 attrs |
-| `platform` | `target_name` | 루트 attrs |
-| `cipher` | `iut_algorithm` + `iut_implementation` | 루트 attrs |
-| `created` | `acquisition_start` | 루트 attrs |
-| `seed` | `rng_seed` | 루트 attrs |
+| `i_k` | `key` | HDF5 배열 |
+| `i_p` | `plaintext` | HDF5 배열 |
+| `o` | `ciphertext` | HDF5 배열 |
+| `t` | `trace` | HDF5 배열 |
+| `i_m` | `mask` | HDF5 배열 |
+| `ns` | `samples_per_trace` | 루트 HDF5 attrs |
+| `trig_count` | `trigger_samples` | 루트 HDF5 attrs |
+| `adc_freq` | `sample_rate_hz` | 루트 HDF5 attrs |
+| `clk_hz` | `target_clock_hz` | 루트 HDF5 attrs |
+| `gain_db` | `channel_gain_db` | 루트 HDF5 attrs |
+| `trace_scale` | `sample_scale` | 루트 HDF5 attrs |
+| `platform` | `target_name` | 루트 HDF5 attrs |
+| `cipher` | `iut_algorithm` + `iut_implementation` | 루트 HDF5 attrs |
+| `created` | `acquisition_start` | 루트 HDF5 attrs |
+| `seed` | `rng_seed` | 루트 HDF5 attrs |
 | `python`·`numpy`·`chipwhisperer` | `tool_chain` (한 문자열로 합침) | 루트 attrs |
 | `n_traces` | `n_records` | subset attrs |
 | (없음) | `role` | subset attrs — 새로 부여 |
@@ -462,7 +468,7 @@ Subset **이름은 자유**지만 `role` 은 이 목록에서 고른다. 프로�
 
 ---
 
-## 9. 참고
+## 9. 출처와 근거
 
 - 용어: [`GLOSSARY.md`](GLOSSARY.md)
 - OPTIMIST *File Format for Traces: Requirements and Glossary* v0.5 — <https://optimist-ose.org/docs/file-format/intro>

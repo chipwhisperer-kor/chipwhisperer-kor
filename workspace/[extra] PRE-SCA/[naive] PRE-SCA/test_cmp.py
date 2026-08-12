@@ -38,7 +38,12 @@ def compare_files_binary(file_a, file_b):
         return False
 
 def main():
-    # 1. 대상 폴더들이 있는 경로 패턴 (사용자 환경에 맞게 수정 필요)
+    """반복 실행 로그와 디스어셈블을 기준 실행에 바이트 단위로 대조한다.
+
+    `./log/*tiny-AES_rand` 중 첫 폴더를 기준으로 세 CSV를 비교하고, 마지막에
+    `disassembly_v3.1.txt`와 `disassembly.txt`를 비교한다. 파일을 변경하지 않고 결과를
+    stdout에 출력한다. 폴더가 둘 미만이면 안내 후 반환하며 종료 코드를 별도로 설정하지 않는다.
+    """
     base_pattern = "./log/*tiny-AES_rand"
     
     # 모든 폴더 목록 가져오기 (시간 순 정렬)

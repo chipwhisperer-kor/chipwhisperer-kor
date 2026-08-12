@@ -64,11 +64,16 @@ make PLATFORM=CW308_STM32F3 CRYPTO_TARGET=NONE SS_VER=SS_VER_2_1
 | `0x82` | `'c'` | `trigger_high()`와 `trigger_low()` 사이에서 연산 수행(기본 `MY_OTP`), 응답 페이로드는 `0x82` |
 | `0x83` | `'r'` | 결과 `global_len` 바이트 회수 |
 
-`MAX_DATA_LEN = 245`는 C 펌웨어와 노트북 **양쪽에 정의되어 있다** (SS_VER_2_1 최대 패킷 249바이트에서 프레이밍 제외). 바꾼다면 양쪽을 함께 바꾼다 — 불일치는 에러 없이 잘린 에코로만 나타난다.
+C 펌웨어의 `MAX_DATA_LEN = 245`는 SimpleSerial 핸들러와 전역 버퍼의 **수용 한도**다.
+튜토리얼 노트북은 같은 이름을 현재 전송할 payload 길이로 사용하며, 통신 점검에서는 245,
+Dataset 수집에서는 16처럼 셀마다 다시 정한다. 둘은 같은 정의가 아니다. 노트북 값은 C의
+수용 한도를 넘으면 안 되고, `0x81 'l'`로 보낸 1바이트 값이 실제 `global_len`이 된다.
+동일한 식별자가 두 의미를 갖는 구조는 코드 리팩터링 전까지 유지되는 제약이므로 새 설명에서
+두 값을 하나의 공유 상수처럼 서술하지 않는다.
 
-## 파형 저장
+## Trace(트레이스) 저장
 
-**모든 파형 Dataset(데이터셋)은 저장소 루트의 `SCHEMA.md`를 따른다.** 용어는
+**모든 Trace Dataset(데이터셋)은 저장소 루트의 `SCHEMA.md`를 따른다.** 용어는
 `GLOSSARY.md`가 정본이다. 정본의 정의문은 영문을 유지하고, 파생 문서·주석·설명은 한국인
 연구자를 독자로 삼아 한글 위주로 쓴다. 코드 식별자와 두문자어는 영문 원형을 유지한다.
 
@@ -92,37 +97,40 @@ make PLATFORM=CW308_STM32F3 CRYPTO_TARGET=NONE SS_VER=SS_VER_2_1
 |---|---|---|
 | `workspace/lib/sca_schema.py` | 스키마 상수·검증기·경로 기반 로더 | 세 수집 경로 전부 |
 | `workspace/lib/aes_ref.py` | `SBOX`·`HW`·`sbox_out`·`aes_ecb_encrypt`·**`intermediates()`** | 수집기의 골든 검증, 분석의 민감값 라벨 |
-| `workspace/iut/{tiny-AES-c,masked-aes-c}/` | 검증 대상 암호 라이브러리 | SCALib 펌웨어 2종 + 에뮬 하네스 2종 |
+| `workspace/iut/{tiny-AES-c,masked-aes-c}/` | IUT(테스트 대상 구현) 암호 라이브러리 | SCALib 펌웨어 2종 + 에뮬 하네스 2종 |
 
 **암호 라이브러리를 공용 트리에 둔 이유**: 실물 펌웨어와 에뮬레이션 하네스가 **같은 `aes.c`를 같은 플래그(`-Os`)로** 컴파일해야 "에뮬에서 찾은 결함이 실측 타겟에도 있다"고 말할 근거가 생긴다. 최적화 수준이 전이 누설을 만들기도 하고 없애기도 하므로 플래그가 다르면 다른 구현을 분석하는 셈이다. 경로를 옮기면 makefile 2개·수집 노트북 2개·SCALib README·`workspace/iut/README.md`를 함께 고치고 **`clean` 재빌드**한다(빌드 산출물에 소스 경로가 문자열로 박힌다).
 
 `intermediates()`가 공용인 이유도 같다 — 에뮬과 실측이 서로 다른 값을 같은 이름으로 부르면 비교가 조용히 무너진다.
 
-시각화는 matplotlib이 아니라 `output_notebook()`을 쓰는 Bokeh다. 파형 파일은 용량이 크므로 요청받지 않는 한 커밋에 넣지 않는다.
+시각화는 matplotlib이 아니라 `output_notebook()`을 쓰는 Bokeh다. 트레이스 파일은 용량이 크므로 요청받지 않는 한 커밋에 넣지 않는다.
 
-현재 상태: `[extra] SCALib`의 h5 2개는 **완전 준수**, 튜토리얼 `workspace/traces/*.h5`는 스키마 제정 이전 수집분이라 **부분 준수**(복원 불가능한 측정 조건 4개 누락).
+현재 checkout에는 `[extra] SCALib/traces/`의 생성 HDF5 파일이 없고 과거 노트북 실행 출력만
+남아 있다. 따라서 두 파일의 현재 준수를 주장하지 않는다. 튜토리얼의
+`workspace/traces/20260427_143337_SCA_DB.h5`는 스키마 제정 이전 수집분이라 기존 문서에서
+부분 준수로 분류하지만, 이 환경에는 `h5py`가 없어 이번 점검에서 검증기를 다시 실행하지 못했다.
 
 ## `[extra]` 프로젝트 — 각자가 자기 규칙을 갖는다
 
 `[extra]` 접두사가 붙은 디렉터리는 공식 튜토리얼 경로와 무관한 연구·부속 프로젝트다. 각각 자기완결적으로 작성되어 있으므로 손대기 전에 그 프로젝트의 README를 먼저 읽고, 경로는 **그 프로젝트 루트 기준 상대경로**로 유지한다(여러 프로젝트가 호스트 절대경로를 명시적으로 금지한다).
 
 - **`[extra] Paper-Deep-Dive/`** — **자체 `CLAUDE.md`·`AGENTS.md`·`PROMPT.md`가 있고, 그 디렉터리 안에서는 이 파일보다 우선한다.** 역할별 단독 쓰기 소유가 엄격한 4역할 문서 파이프라인이며, Claude는 `director` 역할에 바인딩되어 `Papers/**`, `.Intermediate_Artifacts/papers/**`, `Presentation_Marp/**`에 쓰면 안 된다. 사본이 여러 개 존재하고 낡은 사본도 안에서 보면 구별되지 않으므로 `.Intermediate_Artifacts/SYNC.md`를 제일 먼저 확인한다.
-- **`[extra] PRE-SCA/`** — ARM 펌웨어(tiny-AES)를 Unicorn/Capstone으로 에뮬레이션하는 pre-silicon SCA/FI 실험. 하드웨어가 필요 없다(`[extra] Physical-AI-SCA`의 에뮬 경로도 그렇다). 그 프로젝트가 이 트리의 **`elfParser.ElfParser`를 재사용**한다 — ELF 파싱 정의는 여기 한 곳이다. 다만 `logger.py`/`emul.py`는 쓰지 않는다: 전역 싱글턴 로거가 실행마다 1.1MB CSV를 쓰고 `emul.py:218`이 명령어마다 입력 CSV를 통째로 다시 읽어, 그 구조로는 수천 장 수집이 불가능하다(그 코드는 오류주입 디버깅용이다). `[naive] PRE-SCA/`는 스크립트 버전으로 `python3 main.py`(또는 N회 반복 `./run_main.sh <N>`)로 실행하며, 설정은 전부 `config.py`에 있다. `config.py`는 자기 snake_case 변수명이 `elfParser`·`emul`·`logger`에서 이름으로 참조되니 리팩터링 시 바꾸지 말라고 경고한다. 노트북 결과는 `nb_output/`에 쌓인다.
-- **`[extra] SCALib/`** — SCALib 0.6.4의 기능을 **기능 하나당 노트북 하나**로 보이되, **Normal AES(`tiny-AES-c`) ∥ Masked AES(`masked-aes-c`) 이중 타겟**을 단계마다 나란히 비교하는 예제 모음(SNR·Quantizer·Ttest·MTtest·CPA·LDA·MultiLDA·RLDA·SASCA·KeyRank). CW308+STM32F3에서 **실측한 파형**을 쓴다. **하드웨어가 필요한 노트북은 `0.0.Dataset_Collect_tiny-AES-c.ipynb`와 `0.1.Dataset_Collect_masked-aes-c.ipynb` 둘**이고, 그것이 만든 `traces/scalib_dataset_{tiny-AES-c,masked-aes-c}.h5`를 분석 노트북 10개가 읽는다(GB 단위라 커밋하지 않는다). 파형 길이는 상수가 아니라 `scope.adc.trig_count`로 정해 AES 연산 전체(키 스케줄+10라운드)를 담는다.
+- **`[extra] PRE-SCA/`** — ARM 펌웨어(tiny-AES)를 Unicorn/Capstone으로 에뮬레이션하는 pre-silicon SCA/FI 실험. 하드웨어가 필요 없다(`[extra] Physical-AI-SCA`의 에뮬 경로도 그렇다). 그 프로젝트가 이 트리의 **`elfParser.ElfParser`를 재사용**한다 — ELF 파싱 정의는 여기 한 곳이다. 다만 `logger.py`/`emul.py`는 쓰지 않는다. 전역 로거가 실행마다 CSV를 쓰고 에뮬레이션 훅이 명령어마다 입력 CSV를 다시 읽는 구조라, 오류주입 디버깅에는 맞지만 수천 Record 수집에는 I/O 비용이 지나치게 크기 때문이다. `[naive] PRE-SCA/`는 스크립트 버전으로 `python3 main.py`(또는 N회 반복 `./run_main.sh <N>`)로 실행하며, 설정은 전부 `config.py`에 있다. `config.py`의 snake_case 변수명은 `elfParser`·`emul`·`logger`가 이름으로 참조하므로 바꾸면 안 된다. 노트북 결과는 `nb_output/`에 쌓인다.
+- **`[extra] SCALib/`** — SCALib 0.6.4의 기능을 **기능 하나당 노트북 하나**로 보이되, **Normal AES(`tiny-AES-c`) ∥ Masked AES(`masked-aes-c`) 이중 타겟**을 단계마다 나란히 비교하는 예제 모음(SNR·Quantizer·Ttest·MTtest·CPA·LDA·MultiLDA·RLDA·SASCA·KeyRank). **하드웨어가 필요한 노트북은 `0.0.Dataset_Collect_tiny-AES-c.ipynb`와 `0.1.Dataset_Collect_masked-aes-c.ipynb` 둘**이고, CW308+STM32F3에서 수집한 전력 Trace를 `traces/scalib_dataset_{tiny-AES-c,masked-aes-c}.h5`에 만든다. 분석 노트북 10개는 그 파일을 읽지만 GB 단위 생성물이라 커밋하지 않는다. 현재 checkout에는 HDF5 파일이 없고 수집 노트북의 과거 실행 출력만 남아 있다. Trace 길이는 수집 시 `scope.adc.trig_count`에서 정하며 AES 연산 전체(키 스케줄+10라운드)를 담도록 설계되어 있다.
 
   **암호 라이브러리는 이 서브프로젝트 밖에 있다** — `workspace/iut/{tiny-AES-c,masked-aes-c}/`. 펌웨어 makefile이 `../../iut/<lib>/aes.c`를 직접 컴파일한다. 세 수집 경로(실물 전력·디버그 트레이스·에뮬레이션)가 **같은 소스**를 봐야 결과를 나란히 놓을 수 있어서 저장소 공용 트리로 올렸다. 출처·패치 내역은 `workspace/iut/README.md`.
 
   경로·타겟 레지스트리·AES 상수·데이터셋 로더는 `scalib_common.py`(`TARGETS`, `load_group(target=…)`, `group_len`) 한 곳에만, 수집 공용 로직은 `dataset_collect_lib.py` 한 곳에만 있다. **분석 로직은 노트북이 직접 보여 준다** — 교육 목적이라 공용 모듈로 빼지 않는다.
 
-  수집 중 캡처는 반드시 `Bench.capture()`(`dataset_collect_lib.py`)로 한다. 장시간 수집은 USB 단절과 Husky 먹통으로 깨지므로 단순 재시도 3회 → 재연결 2회 → **Husky 펌웨어 재기록 1회** 순으로 스스로 복구하고, 복구 뒤 측정 설정과 마스크 시드를 되돌린다. 사람이 다시 눌러 줄 필요가 없어야 한다. Husky 펌웨어 손상은 **버전을 정상값으로 보고하면서** `cw.scope()` 만 `Unknown hwInfoVer` 로 실패하는 형태로 나타나며, USB 전원 차단이나 물리적 재삽입으로는 낫지 않고 재기록만 듣는다.
+  수집 중 캡처는 `Bench.capture()`(`dataset_collect_lib.py`)를 사용한다. 구현된 복구 순서는 단순 재시도 3회 → 재연결 2회 → **Husky 펌웨어 재기록 1회**이며, 재연결 뒤 측정 설정과 마스크 시드를 다시 적용한다. 펌웨어 재기록은 장치 상태를 덮어쓰는 부작용이 있으므로 `capture()`의 앞 단계가 모두 실패했을 때만 실행한다. 과거 Masked 수집의 저장된 노트북 출력에는 `reflash`, `reconnect`, `reconnect`가 기록되어 있지만, 현재 HDF5 파일이 없으므로 새 수집에서는 복구 이력과 설정 복원을 다시 확인해야 한다.
 
   이 서브프로젝트 고유의 세 가지 규칙:
   1. **관점 분리** — Masked h5에는 연구용 마스크 `mask (n,10)`이 들어 있다. **공격자 관점 셀은 절대 `mask`를 참조하지 않는다.** 쓰는 절은 "연구자" 로 제목을 분리한다.
-  2. **비교는 암호화 구간에서만** — `masked-aes-c`는 `CipherMasked`만 보호하고 `KeyExpansion`은 벤더 원본 비마스킹인데, 펌웨어가 키 스케줄을 트리거 안에서 돌린다. 전 구간 비교는 이 공통 누설에 지배된다(전 구간 TVLA `|t|`가 Normal 114 / Masked 116으로 차이가 없어 보인다). `1.0`이 평문 의존 누설 시작점 `enc_start`를 실측해 `nb_output/poi_*.npz`에 저장하고 `2.0`–`6.0`이 그 이후만 본다.
+  2. **비교는 암호화 구간에서만** — `masked-aes-c`는 `CipherMasked`만 보호하고 `KeyExpansion`은 벤더 원본 비마스킹인데, 펌웨어가 키 스케줄을 트리거 안에서 돌린다. 전 구간 비교는 이 공통 누설에 지배된다. 저장된 `2.0.Ttest.ipynb` 출력은 전 구간 최대 `|t|`가 Normal 114.31 / Masked 113.81임을 보여 준다. `1.0`은 Dataset에서 평문 의존 누설 시작점 `enc_start`를 산출해 `nb_output/poi_*.npz`에 저장하고 `2.0`–`6.0`은 그 이후만 보도록 작성되어 있다.
   3. **트레이스 수는 목표치가 아니라 실제 보유량** — `N_PROFILING` 같은 상수는 수집 목표다. 분석은 `group_len()`으로 실제 트레이스 수를 읽고, 타겟 간 비교는 양쪽을 같은 예산으로 맞춘다.
 
-  두 Dataset 모두 목표 트레이스 수를 채웠고(profiling 각 100,000개) `SCHEMA.md` **완전 준수**다. Masked 수집은 자동 복구 경로를 실제로 탔다 — `recoveries` attr에 `reflash`·`reconnect`·`reconnect`가 남아 있다. 마스크 RNG의 벤더 원본 편향(`rand() % 0xFF`)은 `rand() & 0xFF`로 고쳐 해소했다(`workspace/iut/masked-aes-c/aes.c`). 커스텀 프로토콜은 공통 `0x81 k/p/l`·`0x82 c`·`0x83 r`에 더해 Masked 전용 `0x81 's'`(마스크 시드)·`0x83 'm'`(마스크 회수)이 있다.
-- **`[extra] Physical-AI-SCA/`** — **AI 가 실험 설계·수집·분석·보고를 수행하는 사전 진단 환경.** 한 암호 구현을 세 방식으로 관측해(에뮬레이션·실물 전력·디버그 트레이스) 하나의 스키마·하나의 판정 규칙 위에 놓는다. **1차 사이클에서 실제로 돌린 것은 에뮬레이션 경로뿐이고, 실물 수집기 2종(`cw_power.py`·`cw_debugtrace.py`)은 골격만 있으며 실행된 적이 없다** — 각 파일 머리말에 명시되어 있다.
+  저장된 수집 노트북 출력은 두 과거 실행이 profiling 목표 100,000 Record를 채웠고 검증기에서 위반을 보고하지 않았다고 기록한다. Masked 출력에는 `reflash`·`reconnect`·`reconnect` 복구 이력도 있다. 이는 현재 파일의 준수 증거가 아니므로 HDF5를 다시 만들면 검증기를 재실행한다. 마스크 RNG 패치는 벤더 원본 `rand() % 0xFF`가 제외하던 `0xFF`를 `rand() & 0xFF`로 포함하지만, `rand()`를 암호학적으로 안전한 RNG로 만들지는 않는다(`workspace/iut/masked-aes-c/aes.c`). 커스텀 프로토콜은 공통 `0x81 k/p/l`·`0x82 c`·`0x83 r`에 더해 Masked 전용 `0x81 's'`(마스크 시드)·`0x83 'm'`(마스크 회수)이 있다.
+- **`[extra] Physical-AI-SCA/`** — **AI가 실험 설계·수집·분석·보고를 나누어 수행하는 사전 진단 환경.** 한 암호 구현을 세 방식으로 관측해(에뮬레이션·실물 전력·디버그 트레이스) 하나의 스키마·하나의 판정 규칙 위에 놓는다. 저장된 문서와 데모 출력은 에뮬레이션 경로의 과거 실행만 기록하며, 현재 `runs/`와 `traces/`에는 그 증거 파일이 없다. 실물 수집기 2종(`cw_power.py`·`cw_debugtrace.py`)은 미실행 골격이므로 동작한다고 주장하지 않는다.
 
   ISO/IEC 17825:2024 를 **준용**하되 **적합성 평가가 아니라 사전 진단(pre-assessment)**이다. §1 Scope 가 이 표준을 ISO/IEC 19790 적합성 판정용으로 정하고 24759 와 함께 암호모듈의 정의된 경계에서 쓰도록 하는데, 여기 IUT 는 모듈이 아니라 라이브러리이고 벤더와 시험자가 동일하며 승인 기관이 없다. 그래서 spec 의 `scope.not_claimed` 가 **비울 수 없는 필수 필드**다 — 무엇을 주장하지 않는지 적지 않으면 나머지가 전부 주장으로 읽힌다.
 
@@ -132,7 +140,7 @@ make PLATFORM=CW308_STM32F3 CRYPTO_TARGET=NONE SS_VER=SS_VER_2_1
 
   누설 벡터는 `[hw_reg | hd_reg | hw_mem | hd_mem]` 연접이며 **HD 는 같은 저장소의 한 명령어 앞뒤 값끼리만** 계산한다(서로 다른 레지스터 쌍은 물리적 근거가 없고 오탐만 만든다). `sample_map` 이 샘플을 명령어 주소로 되짚어 주므로 결함 후보를 `addr2line` 으로 소스 행까지 옮길 수 있다 — 하네스를 `-gdwarf-2` 로 빌드하는 이유다.
 
-  실행·검증된 사실: 에뮬 명령어 수는 입력과 무관하게 고정(tiny 6,030 / masked 10,147), 골든 AES 일치, `UC_HOOK_MEM_WRITE` 는 쓰기 **전**에 걸려 `mem_read` 가 이전 값을 준다. 비마스킹 대조군에서 검출기가 `AddRoundKey`(`aes.c:244`)와 `SubBytes`(`aes.c:258`)를 정확히 지목한다.
+  저장된 데모·진행 문서는 과거 실행에서 에뮬 명령어 수가 tiny 6,030 / masked 10,147로 일정했고, 골든 AES가 일치했으며, 비마스킹 대조군의 결함 후보에 `AddRoundKey`와 `SubBytes`가 포함됐다고 기록한다. 현재 실행 증거 번들이 없으므로 이 값과 소스 위치는 새 실행의 `results.json`·보고서·해시 번들로 다시 확인해야 한다.
 - **`[extra] Presentation_Marp/`** — Marp 발표자료. `0. Template/presentation.md`가 템플릿이자 문법 레퍼런스다(`marp: true`, `size: "16:9"`, `lang: ko`, `math: mathjax`; 클래스 `lead`, `divider`, `small`, `tiny`, `code-small`, `code-tiny`). `marp` 바이너리는 설치되어 있지 않다 — 슬라이드는 에디터 확장에서 미리보기만 하며 여기서 빌드하지 않는다.
 
 ## 실무 메모

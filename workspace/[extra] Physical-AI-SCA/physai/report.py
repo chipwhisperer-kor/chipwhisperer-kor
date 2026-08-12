@@ -33,6 +33,8 @@ import numpy as np
 
 from . import conformance, llm, paths, spec as spec_mod
 
+# SVG 안의 래스터 요소를 화면에서 읽을 수 있게 하는 렌더링 해상도다. 판정 수치에는
+# 영향을 주지 않으며 보고서 파일 크기가 불필요하게 커지지 않는 수준으로 둔다.
 FIG_DPI = 110
 
 
@@ -40,7 +42,12 @@ FIG_DPI = 110
 # 01 실험 계획 보고서 — 수집 전
 # ─────────────────────────────────────────────────────────────
 def write_plan(spec, out_dir, dataset_path=None):
-    """수집 전에 만든다. 이 시점에는 데이터가 없으므로 대조표가 대부분 `미기록` 이다."""
+    """수집 전에 확정할 기준을 `01_experiment_plan.md`로 기록한다.
+
+    검증된 `spec`과 선택적 Dataset 경로를 받아 `out_dir`을 만들고 기존 계획 보고서를
+    덮어쓴다. 보통 이 시점에는 Dataset이 없어 대조표가 `미기록`이다. 파일 쓰기·명세
+    계산 실패는 호출자에게 전파되며 생성된 `Path`를 반환한다.
+    """
     out_dir.mkdir(parents=True, exist_ok=True)
     rep = conformance.check(dataset_path=dataset_path, spec=spec, results=None,
                             level=spec["criteria"]["security_level"])
@@ -126,6 +133,12 @@ def write_plan(spec, out_dir, dataset_path=None):
 # 02 분석 결과 보고서
 # ─────────────────────────────────────────────────────────────
 def write_analysis(spec, results, out_dir, dataset_path):
+    """분석 결과와 증거 그림을 `02_analysis_report.md`로 기록한다.
+
+    `results`의 수치·판정을 문장으로 재구성할 뿐 새 판정을 만들지 않는다. 출력 디렉터리와
+    그림 파일을 생성하고 기존 동명 보고서를 덮어쓴다. Dataset·명세는 변경하지 않으며
+    필수 결과가 없거나 파일 쓰기에 실패하면 예외가 전파된다.
+    """
     out_dir.mkdir(parents=True, exist_ok=True)
     figs = _make_figures(spec, results, out_dir, dataset_path)
     rep = conformance.check(dataset_path=dataset_path, spec=spec, results=results,
@@ -139,7 +152,7 @@ def write_analysis(spec, results, out_dir, dataset_path):
     L = ["# 분석 결과 보고서 — %s" % results["title"], "",
          "| | |", "|---|---|",
          "| spec id | `%s` |" % results["spec_id"],
-         "| 데이터셋 | `%s` |" % paths.Path(results["dataset"]).name,
+         "| Dataset | `%s` |" % paths.Path(results["dataset"]).name,
          "| 분석 시각 | %s |" % results["generated"],
          "| **종합** | **%s** |" % overall, ""]
 
@@ -250,6 +263,7 @@ def _narrative(results, overall):
 
 
 def _ta_body(r):
+    """TA 결과 사전을 단계별 판정과 계측 요건 Markdown 줄로 변환한다."""
     if not r.get("stages"):
         return [""]
     L = ["| 단계 | subset | 판정 | 실행시간 min–max | 고유값 | 근거 |",
@@ -268,6 +282,7 @@ def _ta_body(r):
 
 
 def _spa_body(r):
+    """SPA 결과를 통계 소견과 미결 육안 검사 상태가 함께 보이도록 변환한다."""
     L = ["관측 재현성(같은 입력 쌍의 최대 절대차) = **%s** — %s" %
          (r.get("noise_floor"), r.get("noise_floor_note", "")), ""]
     if r.get("findings"):
@@ -287,6 +302,7 @@ def _spa_body(r):
 
 
 def _dpa_body(r, figs):
+    """DPA 결과를 임계·Trace 수 부족·검정 불가 Sample을 구분한 Markdown으로 만든다."""
     if r.get("verdict") in (None, "not-applicable", "not-run"):
         return [""]
     L = ["| | |", "|---|---|",
@@ -317,6 +333,7 @@ def _dpa_body(r, figs):
 
 
 def _soundness_body(r, figs):
+    """연구자 관점 soundness 결과와 명령어별 결함 후보를 Markdown으로 만든다."""
     L = ["## soundness — 구현 층 1차 누설 검출 (판정)", "",
          "**판정: %s**" % r["verdict"], "",
          "> 검사하는 명제: %s" % r["proposition"], "",
@@ -375,6 +392,12 @@ def _soundness_body(r, figs):
 # 03 증거 번들
 # ─────────────────────────────────────────────────────────────
 def write_evidence(spec, out_dir, dataset_path):
+    """증거 파일의 해시·툴체인·재현 명령을 JSON과 Markdown으로 기록한다.
+
+    `manifest.json`이 기계 판독 정본이고 `03_evidence_manifest.md`는 사람이 읽는 파생물이다.
+    자기참조 해시는 만들지 않으며, 기존 두 파일은 덮어쓴다. Dataset과 ELF는 읽기만 한다.
+    누락된 선택 파일은 제외하고 파일 I/O 실패는 호출자에게 전파한다.
+    """
     out_dir.mkdir(parents=True, exist_ok=True)
     # 자기 자신을 목록에 넣지 않는다.
     #
@@ -384,7 +407,7 @@ def write_evidence(spec, out_dir, dataset_path):
     # (실제로 그 버그가 있었고 verify 가 잡아냈다.)
     #
     # 무결성이 손상되지 않는 이유: `manifest.json` 이 정본이고 `03_…md` 는 그것을
-    # 사람이 읽게 옮긴 파생물이다. 데이터셋·결과·그림은 모두 목록에 들어간다.
+    # 사람이 읽게 옮긴 파생물이다. Dataset·결과·그림은 모두 목록에 들어간다.
     SELF = {"manifest.json", "03_evidence_manifest.md"}
     files = []
     for p in sorted(out_dir.iterdir()):
@@ -426,7 +449,7 @@ def write_evidence(spec, out_dir, dataset_path):
         L.append("| `%s` | %s | `%s` | %s |"
                  % (f["path"], _human(f["bytes"]), f["sha256"][:16] + "…", f.get("label", "")))
     L += ["", "## 검증", "", "```bash", "python3 -m physai.verify --run %s" % spec["id"], "```", "",
-          "`verify` 는 위 해시를 다시 계산해 대조하고, 데이터셋이 여전히 스키마를 지키는지, "
+          "`verify`는 위 해시를 다시 계산해 대조하고, Dataset이 여전히 스키마를 지키는지, "
           "툴체인이 같은지 확인한다. 하나라도 어긋나면 0 이 아닌 종료 코드를 낸다.", ""]
     p = out_dir / "03_evidence_manifest.md"
     p.write_text("\n".join(L), encoding="utf-8")
@@ -434,6 +457,7 @@ def write_evidence(spec, out_dir, dataset_path):
 
 
 def _file_entry(p, out_dir, label=""):
+    """파일 하나의 상대경로·바이트 크기·SHA-256·표시 라벨을 반환한다."""
     h = hashlib.sha256()
     with open(p, "rb") as f:
         for chunk in iter(lambda: f.read(1 << 20), b""):
@@ -446,6 +470,11 @@ def _file_entry(p, out_dir, label=""):
 
 
 def _toolchain():
+    """현재 Python·분석 모듈·ARM 컴파일러 버전을 증거용 사전으로 수집한다.
+
+    모듈이나 컴파일러가 없으면 `없음`으로 기록한다. 파일을 변경하지 않지만 컴파일러
+    버전 확인을 위해 최대 10초짜리 하위 프로세스를 한 번 실행한다.
+    """
     out = {"python": platform.python_version()}
     for mod in ("numpy", "h5py", "scalib", "unicorn", "capstone", "lief", "scipy"):
         try:
@@ -463,6 +492,7 @@ def _toolchain():
 
 
 def _human(n):
+    """바이트 수를 B·KB·MB·GB 단위의 한 자리 소수 문자열로 바꾼다."""
     for u in ("B", "KB", "MB", "GB"):
         if n < 1024 or u == "GB":
             return "%.1f %s" % (n, u)
@@ -548,6 +578,7 @@ def _make_figures(spec, results, out_dir, dataset_path):
 
 
 def _c(s):
+    """보고서 표 셀용으로 줄바꿈·구분자를 정리하고 140자로 제한한다."""
     return (s or "").replace("\n", " ").replace("|", "\\|")[:140]
 
 
@@ -602,6 +633,12 @@ def _num(v, fmt="%.4g"):
 
 
 def main(argv=None):
+    """실행 ID의 분석 결과를 읽어 분석 보고서와 증거 번들을 생성한다.
+
+    계획 보고서가 없으면 사후 생성 사실을 경고해 사전 확정 증거로 오인되지 않게 한다.
+    결과 파일이 없으면 `SystemExit`로 중단하고, 성공하면 생성 파일 JSON과 종료 코드 0을
+    반환한다. Dataset과 명세는 읽기 전용이다.
+    """
     ap = argparse.ArgumentParser(prog="physai.report")
     ap.add_argument("--run", required=True, help="spec id")
     ap.add_argument("--spec", default=None, help="생략하면 exp/<run>.yaml")

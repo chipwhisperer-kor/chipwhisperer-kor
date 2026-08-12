@@ -25,9 +25,10 @@ from scenario import Scenario
 # -----------------------------------------------------------------------------
 
 def get_log_context() -> Tuple[str, str]:
-    """
-    logger 모듈에서 생성한 로그 파일 경로를 기반으로
-    디렉토리 경로와 파일명 접두사(타임스탬프)를 추출합니다.
+    """현재 레지스터 로그 경로에서 `(디렉터리, 날짜·시간 접두사)`를 반환한다.
+
+    로거 파일이 아직 선택되지 않았으면 `("./log", "")`을 반환해 호출자가 I/O 생성을
+    건너뛰게 한다. 파일을 읽거나 쓰지 않는다.
     """
     log_file_path = logger.get_log_file_name()
     if not log_file_path:
@@ -79,7 +80,11 @@ def make_io_data_files(uc: Uc, index: int):
         print(f"[Error] Failed to write LogVirIN: {e}")
 
 def get_input_data() -> List[List[int]]:
-    """입력 데이터(LogVirIN.csv)를 로드합니다."""
+    """`config.log_vir_in_file`의 비어 있지 않은 CSV 행을 정수 목록으로 읽는다.
+
+    파일이 없으면 빈 목록을 반환한다. 파싱·I/O 실패는 경고를 출력하고 지금까지 읽은
+    행만 반환하며 파일을 변경하지 않는다.
+    """
     input_data_list = []
     if not os.path.exists(config.log_vir_in_file):
         return []
@@ -96,7 +101,11 @@ def get_input_data() -> List[List[int]]:
     return input_data_list
 
 def inject_input_data(uc: Uc, data_row: List[int]):
-    """메모리에 입력 데이터를 주입합니다."""
+    """정수 바이트 행을 `vir_IN` 시작 주소에 연속으로 기록한다.
+
+    값이 0–255 범위를 벗어나면 `bytes()`의 `ValueError`, 매핑되지 않은 주소면 Unicorn
+    예외가 발생한다. 에뮬레이터 메모리를 변경하고 반환값은 없다.
+    """
     # 데이터는 바이트 단위로 기록됨
     packed_data = bytes(data_row)
     uc.mem_write(setEmulData.vir_in_addr, packed_data)
@@ -207,7 +216,11 @@ def make_disassembly_file():
 sync_ctr = 0  # 입력 주입 순서를 맞추는 공용 카운터
 
 def hook_code_trace(uc: Uc, address: int, size: int, user_data: Any):
-    """명령어 실행 전 레지스터 상태를 기록하고 종료 주소에서 에뮬레이션을 멈춘다."""
+    """명령어 실행 전 레지스터 상태를 기록하고 `_exit` 주소에서 실행을 멈춘다.
+
+    로거 버퍼·CSV와 Unicorn 실행 상태를 변경한다. 로깅 또는 에뮬레이터 오류는 호출자에게
+    전파되며 반환값은 없다.
+    """
     logger.write_log_regs(uc, address, user_data)
     
     # 종료 주소 도달 시 에뮬레이션 중단
@@ -217,7 +230,12 @@ def hook_code_trace(uc: Uc, address: int, size: int, user_data: Any):
         uc.emu_stop()
 
 def hook_scene_injection(uc: Uc, address: int, size: int, scene: Scenario):
-    """명령어 순서에 맞춰 입력 데이터와 Fault injection(오류주입) 시나리오를 적용한다."""
+    """명령어 순서에 맞춰 입력 바이트와 Fault injection(오류주입)을 적용한다.
+
+    현재 `sync_ctr`와 정상 실행의 `LOG_MATRIX` 주소를 기준으로 입력 메모리·레지스터·PC를
+    변경한다. 잘못된 시나리오 인덱스는 건너뛰며 `_exit`에서 카운터를 0으로 되돌린다.
+    입력 CSV를 매 hook마다 다시 읽는 레거시 동작 때문에 대량 실행에는 적합하지 않다.
+    """
     global sync_ctr
     
     # 1. 입력 데이터 주입 (Sync Counter 기반)
@@ -261,7 +279,12 @@ def hook_scene_injection(uc: Uc, address: int, size: int, scene: Scenario):
         sync_ctr = 0
 
 def init_emulator() -> Uc:
-    """Unicorn 에뮬레이터 인스턴스 생성 및 메모리 매핑"""
+    """새 Unicorn 인스턴스에 ELF 메모리와 초기 레지스터를 설정해 반환한다.
+
+    Flash·RAM을 페이지 단위로 매핑하고 ELF 섹션을 읽어 메모리에 쓴다. 호스트 파일은
+    변경하지 않는다. 일부 겹친 매핑·쓰기 오류는 레거시 호환을 위해 무시하지만, ELF I/O와
+    인스턴스 생성 실패는 호출자에게 전파된다.
+    """
     arch = UC_ARCH_ARM
     mode = UC_MODE_THUMB if setEmulData.MODE == 2 else UC_MODE_ARM
     uc = Uc(arch, mode)
@@ -310,7 +333,12 @@ def init_emulator() -> Uc:
     return uc
 
 def run():
-    """메인 실행 함수"""
+    """디스어셈블을 만들고 정상·오류주입 에뮬레이션을 순서대로 실행한다.
+
+    오류주입 시나리오가 있으면 정상 실행 뒤 Faulty 실행을 한 번 수행한다. 실행별 레지스터
+    로그와 가상 I/O CSV를 만들고 `disassembly.txt`를 덮어쓴다. ELF·Unicorn·파일 I/O 오류는
+    호출자에게 전파되며 반환값은 없다.
+    """
     print("Emulating the code..")
     
     # 1. disassembly 파일 생성 (디스어셈블리)

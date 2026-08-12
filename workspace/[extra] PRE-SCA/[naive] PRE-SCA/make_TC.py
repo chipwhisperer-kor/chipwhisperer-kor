@@ -10,7 +10,12 @@ import random
 from config import *
 
 def make_TC():
-    """`BUFFER_BLOCK * BUFFER_NUM` 크기의 입력 한 행을 `log_vir_in_file`에 저장한다."""
+    """재현 가능한 가상 입력 한 행을 `log_vir_in_file`에 저장한다.
+
+    전체 길이는 `BUFFER_BLOCK * BUFFER_NUM`이고 앞 64바이트만 seed 1의 난수로 채우며
+    나머지는 0이다. 첫 열에는 주입 순서 0을 쓴다. 기존 파일을 덮어쓰고 경로·권한 오류는
+    호출자에게 전파되며 반환값은 없다.
+    """
     random.seed(1)
 
     test_VirIN = [0x0 for _ in range(BUFFER_BLOCK * BUFFER_NUM)]

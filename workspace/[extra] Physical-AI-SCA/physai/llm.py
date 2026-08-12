@@ -38,12 +38,19 @@ ENV_KEY = "PHYSAI_LLM_API_KEY"
 
 
 def available():
-    """호출할 수 있는 설정이 갖춰졌는가. 보고서 생성기가 이것부터 본다."""
+    """필수 엔드포인트·모델 환경변수가 모두 있으면 `True`를 반환한다.
+
+    네트워크 호출이나 환경 변경은 하지 않는다. API 키는 필수 여부가 서비스마다 달라
+    가용성 판정에 포함하지 않는다.
+    """
     return bool(os.environ.get(ENV_BASE) and os.environ.get(ENV_MODEL))
 
 
 def why_unavailable():
-    """왜 못 쓰는지 사람이 읽을 문장. 보고서의 빈 칸에 그대로 들어간다."""
+    """누락된 필수 환경변수를 설명하는 보고서용 문장을 반환한다.
+
+    설정이 모두 있으면 빈 문자열을 반환한다. 환경이나 파일을 변경하지 않는다.
+    """
     missing = [k for k in (ENV_BASE, ENV_MODEL) if not os.environ.get(k)]
     if not missing:
         return ""
@@ -58,8 +65,12 @@ def complete(prompt, system=None, timeout=120, max_tokens=2048, temperature=0.2)
     출력: 응답 문자열. 설정이 없으면 **None** (예외가 아니다 — 없어도 파이프라인이
     끝까지 돌아야 하기 때문이다).
 
-    실패 조건: 설정은 있는데 호출이 실패하면 RuntimeError. 이때는 조용히 넘어가지
-    않는다 — 쓰겠다고 해 놓고 못 쓴 것은 알려야 한다.
+    `prompt`와 선택적 `system` 문장을 OpenAI 호환 `/chat/completions`에 한 번 전송한다.
+    `timeout`은 네트워크 대기 상한(초), `max_tokens`와 `temperature`는 생성 파라미터다.
+    네트워크 전송이 유일한 부작용이며 API 키는 반환값이나 오류에 싣지 않는다.
+
+    실패 조건: 설정은 있는데 호출 또는 응답 해석이 실패하면 `RuntimeError`가 발생한다.
+    이때는 조용히 넘어가지 않는다 — 쓰겠다고 해 놓고 못 쓴 것은 알려야 한다.
     """
     if not available():
         return None
@@ -93,7 +104,10 @@ def complete(prompt, system=None, timeout=120, max_tokens=2048, temperature=0.2)
 
 
 def describe_config():
-    """지금 무엇으로 붙게 되어 있는지. 증거 번들에 남긴다 (키는 싣지 않는다)."""
+    """증거 번들에 기록할 LLM 연결 설정을 사전으로 반환한다.
+
+    API 키는 값 대신 설정 여부만 싣고, 네트워크 호출이나 환경 변경은 하지 않는다.
+    """
     return {
         "base_url": os.environ.get(ENV_BASE, ""),
         "model": os.environ.get(ENV_MODEL, ""),

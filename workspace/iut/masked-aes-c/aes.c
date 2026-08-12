@@ -233,8 +233,9 @@ static const uint8_t Rcon[11] = {
 static uint8_t SboxMasked[256];
 static uint8_t rSboxMasked[256];
 
-/* [extra] SCALib 연구 훅: 마지막 연산의 mask[10] 스냅샷.
- * 원본은 스택 지역변수만 쓰므로 외부에서 읽을 수 없다. 수집·진단용. */
+/* [extra] SCALib 연구자 관점 훅: 마지막 연산의 마스크 10바이트 스냅샷.
+ * 벤더 원본은 스택 지역변수만 써서 연산 뒤 값을 확인할 수 없다. 공격자 관점 분석과
+ * 분리된 HDF5 `mask` 배열 수집 및 화이트박스 진단에만 제공한다. */
 #if defined(MASKED) && (MASKED == 1)
 static uint8_t last_masks[10];
 #endif
@@ -306,15 +307,16 @@ static void InitMaskingDecrypt(const uint8_t *RoundKey, uint8_t * RoundKeyMasked
 {
   memcpy(RoundKeyMasked, RoundKey, AES_keyExpSize);
 
-  /* srand 는 호출하지 않는다. 임베디드에서 time(NULL) 이 의미 없고,
-   * 매 블록 재시드는 엔트로피를 해친다. 시드는 호스트가 0x81 's' 로 준다
-   * (simpleserial-base.c 참고). 시드를 안 주면 매 부팅 같은 수열이 나온다. */
+  /* 여기서는 srand를 호출하지 않는다. 이 타겟에서 time(NULL)은 유효한 엔트로피가
+   * 아니며, 블록마다 재시드하면 오히려 마스크 수열이 반복될 수 있다. SCALib 펌웨어의
+   * 호스트는 연결 또는 재플래시 직후 SimpleSerial2 0x81 's' 명령으로 4바이트
+   * little-endian 시드를 보내고 해당 Subset(서브셋)의 HDF5 attrs에 기록한다. 시드를 보내지 않으면
+   * 펌웨어의 고정 부팅 시드 때문에 재시작마다 같은 마스크 수열이 재생된다. */
   //Randomly generate the masks: m1 m2 m3 m4 m m'
   for (uint8_t i = 0; i < 6; i++){
-    /* 벤더 원본은 rand() % 0xFF 였다 — 0xFF 가 절대 나오지 않고(0~254) 분포도
-     * 균일하지 않은 명백한 실수다. 마스크는 8비트 전 범위를 균일하게 덮어야
-     * 하므로 & 0xFF 로 고쳤다. newlib rand() 는 상위 비트를 돌려주는 구현이라
-     * 하위 8비트를 그대로 써도 편향되지 않는다. */
+    /* 벤더 원본의 rand() % 0xFF는 0xFF를 절대 만들지 않아 마스크 범위를 0~254로
+     * 줄인다. 하위 8비트를 취해 0~255 전체를 사용한다. 다만 rand()는 CSPRNG가
+     * 아니므로 이 패치는 제품 보안을 주장하지 않으며 재현 가능한 연구 수집에만 쓴다. */
     mask[i] = rand() & 0xFF;
   }
 
@@ -341,7 +343,11 @@ static void InitMaskingEncrypt(const uint8_t *RoundKey, uint8_t *RoundKeyMasked,
 {
   memcpy(RoundKeyMasked, RoundKey, AES_keyExpSize);
 
-  /* srand 호출 없음, rand() & 0xFF 로 고친 이유 — InitMaskingDecrypt 주석과 동일. */
+  /* 여기서는 srand를 호출하지 않는다. 호스트가 연결 또는 재플래시 직후 SimpleSerial2
+   * 0x81 's' 명령으로 기록 가능한 시드를 주며, 시드가 없으면 고정 부팅 시드 때문에
+   * 재시작마다 같은 수열이 반복된다. 벤더 원본의 rand() % 0xFF는 0xFF를 제외하므로
+   * 하위 8비트를 취해 전체 바이트 범위를 사용한다. rand()는 CSPRNG가 아니며 이 변경은
+   * 제품 보안이 아니라 재현 가능한 연구 수집을 위한 것이다. */
   //Randomly generate the masks: m1 m2 m3 m4 m m'
   for (uint8_t i = 0; i < 6; i++){
     mask[i] = rand() & 0xFF;

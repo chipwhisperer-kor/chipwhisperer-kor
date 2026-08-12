@@ -64,9 +64,10 @@ void AES_ECB_decrypt(const struct AES_ctx* ctx, uint8_t* buf);
 
 #endif // #if defined(ECB) && (ECB == !)
 
-/* 연구용 마스크 export ([extra] SCALib 패치).
- * MASKED=1 일 때 마지막 암호화/복호화에 쓰인 mask[10] 을 복사한다.
- * 공격자가 모르는 값이지만 실험실 수집·화이트박스 진단에 필요하다.
+/* 연구자 관점 마스크 export([extra] SCALib 패치).
+ * MASKED=1일 때 마지막 암호화 또는 복호화에 쓴 마스크를 호출자가 제공한 10바이트
+ * 버퍼에 복사한다. 첫 연산 전에는 정적 초기값인 0만 반환하며 실패값이나 다른 부작용은
+ * 없다. 공격자에게 공개하면 안 되는 진단 인터페이스다.
  * 레이아웃: [M1 M2 M3 M4 M' M M1' M2' M3' M4'] */
 #if defined(MASKED) && (MASKED == 1)
 #define AES_MASK_LEN 10

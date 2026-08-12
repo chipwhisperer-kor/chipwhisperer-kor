@@ -12,7 +12,7 @@
 | `준수` | 근거 값이 있고 요건을 만족한다 |
 | `미준수` | 근거 값이 있고 만족하지 못한다 |
 | `해당없음` | 이 채널·IUT 에 적용되지 않는다 — **반드시 이유를 함께** (`shall [07.02]`) |
-| `미기록` | 판정에 필요한 값이 데이터셋에 없다 — **추정치로 채우지 않는다** (SCHEMA.md §5.3) |
+| `미기록` | 판정에 필요한 값이 Dataset(데이터셋)에 없다 — **추정치로 채우지 않는다** (SCHEMA.md §5.3) |
 | `범위밖` | 이 환경이 원리적으로 판정할 수 없다 — 독립 시험소·승인 기관·육안 검사 |
 
 **`미기록` 과 `미준수` 는 다르다.** 전자는 "모른다", 후자는 "안 지켰다" 이며, 둘을
@@ -53,6 +53,7 @@ OK, NG, NA, NR, OOS = "준수", "미준수", "해당없음", "미기록", "범�
 
 
 def _item(clause, requirement, verdict, evidence="", note=""):
+    """요건 한 행을 보고서와 JSON이 공유하는 사전 형태로 만든다."""
     return {"clause": clause, "requirement": requirement, "verdict": verdict,
             "evidence": evidence, "note": note}
 
@@ -61,12 +62,13 @@ def check(dataset_path=None, spec=None, results=None, level=3):
     """대조표를 만든다.
 
     입력
-        dataset_path : h5 경로 (없으면 데이터셋 항목이 전부 `미기록`)
+        dataset_path : HDF5 경로 (없으면 Dataset 항목이 전부 `미기록`)
         spec         : 실험 명세 (없으면 계획 관련 항목이 `미기록`)
         results      : analyze 가 낸 results.json 내용 (없으면 시험 항목이 `미수행`)
         level        : 보안수준 3 또는 4. spec 이 있으면 그쪽을 따른다.
 
-    출력 dict — scope 선언 + 항목 목록 + 등급별 집계.
+    출력 dict — scope 선언 + 항목 목록 + 등급별 집계. 입력 파일은 읽기 전용이며, 파일이
+    없거나 명세 구조가 잘못되면 로더 예외가 호출자에게 전파된다.
     """
     attrs = S.root_attrs(dataset_path) if dataset_path else {}
     if spec:
@@ -103,6 +105,7 @@ def check(dataset_path=None, spec=None, results=None, level=3):
 
 
 def _scope_items(spec):
+    """명세의 적용 범위와 이 환경이 주장할 수 없는 항목을 대조표 행으로 만든다."""
     if not spec:
         return [_item("§1 Scope", "적용 범위 선언", NR, note="spec 이 없다")]
     sc = spec["scope"]
@@ -179,6 +182,7 @@ def _mandatory_test_items(spec, results, A, level):
 
 
 def _annex_a_items(attrs, spec, results, A, level):
+    """Annex A의 수집량·전처리·정렬 요건을 실제 Metadata와 결과에 대조한다."""
     out = []
 
     # A.2.1 / A.3.1 — 수집 시간 상한
@@ -218,11 +222,11 @@ def _annex_a_items(attrs, spec, results, A, level):
         out.append(_item("%s.4 **`shall collect`**" % A,
                          "타이밍 측정 각 %d회 (2블록)" % need, NR))
 
-    # A.2.2 / A.3.2 — SPA 파형 수와 해상도
+    # A.2.2 / A.3.2 — SPA Trace 수와 해상도
     r = (results or {}).get("tests", {}).get("spa", {})
     req = r.get("requirement")
     if req:
-        out.append(_item("%s.2" % A, "SPA 파형 %d장, CSP 비트당 %d 포인트"
+        out.append(_item("%s.2" % A, "SPA Trace(트레이스) %d장, CSP 비트당 %d 포인트"
                          % (req["required_traces"], req["required_points_per_csp_bit"]),
                          OK if req["met"] else NG,
                          evidence="; ".join(req.get("shortfall", [])) or "충족"))
@@ -233,7 +237,7 @@ def _annex_a_items(attrs, spec, results, A, level):
                          note="육안 검사는 사람의 행위다. 이 도구는 그림을 산출물로 내고 "
                               "미결로 표시하며, 수행했다고 주장하지 않는다."))
     else:
-        out.append(_item("%s.2" % A, "SPA 파형 수·해상도", NR))
+        out.append(_item("%s.2" % A, "SPA Trace 수·해상도", NR))
 
     # A.2.5 `shall [A.01]` — 전처리 (10회 평균)
     avg = attrs.get("preprocessing_average_n")
@@ -323,6 +327,7 @@ def _annex_b_items(attrs):
 
 
 def _procedure_items(attrs, spec, results):
+    """시험 순서·사전 기준·벤더 정보 등 절차 요건을 대조표 행으로 만든다."""
     out = []
     c = spec["criteria"] if spec else None
 
@@ -370,7 +375,11 @@ def _procedure_items(attrs, spec, results):
 
 # ─────────────────────────────────────────────────────────────
 def to_markdown(rep):
-    """대조표를 사람이 읽을 마크다운으로. 보고서 3종이 모두 이것을 싣는다."""
+    """대조표 사전을 세 보고서가 공통으로 싣는 한국어 Markdown으로 변환한다.
+
+    표 셀의 줄바꿈·구분자를 이스케이프하며 파일을 쓰지 않는다. 필수 키가 없으면
+    `KeyError`가 발생해 불완전한 대조표가 조용히 생성되지 않게 한다.
+    """
     L = []
     L.append("## 적용 범위 선언")
     L.append("")
@@ -405,11 +414,17 @@ def to_markdown(rep):
 
 
 def _cell(s):
+    """값을 한 줄 Markdown 표 셀로 바꾸고 220자를 넘는 서술은 말줄임한다."""
     s = (s or "").replace("\n", " ").replace("|", "\\|").strip()
     return s if len(s) <= 220 else s[:217] + "…"
 
 
 def main(argv=None):
+    """명세·Dataset·분석 결과를 읽어 대조표를 Markdown 또는 JSON으로 출력한다.
+
+    입력 파일은 변경하지 않는다. 파싱·검증 실패는 예외로 중단되며 성공 시 종료 코드 0을
+    반환한다.
+    """
     ap = argparse.ArgumentParser(prog="physai.conformance",
                                  description="ISO/IEC 17825 요건 대조표")
     ap.add_argument("--dataset", default=None)

@@ -9,7 +9,8 @@
     하나의 분석기가 셋을 다 받을 수 있다. 검증기가 프로젝트마다 따로 있으면
     "준수"의 뜻이 프로젝트마다 달라진다.
 
-여기 있는 것은 **하드웨어와 무관한 순수 계산**뿐이다.
+여기 있는 것은 하드웨어 제어가 없는 스키마 검사와 읽기 전용 HDF5 로더다. Dataset 파일을
+읽지만 수정하지 않으며, 파일 생성과 수집은 각 수집기의 책임이다.
 
 판번호
     현재 문서 판번호는 SCHEMA_VERSION = "1.1" 이다.
@@ -137,6 +138,12 @@ def validate_dataset(path=None):
 
 
 def _check_root_metadata(a, ver):
+    """루트 HDF5 attrs를 판번호별 Metadata 규칙과 대조해 위반 목록을 반환한다.
+
+    ``a``는 h5py attrs 매핑이고 ``ver``는 알려진 판번호여야 한다. 채널·축별 조건부
+    필드와 허용값도 검사한다. 입력이나 파일은 변경하지 않으며, attrs 값의 형식이
+    예상과 다르면 변환 과정의 예외가 호출자에게 전달될 수 있다.
+    """
     bad = []
     required = REQUIRED_METADATA_1_0 if ver == "1.0" else REQUIRED_METADATA_1_1
     for key in required:
@@ -190,6 +197,8 @@ def _check_sample_map(h5, a, ver):
 
     명령어 축 데이터셋에서 이 배열이 없으면 "어디서 새는가" 를 말할 수 없다.
     누설 지점을 명령어로 지목하는 것이 에뮬레이션 채널의 존재 이유이므로 필수다.
+    ``h5``와 루트 attrs ``a``를 읽어 위반 문자열 목록을 반환한다. 파일을 변경하지 않으며,
+    손상된 HDF5 객체 접근 오류는 호출자에게 전달된다.
     """
     bad = []
     if ver == "1.0":
@@ -211,6 +220,12 @@ def _check_sample_map(h5, a, ver):
 
 
 def _check_subset(h5, name, a):
+    """한 Subset의 배열·HDF5 attrs·행 정렬 위반을 문자열 목록으로 반환한다.
+
+    ``name``이 가리키는 그룹의 필수 배열, 역할, Record 수, Trace 형상·dtype을 루트
+    Metadata ``a``와 대조한다. 읽기 전용이며 파일을 변경하지 않는다. 그룹이 아니거나
+    배열 형식이 손상됐으면 h5py 또는 형상 접근 예외가 호출자에게 전달될 수 있다.
+    """
     bad = []
     g = h5[name]
     for key in REQUIRED_SUBSET_METADATA:
@@ -252,7 +267,12 @@ def _check_subset(h5, name, a):
 
 
 def require_schema(path):
-    """준수하지 않으면 예외를 던진다. 수집 직후·분석 시작 시 쓴다."""
+    """Dataset(데이터셋)을 검증하고 위반이 없으면 `True`를 반환한다.
+
+    수집 직후와 분석 시작 시 잘못된 Dataset이 다음 단계로 넘어가지 않게 하는 경계다.
+    파일이 없으면 `validate_dataset()`의 위반을 담은 `RuntimeError`가 발생하며 파일은
+    변경하지 않는다.
+    """
     bad = validate_dataset(path=path)
     if bad:
         raise RuntimeError("SCHEMA.md 위반 %d건:\n  - %s" % (len(bad), "\n  - ".join(bad)))
@@ -350,18 +370,31 @@ def instruction_window_columns(path, lo, hi):
 
 
 def root_attrs(path):
-    """루트 Metadata 만 읽는다. 대용량 파일에서도 즉시 끝난다."""
+    """루트 HDF5 attrs를 Metadata 사전으로 읽고 배열 본문은 읽지 않는다.
+
+    파일이 없으면 `FileNotFoundError`, HDF5가 손상됐으면 h5py 예외가 발생한다. 읽기
+    전용으로 열기 때문에 파일을 변경하지 않는다.
+    """
     with h5py.File(_must_exist(path), "r") as h5:
         return {k: h5.attrs[k] for k in h5.attrs}
 
 
 def subset_names(path):
-    """subset 이름 목록."""
+    """루트에 있는 HDF5 그룹 이름을 Subset 목록으로 반환한다.
+
+    루트 배열은 제외한다. 파일이 없거나 읽을 수 없으면 `_must_exist()` 또는 h5py의
+    예외가 발생하며 파일을 변경하지 않는다.
+    """
     with h5py.File(_must_exist(path), "r") as h5:
         return [n for n in h5 if isinstance(h5[n], h5py.Group)]
 
 
 def _must_exist(path):
+    """기존 Dataset 파일 경로를 ``Path``로 반환한다.
+
+    ``path``가 파일이 아니면 경로를 포함한 ``FileNotFoundError``를 발생시킨다. 경로를
+    확인하기만 하며 파일이나 디렉터리를 만들지 않는다.
+    """
     p = Path(path)
     if not p.is_file():
         raise FileNotFoundError("데이터셋이 없다: %s" % p)

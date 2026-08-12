@@ -120,7 +120,7 @@ def required_n(criteria):
 def corrected_threshold(criteria, n_tests):
     """다중비교 보정 후의 t 임계.
 
-    §8.4 `shall [08.03]` 이 보정을 요구한다. 샘플이 수만 개인 파형에서 보정 없이
+    §8.4 `shall [08.03]` 이 보정을 요구한다. Sample이 수만 개인 Trace에서 보정 없이
     |t| > 4.5 를 쓰면 귀무가설이 참이어도 수십 개가 우연히 넘는다.
 
     Bonferroni: per-test 유의수준 α/m 에 해당하는 정규분포 양측 임계를 쓴다.
@@ -141,12 +141,20 @@ def corrected_threshold(criteria, n_tests):
 
 
 def subset_by_role(spec, role):
-    """해당 role 인 subset 정의 목록."""
+    """명세에서 `role`이 일치하는 Subset 정의를 원래 순서대로 반환한다.
+
+    일치 항목이 없으면 빈 목록을 반환한다. 명세를 변경하지 않으며 필드 누락은 `KeyError`로
+    드러낸다. 호출 전에 `load()`로 계약을 검증해야 한다.
+    """
     return [s for s in spec["subsets"] if s["role"] == role]
 
 
 def summary_lines(spec):
-    """사람이 읽을 요약. collect 가 시작할 때 찍는다."""
+    """검증된 명세를 수집 시작 전에 보여 줄 한국어 줄 목록으로 변환한다.
+
+    판정 기준·유도된 Trace 수·주장하지 않는 범위를 포함한다. 출력이나 파일 쓰기는 하지
+    않으며, 필수 필드가 없으면 `KeyError`가 발생한다.
+    """
     c = spec["criteria"]
     n = required_n(c)
     out = [

@@ -8,9 +8,10 @@
 `HD = HW(share1 ^ share2) = HW(민감값)` 이 되어, **수식은 그대로인데 구현만 새는**
 상태가 된다.
 
-이 결함은 실측 파형으로 찾기 어렵다(잡음에 묻히고 명령어 단위로 짚을 수 없다).
+이 결함은 실측 Trace로 찾기 어렵다(잡음에 묻히고 명령어 단위로 짚을 수 없다).
 에뮬레이션은 정반대 조건을 준다 — **잡음 0, 샘플 하나가 명령어 하나.**
-그래서 종속성이 있으면 무조건 보이고, 보이는 즉시 어느 명령어인지 지목할 수 있다.
+그래서 물리 잡음 없이 종속성을 관찰하고, 검출된 Sample(샘플)을 어느 명령어가 만들었는지
+`sample_map`으로 되짚을 수 있다.
 
 **이것은 실측의 대용품이 아니다.** HW/HD 모델은 글리치·커플링 같은 물리 효과를 담지
 않으므로, 여기서 깨끗해도 실물에서 샐 수 있다. 세 관측은 서로 다른 고리를 본다.
@@ -35,13 +36,13 @@
 메모리 성분을 넣는 이유: tiny-AES 계열은 state 를 메모리 배열에 두고 **in-place 로
 갱신**한다. 전이 결함은 레지스터보다 이 state 버퍼에서 더 자주 난다.
 
-## 구현이 기대는 실측 사실 (전부 확인함)
+## 구현이 기대는 에뮬레이터 동작
 
-- `UC_HOOK_CODE` 는 명령어 **실행 전**에 걸린다 → 연속한 두 hook 의 같은 레지스터를
+- 로컬 자가검사에서 `UC_HOOK_CODE`는 명령어 **실행 전**에 호출됐다 → 연속한 두 hook의 같은 레지스터를
   XOR 하면 그 명령어의 전이가 된다. `[extra] PRE-SCA` 의 `logger.py` 도 같은 방식이다.
-- `UC_HOOK_MEM_WRITE` 도 **쓰기 전**에 걸린다 → 콜백 안의 `mem_read` 가 이전 값을 준다.
+- `UC_HOOK_MEM_WRITE`도 **쓰기 전**에 호출됐다 → 콜백 안의 `mem_read`가 이전 값을 준다.
   (`UC_HOOK_MEM_WRITE_AFTER` 는 Unicorn 2.1.4 에 **없다** — 이 방법뿐이다.)
-- `capstone` 의 `insn.regs_access()` 가 명령어별 write 레지스터를 준다 → 미리 캐싱해
+- `capstone`의 `insn.regs_access()`가 명령어별 쓰기 레지스터를 준다 → 미리 캐싱해
   hook 에서 17개를 다 읽지 않는다.
 
 ## PC 를 레지스터 성분에서 빼는 이유
@@ -96,9 +97,18 @@ class EmulationTarget:
     실패 조건
         ELF 가 없으면 FileNotFoundError (빌드 방법을 알려 준다).
         필요한 심볼이 없으면 elfParser 가 종료시킨다.
+
+    생성자는 ELF를 읽고 디스어셈블 캐시를 메모리에 만들지만 파일을 변경하지 않는다.
     """
 
     def __init__(self, iut_name, window=None, components=COMPONENTS):
+        """IUT ELF와 관측 구간을 검증하고 반복 실행용 캐시를 만든다.
+
+        `window`은 시작·끝 심볼 사전이며 생략하면 AES 초기화부터 ECB 암호화 복귀까지다.
+        `components`는 `hw_reg`, `hd_reg`, `hw_mem`, `hd_mem` 중 하나 이상이어야 한다.
+        ELF를 읽고 `FileNotFoundError`·심볼 종료·알 수 없는 성분의 `ValueError`가 발생할 수
+        있지만 파일은 변경하지 않는다.
+        """
         self.iut = iut_name
         self.path = paths.harness_elf(iut_name)
         self.components = tuple(components)
@@ -180,6 +190,11 @@ class EmulationTarget:
         return cache
 
     def _new_uc(self):
+        """새 Unicorn 인스턴스에 메모리·ELF 이미지·초기 레지스터를 설정해 반환한다.
+
+        Trace마다 독립 상태를 보장하기 위해 실행 인스턴스를 재사용하지 않는다. 매핑이나
+        이미지 쓰기 실패는 Unicorn 예외로 전파되며 호스트 파일은 변경하지 않는다.
+        """
         uc = Uc(UC_ARCH_ARM, UC_MODE_THUMB if self.mode == 2 else UC_MODE_ARM)
         uc.mem_map(_LOW_BASE, _LOW_SIZE)
         uc.mem_map(_STOP_ADDR, _PAGE)
@@ -244,7 +259,11 @@ class EmulationTarget:
 
     # ── 메타데이터 ──────────────────────────────────────────
     def leakage_segments(self):
-        """성분별 샘플 구간. `[("hw_reg", 0, L), ("hd_reg", L, 2L), …]`"""
+        """성분별 Sample 구간을 `(이름, 시작, 끝)` 목록으로 반환한다.
+
+        각 범위는 반열림 구간이며 실행을 한 번도 하지 않아 명령어 수를 모르면
+        `RuntimeError`가 발생한다. 상태나 파일을 변경하지 않는다.
+        """
         if self.n_instr is None:
             raise RuntimeError("먼저 한 번 실행해야 구간 길이를 안다.")
         out, off = [], 0
@@ -258,6 +277,9 @@ class EmulationTarget:
 
         누설이 검출된 샘플을 명령어로 되짚는 유일한 수단이다. 이것이 없으면
         "샌다" 까지만 말할 수 있고 "여기서 샌다" 를 말할 수 없다.
+
+        `trace=True` 실행 전에는 `RuntimeError`가 발생한다. 반환 배열을 새로 만들며 타겟
+        상태나 파일은 변경하지 않는다.
         """
         if self.addr_seq is None:
             raise RuntimeError("먼저 trace=True 로 한 번 실행해야 한다.")
@@ -290,14 +312,18 @@ class EmulationTarget:
         return " ".join(r.stdout.split())
 
     def metadata(self):
-        """SCHEMA.md §3.9 가 요구하는 에뮬레이션 Metadata."""
+        """SCHEMA.md §3.9의 에뮬레이션 Metadata를 사전으로 반환한다.
+
+        실행으로 확정된 구간 길이가 필요하다. 컴파일 플래그 확인을 위해 `make ... flags`를
+        실행하며 실패하면 `RuntimeError`가 발생한다. ELF나 Dataset은 변경하지 않는다.
+        """
         import unicorn
         model = "concat(%s)" % ", ".join(
             {"hw_reg": "HW(reg)", "hd_reg": "HD(reg,same)",
              "hw_mem": "HW(mem)", "hd_mem": "HD(mem,same)"}[c] for c in self.components)
         # 관측 구간 안의 주요 심볼 주소. 분석기가 이것으로 구간 경계(예: 키 스케줄이
         # 끝나고 암호화가 시작되는 명령어 인덱스)를 sample_map 에서 찾는다.
-        # 데이터셋만으로 경계를 알 수 있어야 분석이 ELF 에 의존하지 않는다.
+        # Dataset만으로 경계를 알 수 있어야 분석이 ELF에 의존하지 않는다.
         syms = {}
         for s in (self.window["from_symbol"], self.window["to_symbol"]):
             try:
@@ -316,7 +342,11 @@ class EmulationTarget:
 
 
 def _has_masks(iut_name):
-    """이 IUT 가 마스크를 export 하는가. 이름이 아니라 규약으로 정한다."""
+    """마스크 10바이트를 출력하는 하네스로 등록된 IUT 이름인지 반환한다.
+
+    현재 등록값은 `masked-aes-c` 하나다. 다른 마스킹 IUT를 추가할 때는 출력 규약을 구현한
+    뒤 이 허용 목록에도 명시해야 하며, 이름을 추측해 자동 판정하지 않는다.
+    """
     return iut_name == "masked-aes-c"
 
 
@@ -327,6 +357,7 @@ class _CountRecorder:
     """명령어만 센다. 타이밍 분석과 자가검사에 쓰며 누설을 모으지 않아 빠르다."""
 
     def __init__(self, tgt):
+        """타겟의 관측 시작·종료 주소를 복사하고 카운터를 빈 상태로 초기화한다."""
         self.win_from = tgt.win_from
         self.win_to = tgt.win_to
         self.n = 0
@@ -335,9 +366,11 @@ class _CountRecorder:
         self._ret = None
 
     def attach(self, uc):
+        """명령어 실행 전 hook을 등록하며 에뮬레이션은 시작하지 않는다."""
         uc.hook_add(UC_HOOK_CODE, self._on_code)
 
     def _on_code(self, uc, address, size, ud):
+        """관측 구간 안에서 실행될 명령어 수를 세고 복귀 주소에서 기록을 닫는다."""
         if address == self.win_from:
             self._in = True
         if address == self.win_to and self._ret is None:
@@ -349,9 +382,11 @@ class _CountRecorder:
             self.n += 1
 
     def finish(self, uc):
+        """명령어 수 기록에는 종료 후 확정할 값이 없어 아무 작업도 하지 않는다."""
         pass
 
     def vector(self, components):
+        """누설을 수집하지 않는 기록기이므로 항상 `None`을 반환한다."""
         return None
 
 
@@ -364,6 +399,7 @@ class _TraceRecorder:
     """
 
     def __init__(self, tgt, uc):
+        """타겟 경계·레지스터 캐시를 복사하고 네 누설 성분 버퍼를 초기화한다."""
         self.win_from = tgt.win_from
         self.win_to = tgt.win_to
         self._ret = None
@@ -376,10 +412,12 @@ class _TraceRecorder:
         self._pending = None          # (regs, before_values)
 
     def attach(self, uc):
+        """명령어 실행 전 hook과 메모리 쓰기 전 hook을 Unicorn에 등록한다."""
         uc.hook_add(UC_HOOK_CODE, self._on_code)
         uc.hook_add(UC_HOOK_MEM_WRITE, self._on_write)
 
     def _flush_pending(self, uc):
+        """직전 명령어의 실행 후 레지스터 HW·HD를 계산해 마지막 슬롯을 확정한다."""
         regs, before = self._pending
         hw = hd = 0
         for r, b in zip(regs, before):
@@ -391,6 +429,7 @@ class _TraceRecorder:
         self._pending = None
 
     def _on_code(self, uc, address, size, ud):
+        """관측 구간 경계를 추적하고 명령어별 레지스터 누설 기록을 한 단계씩 진행한다."""
         if address == self.win_from:
             self._in = True
         # 구간의 끝 — to_symbol 이 **복귀**하는 지점에서 닫는다.
@@ -419,20 +458,23 @@ class _TraceRecorder:
             self._pending = (regs, [uc.reg_read(r) for r in regs])
 
     def _on_write(self, uc, access, address, size, value, ud):
+        """현재 명령어의 메모리 쓰기 전·후 값에서 HW·HD를 누적한다."""
         if not self._in or not self.hw_mem:
             return
-        # 콜백은 쓰기 **전**에 걸리므로 mem_read 가 이전 값을 준다 (실측 확인).
+        # 로컬 자가검사에서 콜백은 쓰기 **전**에 호출됐으므로 mem_read가 이전 값을 준다.
         old = int.from_bytes(uc.mem_read(address, size), "little")
         new = value & ((1 << (8 * size)) - 1)
         self.hw_mem[-1] += new.bit_count()
         self.hd_mem[-1] += (old ^ new).bit_count()
 
     def finish(self, uc):
+        """에뮬레이션 종료 뒤 남은 마지막 명령어의 레지스터 누설을 확정한다."""
         # 마지막 명령어의 '실행 후' 값은 에뮬레이션이 끝난 뒤에 읽는다.
         if self._pending is not None:
             self._flush_pending(uc)
 
     def vector(self, components):
+        """요청한 성분을 순서대로 연접한 1차원 int16 누설 벡터를 반환한다."""
         parts = {"hw_reg": self.hw_reg, "hd_reg": self.hd_reg,
                  "hw_mem": self.hw_mem, "hd_mem": self.hd_mem}
         return np.concatenate([np.asarray(parts[c], dtype=np.int16) for c in components])
@@ -446,6 +488,10 @@ def selftest(iut_name, n=10, seed=1234):
 
     수집 전에 이것부터 통과해야 한다. 골든이 어긋나면 에뮬레이션 환경이 잘못된
     것이고, 명령어 수가 변동하면 sample_map 이 성립하지 않는다.
+
+    결정적 `seed`로 `n`회 실행하고 골든 AES·마스크 길이·명령어 수·처리 시간을 사전으로
+    반환한다. ELF를 읽고 `make ... flags`를 실행하지만 Dataset은 만들지 않는다. 빌드
+    누락·심볼 오류·에뮬레이션 실패는 호출자에게 전파된다.
     """
     from aes_ref import aes_ecb_encrypt
 
@@ -484,6 +530,11 @@ def selftest(iut_name, n=10, seed=1234):
 
 
 def _cli():
+    """IUT별 에뮬레이션 자가검사를 실행해 사람용 로그와 JSON을 출력한다.
+
+    ELF가 없는 IUT는 명시적으로 건너뛰며, 실행한 모든 IUT가 골든 AES와 고정 명령어 수를
+    만족하면 종료 코드 0, 아니면 1로 `SystemExit`한다. Dataset은 생성하지 않는다.
+    """
     import argparse
     import json
 

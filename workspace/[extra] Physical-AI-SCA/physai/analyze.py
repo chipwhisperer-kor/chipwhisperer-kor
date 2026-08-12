@@ -1,4 +1,4 @@
-"""CLI — 데이터셋을 분석하고 `runs/<id>/results.json` 을 만든다.
+"""CLI — Dataset(데이터셋)을 분석하고 `runs/<id>/results.json`을 만든다.
 
     python3 -m physai.analyze --spec exp/001.yaml
 
@@ -50,7 +50,7 @@ def window_boundaries(dataset_path):
 
     출력: {심볼 이름: 명령어 인덱스}. 그 심볼이 구간 안에 없으면 빠진다.
 
-    ELF 를 다시 열지 않는다 — 데이터셋만으로 분석할 수 있어야 하기 때문이다.
+    ELF를 다시 열지 않는다 — Dataset만으로 분석할 수 있어야 하기 때문이다.
     """
     attrs = S.root_attrs(dataset_path)
     text = str(attrs.get("window_symbols", ""))
@@ -79,6 +79,7 @@ def sensitive_window(spec, boundaries, n_instr):
     """
     slt = spec["criteria"]["sensitive_leakage_time"]
     def resolve(v, default):
+        """심볼·정수·`end` 경계값을 명령어 인덱스로 해석하고 실패 시 기본값을 쓴다."""
         if v is None:
             return default
         v = str(v)
@@ -104,7 +105,8 @@ def run_cpa(dataset_path, spec, n=None):
     데이터가 아니라 도구를 의심해야 한다.
     """
     # 정답 키는 attack subset 이 고정 키를 쓰므로 그 첫 행에서 읽는다.
-    # (루트 attrs 의 fixed_key 는 이 수집기가 쓰지 않는다 — 두 곳에 두면 어긋난다.)
+    # 루트 HDF5 attrs에 fixed_key를 복제하지 않는다. 정답 키의 정본은 attack Subset 첫
+    # 레코드이며 두 곳에 두면 한쪽만 갱신될 수 있다.
     g = S.load_group(dataset_path, "attack", n=n,
                      fields=[S.F_TRACE, S.F_KEY, S.F_PLAINTEXT])
     tr = g[S.F_TRACE].astype(np.float64)
@@ -147,6 +149,13 @@ def run_cpa(dataset_path, spec, n=None):
 
 
 def main(argv=None):
+    """명세와 Dataset(데이터셋)을 분석해 결과·중간 증거 파일을 기록한다.
+
+    `argv`는 CLI 인자 목록이며 `None`이면 `sys.argv`를 사용한다. 스키마 위반, 누락된
+    입력, 분석 오류는 예외 또는 `SystemExit`로 중단된다. 성공하면 `runs/<spec-id>/`에
+    `results.json`, SPA·DPA 증거 배열을 쓰고 종료 코드 0을 반환한다. 저장된 Dataset과
+    판정 기준은 변경하지 않는다.
+    """
     ap = argparse.ArgumentParser(prog="physai.analyze")
     ap.add_argument("--spec", required=True)
     ap.add_argument("--dataset", default=None)
@@ -165,7 +174,7 @@ def main(argv=None):
     ds = paths.TRACES / ("%s.h5" % sp["id"]) if a.dataset is None else paths.Path(a.dataset)
     bad = S.validate_dataset(path=ds)
     if bad:
-        raise SystemExit("데이터셋이 스키마를 어긴다 (%d건):\n  - %s"
+        raise SystemExit("Dataset이 스키마를 어긴다 (%d건):\n  - %s"
                          % (len(bad), "\n  - ".join(bad)))
 
     attrs = S.root_attrs(ds)
@@ -181,7 +190,7 @@ def main(argv=None):
     say("=" * 70)
     say(" 분석: %s — %s" % (sp["id"], sp["title"]))
     say("=" * 70)
-    say("  데이터셋      : %s" % ds.name)
+    say("  Dataset       : %s" % ds.name)
     say("  샘플/트레이스 : %d (명령어 %d × 성분 %d)"
         % (ns, n_instr, max(1, ns // max(1, n_instr))))
     say("  구간 경계     : %s" % (bounds or "(window_symbols 없음)"))
@@ -237,7 +246,7 @@ def main(argv=None):
                 if bounds else None
             r = spa_mod.run(ds, sp, key_schedule_window=ks)
             r.pop("_groups", None)
-            # 육안 검사용 파형을 증거로 남긴다. SPA subset 은 파형이 십여 장뿐이라
+            # 육안 검사용 Trace를 증거로 남긴다. SPA Subset은 Trace가 십여 장뿐이라
             # 통째로 저장해도 부담이 없고, 사람이 확인하려면 반드시 있어야 한다.
             _save_spa_traces(ds, sp, paths.run_dir(sp["id"], create=True))
         else:
@@ -303,7 +312,12 @@ def main(argv=None):
 
 
 def _save_spa_traces(ds, sp, out_dir):
-    """SPA subset 의 파형을 npz 로 남긴다 — 육안 검사(A.2.2)의 근거 자료다."""
+    """SPA Subset의 Trace(트레이스)를 압축 NPZ 증거 파일로 저장한다.
+
+    `simple-analysis` 역할이 없으면 파일을 만들지 않는다. 입력 Dataset은 읽기 전용이며,
+    기존 `spa_traces.npz`가 있으면 최신 분석 증거로 덮어쓴다. 저장 실패는 호출자에게
+    전파된다. 이 파일은 사람이 수행할 육안 검사(A.2.2)의 입력이지 자동 판정이 아니다.
+    """
     payload = {}
     for s in sp["subsets"]:
         if s["role"] != "simple-analysis":
@@ -342,6 +356,11 @@ def _json_safe(o):
 
 
 def _json_default(o):
+    """NumPy 스칼라·배열·바이트를 표준 JSON 직렬화 가능 값으로 바꾼다.
+
+    알려지지 않은 객체는 문자열로 보존한다. 파일을 쓰지 않으며 디코딩할 수 없는 바이트는
+    대체 문자를 사용한다.
+    """
     if isinstance(o, (np.integer,)):
         return int(o)
     if isinstance(o, (np.floating,)):

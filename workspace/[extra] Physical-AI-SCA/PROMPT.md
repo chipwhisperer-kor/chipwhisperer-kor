@@ -69,11 +69,11 @@ python3 -m physai.collectors.emulation --selftest --n 10
 | `soundness` | `profiling` |
 | `cpa` | `attack` |
 
-`spa` 가 보는 것은 **키가 다른 쌍**이다. 평문이 다르면 파형도 다른 것은 모든 구현에서
+`spa` 가 보는 것은 **키가 다른 쌍**이다. 평문이 다르면 트레이스도 다른 것은 모든 구현에서
 당연하므로 근거가 될 수 없다(§8.3.1 이 지목한 표적은 key derivation 이다).
 
 **`spa` 는 `pass` 도 `fail` 도 내지 않는다.** A.2.2 가 요구하는 육안 검사는 사람의 몫이고,
-잡음 바닥이 0 인 결정적 채널에서는 키가 다르면 파형이 거의 항상 달라서 그것만으로
+잡음 바닥이 0 인 결정적 채널에서는 키가 다르면 트레이스가 거의 항상 달라서 그것만으로
 fail 을 내면 판별력이 없다. 결과는 언제나 `inconclusive` 이며 `statistical_verdict` 가
 무엇이 관측되었는지 말한다 — `key-dependent-structure-observed` / `no-difference-beyond-noise`
 / `requirements-unmet`. 판정은 그림과 이 값을 보고 사람이 한다.

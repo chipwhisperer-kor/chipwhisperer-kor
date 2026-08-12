@@ -45,6 +45,10 @@ class Scenario:
     }
 
     def __init__(self):
+        """`config.fault_reg_file`을 읽어 유효한 Fault injection 행을 캐시한다.
+
+        파일이 없거나 행이 잘못돼도 가능한 항목만 보존하며 호스트 파일은 변경하지 않는다.
+        """
         self.fault_list: List[Dict[str, Any]] = []
         self._load_scenario_data()
 
@@ -54,9 +58,11 @@ class Scenario:
         return self.fault_list
 
     def _load_scenario_data(self):
-        """
-        CSV 파일에서 오류 주입 시나리오를 로드하고 전처리합니다.
-        문자열 데이터를 에뮬레이션 중에 즉시 사용할 수 있는 형태(int, bool)로 변환합니다.
+        """시나리오 CSV를 읽어 에뮬레이션용 정수·불리언 값으로 캐시한다.
+
+        파일이 없으면 알림을 출력하고 빈 시나리오를 유지한다. 헤더 여부를 판별한 뒤 유효한
+        행만 추가하며 파싱·I/O 실패는 오류를 출력하고 지금까지 읽은 항목을 보존한다. 파일은
+        변경하지 않는다.
         """
         if not os.path.exists(config.fault_reg_file):
             print("Notice: Fault injection file not found. Running in normal mode.")
@@ -86,7 +92,11 @@ class Scenario:
             print(f"Error loading fault scenario: {e}")
 
     def _preprocess_row(self, row: Dict[str, str]) -> Dict[str, Any]:
-        """CSV 행 데이터를 파싱하여 최적화된 형태로 변환합니다."""
+        """CSV 한 행을 실행 가능한 시나리오 사전으로 변환한다.
+
+        `ctr`이 정수가 아니면 빈 사전을 반환해 행 전체를 무시한다. 각 레지스터는 `None`,
+        `Flip`, 정수 중 하나로 정규화하며 입력 사전은 변경하지 않는다.
+        """
         processed = {}
         
         # 1. Counter & NOP Flag
@@ -115,13 +125,17 @@ class Scenario:
         return processed
 
     def check_nop(self, index: int) -> bool:
-        """해당 인덱스의 시나리오가 NOP 수행인지 확인합니다."""
+        """유효한 인덱스의 시나리오가 명령어 건너뛰기이면 `True`를 반환한다."""
         if 0 <= index < len(self.fault_list):
             return self.fault_list[index]['isNOP']
         return False
 
     def nop(self, uc: Uc):
-        """PC를 증가시켜 현재 명령어를 건너뜁니다 (NOP 효과)."""
+        """현재 실행 모드의 명령어 폭만큼 PC를 증가시켜 명령어를 건너뛴다.
+
+        Unicorn PC를 변경하는 Fault injection이다. 레지스터 접근 실패는 오류를 출력하고
+        반환하며 예외를 다시 발생시키지 않는다.
+        """
         try:
             pc = uc.reg_read(UC_ARM_REG_PC)
             # 현재 모드(Thumb/ARM)에 맞춰 PC 증가
@@ -131,7 +145,10 @@ class Scenario:
             print(f"Error executing NOP: {e}")
 
     def _flip_register(self, uc: Uc, reg_const: int):
-        """비트 반전(Bit Flip)을 수행합니다."""
+        """지정 레지스터를 ARM이면 32비트, Thumb이면 16비트 마스크로 반전한다.
+
+        Unicorn 레지스터를 변경하며 접근 실패는 레거시 호환을 위해 조용히 무시한다.
+        """
         try:
             val = uc.reg_read(reg_const)
             
@@ -146,7 +163,11 @@ class Scenario:
             pass
 
     def modify_regs(self, uc: Uc, index: int):
-        """시나리오에 정의된 대로 레지스터 값을 수정하거나 Flip합니다."""
+        """시나리오 인덱스가 지정한 모든 레지스터 쓰기·반전을 적용한다.
+
+        범위 밖 인덱스는 아무 작업도 하지 않는다. 값이 `None`인 레지스터는 보존하며 Unicorn
+        쓰기 실패는 호출자에게 전파된다. 에뮬레이터 상태를 변경하고 반환값은 없다.
+        """
         if not (0 <= index < len(self.fault_list)):
             return
 

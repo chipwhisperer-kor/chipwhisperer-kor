@@ -1,13 +1,14 @@
-"""[extra] SCALib 파형 수집 공용 로직.
+"""[extra] SCALib Trace(트레이스) 수집 공용 로직.
 
 0.0 (tiny-AES-c) 과 0.1 (masked-aes-c) 노트북이 같은 연결·캡처·저장 절차를 쓴다.
 정의는 여기 한 곳, 노트북은 타겟 상수·내러티브·호출만 담당한다.
 
 마스크 회수: capture_one(..., with_masks=True) 일 때 0x83 'm' 으로 10바이트를 읽는다.
-호출은 반드시 trigger_low 이후(암호화 명령이 끝난 뒤)이므로 파형에 UART 가 섞이지 않는다.
+호출은 반드시 `trigger_low` 이후(암호화 명령이 끝난 뒤)이므로 Trace에 UART가 섞이지 않는다.
 
 장시간 수집은 중간에 깨진다. 그래서 캡처는 항상 Bench.capture() 로 하며, 실패하면
-단순 재시도 → 재연결 → Husky 펌웨어 재기록 순으로 스스로 복구한다(Bench 참고).
+단순 재시도 3회 → 장비 재연결과 설정 복원 2회 → Husky 펌웨어 재기록 1회 순으로
+복구한다. 모두 실패하면 이미 기록한 레코드는 보존하고 예외로 수집을 중단한다.
 사람이 지켜보다 다시 눌러 줄 필요가 없어야 한다.
 """
 
@@ -106,8 +107,10 @@ GROUP_MODES = {
 def my_fsr_cmd(target, cmd, scmd, data, payload_only=False, timeout=500):
     """SimpleSerial2 명령 한 번을 보내고 응답을 읽는다.
 
-    payload_only=True 면 응답 패킷에서 데이터 부분만 잘라 돌려준다.
-    응답이 없으면 None.
+    `target`에 명령 바이트, 문자 Subcommand, payload를 보내며 `timeout`은
+    `target.read_cmd()`에 그대로 전달한다. `payload_only=True`면 응답 프레임에서 길이
+    바이트가 지정한 payload만 반환하고, 아니면 전체 응답을 반환한다. 응답이 없으면
+    `None`이며 통신 객체의 송수신 버퍼를 변경하는 것이 부작용이다.
     """
     target.flush()
     target.send_cmd(cmd=cmd, scmd=ord(scmd), data=data)
@@ -122,7 +125,9 @@ def my_fsr_cmd(target, cmd, scmd, data, payload_only=False, timeout=500):
 def target_aes_encrypt(target, key16, plain16):
     """타겟에서 AES-128 ECB 한 블록을 계산하고 암호문을 돌려준다.
 
-    0x81 k/p/l → 0x82 c → 0x83 r. 'l' 은 매 회 보낸다.
+    SimpleSerial2 순서는 `0x81 k/p/l → 0x82 c → 0x83 r`이며 `l`은 매 회 16으로 보낸다.
+    입력 길이가 16이 아니면 `ValueError`, 암호문 응답이 없으면 `RuntimeError`가 발생한다.
+    타겟의 키·평문·결과 상태를 변경하고 16바이트 `bytes` 암호문을 반환한다.
     """
     key16 = bytearray(key16)
     plain16 = bytearray(plain16)
@@ -140,9 +145,11 @@ def target_aes_encrypt(target, key16, plain16):
 
 
 def target_get_masks(target):
-    """마지막 암호화에 쓰인 마스크 10바이트 (0x83 'm').
+    """마지막 암호화에 쓰인 마스크 10바이트를 `0x83 'm'`으로 읽는다.
 
-    트리거 구간 밖에서 호출한다. 펌웨어 simpleserial_masked-aes-c 전용.
+    트리거 구간 밖에서만 호출하며 masked 펌웨어 전용이다. 응답이 없거나 길이가 10이
+    아니면 `RuntimeError`가 발생한다. 타겟 상태를 바꾸지 않고 `bytes`를 반환하지만 UART
+    통신은 발생한다.
     """
     m = my_fsr_cmd(target, 0x83, "m", [], payload_only=True)
     if m is None or len(m) != MASK_LEN:
@@ -186,7 +193,7 @@ def set_mask_seed(target, seed):
 
     **연결·재플래시 직후 반드시 호출한다.** 타겟은 스스로 엔트로피를 만들지 못해
     부팅 시드가 매번 같다. 이 호출을 빠뜨리면 재시작할 때마다 같은 마스크 수열이
-    처음부터 재생되고, 그렇게 모은 파형은 마스크가 중복되어 분석에 쓸 수 없다.
+    처음부터 재생되고, 그렇게 모은 Trace는 마스크가 중복되어 분석에 쓸 수 없다.
 
     Normal(tiny-AES-c) 펌웨어에는 없는 명령이다. 호출하면 응답이 없다.
 
@@ -203,7 +210,12 @@ def set_mask_seed(target, seed):
 
 
 def open_scope(sn, name, tries=4, pause=3.0):
-    """장치 하나를 연다. 실패하면 쉬었다가 재시도."""
+    """시리얼 번호의 ChipWhisperer 장치를 열어 scope 객체를 반환한다.
+
+    최대 `tries`회 시도하고 실패 사이에 `pause`초 기다린다. 성공한 재시도와 실패 원인을
+    stdout에 출력하며 전부 실패하면 마지막 예외를 포함한 `RuntimeError`가 발생한다.
+    USB 연결을 여는 것이 부작용이다.
+    """
     last = None
     for attempt in range(1, tries + 1):
         try:
@@ -220,7 +232,12 @@ def open_scope(sn, name, tries=4, pause=3.0):
 
 
 def connect_all_devices(required=("ChipWhisperer_Lite", "ChipWhisperer_Husky"), tries=4):
-    """USB 의 ChipWhisperer 를 모두 열어 {이름: scope} 로 돌려준다."""
+    """USB ChipWhisperer를 탐색해 `{정규화한 이름: scope}` 사전으로 반환한다.
+
+    장치 목록은 최대 `tries`회 확인하며 Lite와 Husky가 기본 필수 장치다. 장치가 없거나
+    필수 이름을 모두 열지 못하면 배선·컨테이너 확인 항목을 담은 `RuntimeError`가 발생한다.
+    성공한 scope의 USB 연결은 호출자가 나중에 닫아야 한다.
+    """
     device_list = []
     for attempt in range(1, tries + 1):
         device_list = cw.list_devices()
@@ -253,6 +270,12 @@ def connect_all_devices(required=("ChipWhisperer_Lite", "ChipWhisperer_Husky"), 
 
 
 def build_firmware(ss_dir, platform, crypto_target, ss_ver, hex_path):
+    """지정한 SimpleSerial 펌웨어를 `make`로 빌드하고 HEX 존재를 확인한다.
+
+    작업 디렉터리·플랫폼·IUT·프로토콜 판번호를 명시적으로 받아 하위 프로세스를 실행한다.
+    디렉터리나 HEX가 없으면 `FileNotFoundError`, make가 실패하면 stdout·stderr를 출력한 뒤
+    `RuntimeError`가 발생한다. 빌드 산출물을 생성하거나 갱신하며 반환값은 없다.
+    """
     if not Path(ss_dir).is_dir():
         raise FileNotFoundError("펌웨어 폴더가 없다: %s" % ss_dir)
     cmd = ["make", "PLATFORM=%s" % platform,
@@ -269,6 +292,12 @@ def build_firmware(ss_dir, platform, crypto_target, ss_ver, hex_path):
 
 
 def flash_firmware(lite_scope, platform, hex_path):
+    """Lite를 통해 지원되는 STM32 플랫폼에 HEX 펌웨어를 기록한다.
+
+    플랫폼이 STM 계열·CWLITEARM·CWNANO가 아니면 장비를 건드리기 전에 `OSError`가
+    발생한다. 성공하면 scope 기본 설정과 타겟 플래시가 변경되며 반환값은 없다. 프로그래밍
+    실패는 ChipWhisperer 예외로 전파된다.
+    """
     if "STM" not in platform and platform not in ("CWLITEARM", "CWNANO"):
         raise OSError("지원하지 않는 PLATFORM: %s" % platform)
     prog = cw.programmers.STM32FProgrammer
@@ -280,7 +309,9 @@ def flash_firmware(lite_scope, platform, hex_path):
 def setup_husky(husky_scope, adc_mul, gain_db):
     """Husky 외부 클럭·트리거·게인. samples 는 아직 정하지 않는다.
 
-    반환: clk_hz (타겟 클럭 최빈값 Hz)
+    AUX 입력을 외부 클럭으로 선택하고 20회 주파수 관측의 최빈값을 타겟 클럭으로 사용한다.
+    `adc_mul`과 `gain_db`를 적용하되 Trace 길이는 아직 설정하지 않는다. 반환값은 클럭 Hz다.
+    PLL 또는 ADC가 잠기지 않으면 `RuntimeError`가 발생하며 scope 설정을 변경한다.
     """
     husky_scope.default_setup()
     time.sleep(0.5)
@@ -328,7 +359,11 @@ def setup_husky(husky_scope, adc_mul, gain_db):
 
 
 def measure_trig_count(target, scope, key16, plain16):
-    """AES 한 번을 돌려 트리거 폭(샘플 수)을 잰다."""
+    """AES 한 번의 트리거 HIGH 구간을 ADC Sample 수로 관측해 정수로 반환한다.
+
+    scope를 arm하고 타겟을 실행하므로 장비 상태와 타겟 버퍼가 변경된다. 캡처 타임아웃이나
+    골든 AES 불일치면 `RuntimeError`가 발생하며 잘못된 길이를 사용하지 않는다.
+    """
     scope.arm()
     ct = target_aes_encrypt(target, key16, plain16)
     if scope.capture():
@@ -339,7 +374,12 @@ def measure_trig_count(target, scope, key16, plain16):
 
 
 def apply_trig_count(husky_scope, trig_counts, adc_mul):
-    """trig_count 실측 목록으로 adc.samples 를 정하고 (TRIG_COUNT, NS) 를 돌려준다."""
+    """관측한 `trig_count` 목록의 최댓값으로 `adc.samples`를 설정한다.
+
+    값이 서로 다르면 경고하지만 Trace가 잘리지 않도록 최댓값을 사용한다. 설정 한계를
+    넘으면 ADC 배수·decimate 조정 방법을 담은 `RuntimeError`가 발생한다. scope 설정을
+    변경하고 `(선택한 trig_count, 실제 adc.samples)` 정수 쌍을 반환한다.
+    """
     print("trig_count 회차:", list(trig_counts))
     if len(set(trig_counts)) != 1:
         print("[주의] trig_count 가 일정하지 않다. 트리거 배선·클럭 안정성을 확인한다.")
@@ -360,15 +400,21 @@ def apply_trig_count(husky_scope, trig_counts, adc_mul):
 
 
 def to_adc_code(wave_f):
-    """Husky 정규화 실수(±0.5) → ADC 코드 스케일 int16."""
+    """Husky 정규화 Trace를 반올림해 ADC 코드 스케일 `int16` 배열로 반환한다.
+
+    입력은 보통 ±0.5 범위이며 32768을 곱한다. 입력을 변경하지 않고 새 배열을 만들며,
+    범위를 벗어난 값의 int16 변환 동작은 NumPy 규칙을 따른다.
+    """
     return np.rint(np.asarray(wave_f, dtype=np.float64) * 32768.0).astype(np.int16)
 
 
 def capture_one(target, scope, key16, plain16, check_golden=True, with_masks=False):
-    """arm → 타겟 AES → capture → (파형, 암호문[, 마스크]).
+    """scope arm → 타겟 AES → capture 순서로 Trace 한 장을 수집한다.
 
-    with_masks=True 이면 마스크 10바이트를 세 번째 값으로 추가한다.
-    마스크 UART 는 capture 이후(트리거 밖)에 수행한다.
+    반환값은 `(정규화 Trace, 암호문)`이며 `with_masks=True`이면 마스크 10바이트를 세 번째
+    값으로 추가한다. 마스크 UART는 capture 이후 트리거 밖에서 수행한다. 타임아웃,
+    선택적 골든 비교 불일치, 마스크 회수 실패는 `RuntimeError`로 중단하며 장비·타겟
+    상태와 통신 버퍼를 변경한다.
     """
     scope.arm()
     ct = target_aes_encrypt(target, key16, plain16)
@@ -394,7 +440,11 @@ def capture_retry(target, scope, k, p, with_masks=False, tries=3, pause=2.0):
 
     Masked 주의: 재시도는 타겟에서 암호화를 한 번 더 돌리므로 rand() 가 그만큼
     전진한다. 즉 시드를 알아도 "n번째 트레이스의 마스크" 를 호스트에서 계산할 수는
-    없다 — 마스크의 정본은 언제나 0x83 'm' 으로 회수해 i_m 에 저장한 값이다.
+    없다 — 마스크의 정본은 언제나 0x83 'm'으로 회수해 HDF5 `mask` 배열에 저장한 값이다.
+
+    성공하면 `capture_one()`과 같은 튜플을 반환한다. 골든·마스크 불일치는 즉시 다시
+    발생시키고, 다른 통신 오류만 증가하는 대기시간으로 `tries`회 재시도한다. 전부 실패하면
+    마지막 원인을 담은 `RuntimeError`가 발생하며 장비·타겟 상태가 여러 번 변경될 수 있다.
     """
     last = None
     for attempt in range(tries):
@@ -420,6 +470,9 @@ def write_root_metadata(h5, bench, cipher_attr, fixed_key, fixed_pt):
     모르는 값은 적지 않는다(SCHEMA.md §5.3). 예를 들어 대역폭은 Husky 설정에서
     바로 읽을 수 없으므로 기록하지 않는다 — 추정치를 넣으면 다음 사람이 그것을
     측정값으로 오해한다.
+
+    쓰기 가능한 h5py 파일과 초기화된 Bench를 받아 루트 HDF5 attrs를 변경한다. 반환값은
+    없고 장비는 읽기만 한다. 장비 속성 조회나 HDF5 쓰기 실패는 호출자에게 전파된다.
     """
     husky = bench.husky
     # cipher_attr 예: "AES-128-ECB (masked-aes-c, MASKED=1)" → 알고리즘과 구현으로 쪼갠다.
@@ -470,7 +523,13 @@ def write_root_metadata(h5, bench, cipher_attr, fixed_key, fixed_pt):
 
 def collect_group(h5, name, n_traces, key_mode, pt_mode, fixed_key, fixed_pt, seed,
                   bench, batch=BATCH):
-    """한 그룹을 HDF5 에 스트리밍 저장한다. 캡처 사고는 bench 가 스스로 복구한다."""
+    """새 Subset을 만들고 `n_traces`개의 레코드를 HDF5에 스트리밍 저장한다.
+
+    키·평문 모드와 결정적 `seed`를 적용하고, Masked 수집이면 마스크와 시드 이력을 함께
+    기록한다. 같은 이름의 그룹이 이미 있으면 h5py 오류가 발생한다. 캡처 사고는 Bench의
+    복구 사다리를 거치며 복구 불가·파일 I/O 오류는 호출자에게 전파된다. HDF5와 장비
+    상태를 변경하고 반환값은 없다.
+    """
     ns, with_masks = bench.ns, bench.with_masks
     g = h5.create_group(name)
     # 배열 이름은 SCHEMA.md 를 따른다 (상수는 scalib_common 에 있다).
@@ -496,6 +555,7 @@ def collect_group(h5, name, n_traces, key_mode, pt_mode, fixed_key, fixed_pt, se
     t_start = time.time()
 
     def flush():
+        """메모리 버퍼의 완성 레코드를 같은 행 순서로 HDF5 배열에 추가한다."""
         if not buf_t:
             return
         m = len(buf_t)
@@ -537,7 +597,10 @@ def collect_group(h5, name, n_traces, key_mode, pt_mode, fixed_key, fixed_pt, se
 def run_full_collect(out_path, bench, cipher_attr):
     """§8 본 수집. 그룹을 작은 것부터 저장한다.
 
-    bench : Bench — 장비·측정 설정을 들고 있으며 캡처 사고를 스스로 복구한다.
+    Bench가 보유한 장비·측정 설정으로 모든 Subset을 작은 것부터 수집한다. `out_path`의
+    기존 파일은 HDF5 `w` 모드로 덮어쓰므로 새 수집에만 사용해야 한다. 성공하면 교육용
+    고정 키·평문 배열을 반환한다. 캡처·스키마·파일 오류는 호출자에게 전파되며 장비와
+    출력 파일을 변경한다.
     """
     with_masks = bench.with_masks
     rng_fix = np.random.RandomState(SEED)
@@ -567,7 +630,12 @@ def run_full_collect(out_path, bench, cipher_attr):
 
 
 def resume_group(h5, name, bench, fixed_key, fixed_pt, batch=BATCH):
-    """그룹이 목표 트레이스 수에 못 미치면 모자란 만큼 이어서 채운다."""
+    """기존 Subset의 실제 Trace 수가 목표보다 작으면 부족분만 이어서 수집한다.
+
+    난수 생성기를 기존 레코드 수만큼 전진시켜 입력 벡터 순서를 보존하고, Masked 수집은
+    새 시드를 HDF5 attrs에 추가한다. 목표를 이미 채웠으면 파일을 바꾸지 않는다. 필수 배열
+    누락·캡처·파일 I/O 실패는 예외로 전파되며 반환값은 없다.
+    """
     with_masks = bench.with_masks
     target_n = GROUP_TARGETS[name]
     key_mode, pt_mode, seed = GROUP_MODES[name]
@@ -598,6 +666,7 @@ def resume_group(h5, name, bench, fixed_key, fixed_pt, batch=BATCH):
     t_start = time.time()
 
     def flush():
+        """이어받기 버퍼를 기존 배열 뒤에 추가하고 즉시 디스크에 반영한다."""
         if not buf_t:
             return
         m = len(buf_t)
@@ -641,7 +710,8 @@ def _report_schema(out_path):
     """수집 직후 스키마 준수를 확인한다 (SCHEMA.md §6).
 
     여기서 걸러야 규약 위반이 분석 단계까지 흘러가지 않는다. 수집은 이미 끝났으므로
-    예외로 죽이지 않고 보고만 한다 — 데이터 자체는 살아 있기 때문이다.
+    예외로 죽이지 않고 보고만 한다 — Dataset 자체는 살아 있기 때문이다. 파일은 읽기
+    전용이며 결과를 stdout에 출력하고 반환값은 없다.
     """
     bad = validate_dataset(path=out_path)
     if bad:
@@ -657,6 +727,9 @@ def _record_recoveries(h5, bench):
 
     자동 복구는 조용히 지나가기 쉬운데, 나중에 데이터 품질을 의심할 때 이 기록이
     첫 단서가 된다. 복구가 잦았다면 배선·USB 를 손봐야 한다는 뜻이다.
+
+    기존 `recoveries` HDF5 attr 뒤에 이번 Bench의 이력을 추가한다. 복구가 없으면 빈 이력을
+    유지하며 파일 쓰기 실패는 호출자에게 전파된다.
     """
     prev = list(h5.attrs.get("recoveries", []))
     h5.attrs["recoveries"] = np.array(
@@ -667,7 +740,12 @@ def _record_recoveries(h5, bench):
 
 
 def run_resume(out_path, bench):
-    """§8.1 이어받기."""
+    """중단된 Dataset의 모든 Subset을 기존 목표치까지 이어서 수집한다.
+
+    파일의 `fixed_key`가 현재 `SEED`에서 유도한 값과 다르면 다른 실험을 섞지 않도록
+    `RuntimeError`로 중단한다. 일치하면 HDF5를 append 모드로 변경하고 복구 이력과 스키마
+    결과를 기록한다. 캡처·파일 오류는 호출자에게 전파되며 반환값은 없다.
+    """
     rng_fix = np.random.RandomState(SEED)
     fixed_key = rng_fix.randint(0, 256, AES_BLOCK, dtype=np.uint8)
     fixed_pt = rng_fix.randint(0, 256, AES_BLOCK, dtype=np.uint8)
@@ -678,7 +756,7 @@ def run_resume(out_path, bench):
         if not np.array_equal(stored, fixed_key):
             raise RuntimeError(
                 "파일의 fixed_key 가 현재 SEED 로 만든 값과 다르다. "
-                "다른 설정으로 만든 데이터셋에 이어붙이면 안 된다.")
+                "다른 설정으로 만든 Dataset에 이어붙이면 안 된다.")
         for name in ("explore", "attack", "tvla_rk", "tvla_fk", "profiling"):
             resume_group(h5, name, bench, fixed_key, fixed_pt)
         _record_recoveries(h5, bench)
@@ -694,6 +772,9 @@ def _samba_port(timeout=25.0):
     컨테이너의 /dev 는 호스트와 분리된 tmpfs 이고 /dev/bus/usb 만 bind-mount 라,
     새로 생긴 tty 노드가 컨테이너에 안 보일 수 있다. pyserial 은 /sys 를 읽으므로
     이름은 찾아내지만 열 수는 없다. 그래서 major:minor 를 읽어 직접 만든다.
+
+    첫 SAM-BA 포트 경로를 반환한다. 필요하면 `/dev` 문자 장치 노드를 생성하므로 권한이
+    필요하다. `timeout`초 안에 포트를 찾지 못하거나 sysfs를 읽지 못하면 예외가 발생한다.
     """
     deadline = time.time() + timeout
     while time.time() < deadline:
@@ -722,7 +803,9 @@ def reflash_husky_firmware(serial_number):
     실패해도 벽돌이 되지 않는다 — SAM 의 하드웨어 부트로더는 지울 수 없어서, 소거 뒤
     재기록이 실패하면 장치는 SAM-BA(03eb:6124) 로 계속 USB 에 보이고 재시도할 수 있다.
 
-    실패 조건: 부트로더 진입 실패나 포트 탐색 실패면 예외.
+    실패 조건: 장치 검색·부트로더 진입·포트 탐색·프로그래밍 실패면 예외가 발생한다.
+    지정한 Husky의 기존 애플리케이션 펌웨어를 소거하고 다시 쓰는 파괴적 장비 작업이며,
+    성공 시 반환값은 없다. 호출자는 복구 사다리의 마지막 단계에서만 사용해야 한다.
     """
     from chipwhisperer.hardware.naeusb.naeusb import NAEUSB
 
@@ -771,6 +854,12 @@ class Bench:
 
     def __init__(self, scopes, target, platform, adc_mul, gain_db,
                  trig_count, ns, clk_hz, with_masks):
+        """열린 장비와 복구에 필요한 측정 설정을 보관한다.
+
+        장비를 새로 열거나 설정하지는 않지만 `cw.list_devices()`에서 Husky 시리얼 번호를
+        찾는다. Husky가 없으면 `StopIteration`이 발생하므로 생성 전에
+        `connect_all_devices()`가 성공해야 한다.
+        """
         self.scopes = scopes
         self.target = target
         self.platform = platform
@@ -787,24 +876,34 @@ class Bench:
 
     @property
     def lite(self):
+        """현재 연결 사전의 ChipWhisperer Lite scope를 반환한다."""
         return self.scopes["ChipWhisperer_Lite"]
 
     @property
     def husky(self):
+        """현재 연결 사전의 ChipWhisperer Husky scope를 반환한다."""
         return self.scopes["ChipWhisperer_Husky"]
 
     def bind_group(self, group, name):
-        """지금 채우는 그룹을 알려 준다. 복구 후 마스크 시드를 여기에 기록한다."""
+        """현재 쓰는 HDF5 Subset과 이름을 복구 문맥으로 보관한다.
+
+        Masked 수집에서 장비를 재연결하면 이 위치의 HDF5 attrs에 새 마스크 시드를
+        기록해야 앞선 수열을 반복하지 않는다. 파일에는 즉시 쓰지 않고 내부 참조만 바꾼다.
+        """
         self._group = (group, name)
 
     def disconnect(self):
+        """타겟과 모든 scope 연결을 닫고 내부 scope 사전을 비운다."""
         disconnect_all(self.scopes, self.target)
 
     def _reopen(self):
         """장비를 다시 열고 측정 설정을 원래대로 복원한다.
 
-        adc.samples 는 처음 실측한 ns 를 그대로 다시 넣는다. 여기서 trig_count 를
-        다시 재면 값이 달라져 행마다 파형 길이가 어긋날 수 있다.
+        `adc.samples`는 처음 관측한 `ns`를 그대로 다시 넣는다. 여기서 `trig_count`를
+        다시 관측하면 값이 달라져 행마다 Trace 길이가 어긋날 수 있다.
+
+        기존 연결을 닫고 새 USB 연결·타겟·PLL·ADC 설정을 만들므로 장비 상태를 크게
+        변경한다. 연결, lock, 골든 AES, 마스크 재시드 중 하나라도 실패하면 예외가 발생한다.
         """
         try:
             disconnect_all(self.scopes, self.target)
@@ -843,14 +942,17 @@ class Bench:
             _seed_masks(self.target, *self._group)
 
     def _try_capture(self, k, p):
+        """현재 연결에서 1단계 단순 재시도를 적용해 Trace 한 장을 반환한다."""
         return capture_retry(self.target, self.husky, k, p,
                              with_masks=self.with_masks, tries=self.RETRY_CAPTURE)
 
     def capture(self, k, p):
         """복구를 포함한 캡처. 사람이 개입할 필요가 없다.
 
-        반환: capture_one 과 같다 (with_masks 면 (파형, 암호문, 마스크)).
-        실패 조건: 사다리를 다 내려가도 안 되면 RuntimeError.
+        반환은 `capture_one()`과 같으며 Masked이면 `(Trace, 암호문, 마스크)`다. 단순 재시도,
+        재연결·설정 복원, Husky 펌웨어 재기록을 순서대로 수행한다. 마지막 단계는 장비
+        펌웨어를 소거·재기록한다. 사다리를 다 내려가도 실패하면 마지막 원인을 담은
+        `RuntimeError`가 발생한다.
         """
         try:
             return self._try_capture(k, p)
@@ -889,6 +991,11 @@ class Bench:
 
 
 def disconnect_all(scopes_dict, target_obj):
+    """타겟과 scope 사전의 모든 장치를 닫고 사전을 비운다.
+
+    각 종료 실패는 경고로 출력하고 나머지 장치 종료를 계속한다. 장비 연결 상태와 입력
+    사전을 변경하며 반환값은 없다.
+    """
     try:
         target_obj.dis()
         print("[OK] target.dis()")

@@ -1,13 +1,13 @@
-# `workspace/iut/` — 검증 대상 암호 구현 (IUT)
+# `workspace/iut/` — Implementation under test / IUT(테스트 대상 구현)
 
-이 디렉터리는 저장소가 **부채널 분석의 대상으로 삼는 암호 라이브러리**를 모아 둔 곳이다.
-`IUT`(implementation under test)는 `GLOSSARY.md`·`SCHEMA.md §3.2`의 정본 용어이며,
-데이터셋 메타데이터의 `iut_algorithm`·`iut_implementation`·`iut_countermeasure` 필드와 같은 축이다.
+이 디렉터리는 저장소가 부채널 분석 대상으로 삼는 암호 라이브러리를 모아 둔 곳이다.
+IUT는 비침습 방식으로 시험하는 구현이며, Dataset Metadata의 `iut_algorithm`·
+`iut_implementation`·`iut_countermeasure`가 알고리즘·구현·대책을 각각 식별한다.
 
 | 라이브러리 | 알고리즘 | 대책 | 출처 |
 |---|---|---|---|
 | `tiny-AES-c/` | AES-128 ECB/CTR/CBC | 없음 | <https://github.com/kokke/tiny-AES-c> (Unlicense / public domain) |
-| `masked-aes-c/` | 위와 같음 | 1차 부울 마스킹 (`CipherMasked` 구간만) | <https://github.com/CENSUS/masked-aes-c> (MELITY PoC, Unlicense / public domain) |
+| `masked-aes-c/` | AES-128 ECB/CTR/CBC | 1차 부울 마스킹 (`CipherMasked` 구간만) | <https://github.com/CENSUS/masked-aes-c> (MELITY PoC, Unlicense / public domain) |
 
 ---
 
@@ -19,7 +19,7 @@
 
 | 관측 | 무엇을 보나 | 쓰는 곳 |
 |---|---|---|
-| 실물 전력 파형 | 실제 칩에서 물리적으로 새는가 | `[extra] SCALib/simpleserial_{tiny-AES-c,masked-aes-c}/` |
+| 실물 전력 트레이스 | 실제 칩에서 물리적으로 새는가 | `[extra] SCALib/simpleserial_{tiny-AES-c,masked-aes-c}/` |
 | 디버그 트레이스 | 실행 흐름이 데이터에 의존하는가 | `[extra] Physical-AI-SCA/` (실장비 필요) |
 | 에뮬레이션 | 이론이 끊어 놓은 누설 고리를 구현이 되살렸는가 | `[extra] Physical-AI-SCA/emul_harness/` |
 
@@ -52,11 +52,13 @@
 
 | # | 위치 | 수정 | 왜 |
 |---|---|---|---|
-| 1 | `aes.c:236`·`:373`, `aes.h:73` | `AES_get_last_masks(uint8_t out[10])` 추가 | 마스크를 밖에서 읽을 수 있어야 **연구자 관점** 분석(마스크를 아는 상태의 진단)이 가능하다. 공격자 관점 분석은 이 값을 쓰지 않는다 |
-| 2 | `aes.c:309`·`:344` | per-encrypt `srand(time(NULL))` 제거 | STM32F303 에는 TRNG 가 없고 임베디드에서 `time(NULL)` 은 의미가 없다. 매 블록 재시드는 엔트로피를 오히려 해친다. **시드는 호스트가 `0x81 's'` 로 준다** |
-| 3 | `aes.c:318`·`:347` | `rand() % 0xFF` → **`rand() & 0xFF`** | 원본은 0–254 만 내놓아 `0xFF` 가 한 번도 나오지 않고 분포도 균일하지 않다. 마스킹의 안전성 논거가 마스크의 **균일성**을 전제하므로 이 편향은 그대로 1차 잔여 누설이 된다 |
+| 1 | `AES_get_last_masks()`·`last_masks` | 마지막 마스크 10바이트를 읽는 연구용 API 추가 | 마스크를 밖에서 읽을 수 있어야 **연구자 관점** 분석(마스크를 아는 상태의 진단)이 가능하다. 공격자 관점 분석은 이 값을 쓰지 않는다 |
+| 2 | `CipherMasked()`의 `srand(time(NULL))` 호출 | 암호화마다 하던 시간 기반 재시드 제거 | STM32F303 에는 TRNG 가 없고 임베디드에서 `time(NULL)` 은 의미가 없다. 매 블록 재시드는 엔트로피를 오히려 해친다. **시드는 호스트가 `0x81 's'` 로 준다** |
+| 3 | `random_uint8()` | `rand() % 0xFF` → **`rand() & 0xFF`** | 원본은 0–254만 내놓아 `0xFF`가 절대 나오지 않는다. 수정은 전체 바이트 범위를 허용하지만, `rand()` 하위 비트의 균일성이나 암호학적 안전성을 보장하지는 않는다 |
 
-3번은 벤더 원본의 결함이다. 실기로 확인했다 — 수정 전 난수부 최댓값 254, 수정 후 **255**.
+3번은 소스 식으로 확인되는 벤더 원본의 범위 결함을 고친다. 수정 전 식은 결과가 최대
+254이고, 수정 후 식은 255도 결과로 허용한다. 이는 값의 범위에 관한 설명일 뿐 실제
+난수 분포를 측정했다거나 `rand()`가 CSPRNG라는 뜻은 아니다.
 
 ### 마스크 레이아웃 (`AES_get_last_masks` 출력 10바이트)
 
@@ -76,7 +78,7 @@ SubBytes 출력 레지스터 = SBOX[p ^ k] ^ mask[5]
 
 `masked-aes-c` 는 **`CipherMasked` 안만 보호한다.** `KeyExpansion` 은 벤더 원본 그대로
 비마스킹이다. 그런데 이 저장소의 펌웨어는 키 스케줄을 트리거 **안**에서 수행하므로,
-파형 앞부분은 마스킹 여부와 무관하게 무방비다.
+트레이스 앞부분은 마스킹 여부와 무관하게 무방비다.
 
 **이것은 마스킹의 실패가 아니라 이 PoC 의 설계된 보호 범위 밖이다.** 분석에서 두 타겟을
 전 구간으로 비교하면 이 공통 누설이 마스킹 효과를 완전히 가린다. 비교는 암호화 구간에서만
@@ -89,9 +91,10 @@ SubBytes 출력 레지스터 = SBOX[p ^ k] ^ mask[5]
 벤더 원본 그대로다. 펌웨어 빌드에서 `-DCBC=0 -DCTR=0` 으로 ECB 경로만 남긴다
 (코드 크기 축소, 교육용 경로 단일화). 소스에는 손대지 않는다.
 
-이 라이브러리는 비교의 **기준선(baseline)** 이자 누설 검출기의 **양성 대조군**이다 —
-비마스킹 구현이므로 어떤 누설 검출기든 여기서는 반드시 반응해야 한다. 반응하지 않으면
-데이터가 아니라 검출기를 의심한다.
+이 라이브러리는 비교의 **기준선(baseline)** 이자 누설 검출기의 **양성 대조군**이다.
+같은 실행 조건에서 기대한 반응이 없으면 Dataset, 라벨, 표본 수, 누설 모델과 검출기 설정을
+함께 점검해야 한다. 어느 한 원인으로 단정할 수 없으며, 대조군이 유효하게 반응하기 전의
+음성 결과는 안전성 근거로 쓰지 않는다.
 
 ---
 
