@@ -500,6 +500,10 @@ git commit -m "변경 내용을 설명하는 메시지"
 git push
 ```
 
+```bash
+git add . && git commit -m "backup $(date '+%F_%T')" && git push
+```
+
 **복원 (Pull)** — GitHub 최신 내용을 로컬로:
 
 ```bash
