@@ -16,7 +16,6 @@ import datetime
 import hashlib
 import json
 import platform as platform_mod
-import subprocess
 import sys
 import time
 from pathlib import Path

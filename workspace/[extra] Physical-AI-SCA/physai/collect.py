@@ -274,12 +274,11 @@ def _write_root_metadata(h5, spec, tgt, ns):
 
 
 def main(argv=None):
-    """명세를 검증하고 계획 보고서와 에뮬레이션 Dataset을 생성한다.
+    """명세를 검증하고 계획 보고서와 Dataset을 생성한다.
 
-    `argv`가 `None`이면 `sys.argv`를 사용한다. 수집 전에 계획 보고서를 기록하고, 현재는
-    `collector.kind=emulation`만 실행한다. 성공 시 JSON 요약을 stdout에 쓰고 스키마 위반이
-    없으면 0, 있으면 1을 반환한다. 실장비 수집기 요청은 미검증 상태와 필요한 절차를
-    설명하는 `SystemExit`로 중단한다.
+    `argv`가 `None`이면 `sys.argv`를 사용한다. 수집 전에 계획 보고서를 기록하고
+    `collector.kind`에 따라 에뮬레이션 또는 실물 전력 수집기를 실행한다. 성공 시 JSON
+    요약을 stdout에 쓰고 스키마 위반이 없으면 0, 있으면 1을 반환한다.
     """
     ap = argparse.ArgumentParser(prog="physai.collect",
                                  description="spec → SCHEMA.md 검증을 통과하는 Dataset 생성")
@@ -308,13 +307,8 @@ def main(argv=None):
     kind = sp["collector"]["kind"]
     if kind == "emulation":
         collect_emulation(sp, out, verbose=not a.quiet, resume=a.resume)
-    elif kind == "cw_power":
+    else:  # JSON Schema가 지원 종류를 emulation과 cw_power로 한정한다.
         cw_power.collect(sp, out, verbose=not a.quiet, resume=a.resume)
-    else:
-        raise SystemExit(
-            "수집기 '%s'는 이 데모 범위에서 제외되어 CLI에 연결하지 않았다. "
-            "cw_debugtrace 하드웨어가 준비될 때 별도 Dataset으로 구현·검증해야 한다."
-            % kind)
 
     bad = S.validate_dataset(path=out)
     result = {"ok": not bad, "spec": sp["id"], "dataset": str(out),

@@ -6,3 +6,5 @@ runs/
 emul_harness/build/
 __pycache__/
 *.pyc
+# LibreOffice가 문서를 열 때 만드는 임시 잠금 파일이다.
+.~lock.*#

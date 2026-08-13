@@ -140,15 +140,6 @@ def corrected_threshold(criteria, n_tests):
             "note": "보정 임계와 spec 의 t_threshold 중 큰 값을 쓴다 — 둘 다 하한이다."}
 
 
-def subset_by_role(spec, role):
-    """명세에서 `role`이 일치하는 Subset 정의를 원래 순서대로 반환한다.
-
-    일치 항목이 없으면 빈 목록을 반환한다. 명세를 변경하지 않으며 필드 누락은 `KeyError`로
-    드러낸다. 호출 전에 `load()`로 계약을 검증해야 한다.
-    """
-    return [s for s in spec["subsets"] if s["role"] == role]
-
-
 def summary_lines(spec):
     """검증된 명세를 수집 시작 전에 보여 줄 한국어 줄 목록으로 변환한다.
 

@@ -14,7 +14,6 @@ from pathlib import Path
 # physai/paths.py → physai/ → [extra] Physical-AI-SCA/ → workspace/
 PROJECT = Path(__file__).resolve().parent.parent
 WORKSPACE = PROJECT.parent
-REPO = WORKSPACE.parent
 
 LIB = WORKSPACE / "lib"                     # 저장소 공용 파이썬 정의
 IUT = WORKSPACE / "iut"                     # IUT(테스트 대상 구현) 암호 라이브러리
@@ -50,20 +49,6 @@ def harness_elf(iut_name):
         raise FileNotFoundError(
             "에뮬레이션 ELF 가 없다: %s\n"
             "먼저 빌드한다:  make -C emul_harness IUT=%s" % (p, iut_name))
-    return p
-
-
-def iut_source(iut_name):
-    """IUT(테스트 대상 구현) 소스 디렉터리의 절대 `Path`를 반환한다.
-
-    펌웨어와 에뮬레이션 하네스가 이 한 경로를 함께 컴파일한다. 이름이 없으면 사용 가능한
-    IUT 목록을 담은 `FileNotFoundError`가 발생하며 파일은 변경하지 않는다.
-    """
-    p = IUT / iut_name
-    if not p.is_dir():
-        raise FileNotFoundError(
-            "IUT 소스가 없다: %s (사용 가능: %s)"
-            % (p, sorted(q.name for q in IUT.iterdir() if q.is_dir())))
     return p
 
 

@@ -11,8 +11,8 @@ Normal AES(tiny-AES-c)와 Masked AES(masked-aes-c) 두 타겟이 같은 AES 상�
 ## 저장소 공용 정의는 `workspace/lib/` 에 있다
 
 스키마(필드 이름·검증기)와 AES 참조 계산은 이 서브프로젝트만의 것이 아니다.
-세 수집 경로(실물 전력·디버그 트레이스·에뮬레이션)가 같은 검증기를 통과하고 같은
-중간값을 라벨로 써야 결과를 나란히 놓을 수 있으므로, 그 정의는 저장소 공용 트리에 있다.
+출처가 다른 관측 Dataset이 같은 검증기를 통과하고 같은 중간값을 라벨로 써야 결과를
+나란히 놓을 수 있으므로, 그 정의는 저장소 공용 트리에 있다.
 
     workspace/lib/sca_schema.py   스키마 상수·검증기·경로 기반 로더
     workspace/lib/aes_ref.py      SBOX·HW·중간값 참조 계산
@@ -228,8 +228,8 @@ def validate_dataset(target=None, path=None):
     출력
         위반 문자열 리스트. **비어 있으면 준수**다.
 
-    실물 전력·디버그 트레이스·에뮬레이션 세 수집 경로가 모두 저장소 공용 검증기를
-    사용하므로, 채널마다 "스키마 준수"의 뜻이 달라지지 않는다. 파일은 변경하지 않는다.
+    출처가 다른 관측 Dataset이 모두 저장소 공용 검증기를 사용하므로, 채널마다
+    "스키마 준수"의 뜻이 달라지지 않는다. 파일은 변경하지 않는다.
     """
     p = path if path is not None else require_target(target)["dataset"]
     return _validate_path(path=p)

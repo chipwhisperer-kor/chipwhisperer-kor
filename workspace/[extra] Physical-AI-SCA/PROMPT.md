@@ -90,10 +90,9 @@ python3 -m physai.collect --spec exp/<id>.yaml
 막는 구조적 장치다. 수집이 끝나면 스키마 검증이 자동으로 돌고, 위반이 있으면 종료 코드가
 0이 아니다.
 
-디버그 트레이스 수집기(`cw_debugtrace`)는 준비된 하드웨어가 없어 **실행되지 않는다**.
-실물 전력 수집기(`cw_power`)는 통합 데모에서 실행되었으며, 현재 실행의 근거는
-`runs/{006,007}_demo_hw_*/manifest.json`과 참조 Dataset을 `verify`한 결과다. 명확한 안내와 함께
-`NotImplementedError` 를 낸다. 실장비가 준비되면 각 파일 머리말의 순서를 따른다.
+지원 수집기는 에뮬레이션(`emulation`)과 실물 전력(`cw_power`)이다. 실물 전력 경로의 현재
+동작 근거는 `runs/{006,007}_demo_hw_*/manifest.json`과 해당 Dataset을 `verify`한 결과다.
+새 장비나 변경된 수집기는 코드 모양이 아니라 새 실행 증거로 판단한다.
 
 ---
 

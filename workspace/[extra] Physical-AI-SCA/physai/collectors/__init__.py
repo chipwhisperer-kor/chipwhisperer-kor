@@ -1,5 +1,5 @@
 """관측 채널별 수집기 패키지.
 
-`emulation`만 현재 CLI에 연결되어 있다. `cw_power`와 `cw_debugtrace`는 실장비 검증 전
-골격이며, 호출하면 그 상태와 필요한 구현 절차를 담은 `NotImplementedError`를 낸다.
+`emulation`은 명령어별 누설 모델을, `cw_power`는 ChipWhisperer 실물 전력을 수집한다.
+둘 다 `physai.collect`가 명세의 `collector.kind`에 따라 호출한다.
 """

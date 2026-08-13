@@ -31,7 +31,7 @@ sudo groupadd -fr chipwhisperer && sudo usermod -aG chipwhisperer,plugdev,docker
 
 같은 컨테이너에 두 가지 방식으로 붙는다: 브라우저 code-server(`http://localhost:8080`, `--auth none`) 또는 host VS Code의 *Dev Containers: Attach to Running Container*. 확장 목록은 `setup/cw-build/extensions.txt`(code-server용)와 `setup/cw-build/Dockerfile`의 `devcontainer.metadata` LABEL(원격 세션용) **두 곳에 따로** 있다 — 한쪽만 고치면 다른 쪽은 바뀌지 않는다.
 
-**`scope`/`target`을 건드리는 코드는 필요한 실장비가 연결된 세션에서 직접 실행해야만 검증할 수 있다.** 하드웨어 없이 돌아가는 것은 `[extra] PRE-SCA`(Unicorn 에뮬레이션)와 `[extra] Physical-AI-SCA`의 **에뮬레이션 경로**뿐이다(그 프로젝트의 실물 수집기 2종은 골격만 있고 실행된 적이 없다). 코드가 맞아 보인다는 이유로 동작한다고 말하지 말고, 검증에 쓴 장치·경로와 실행 결과를 명시한다.
+**`scope`/`target`을 건드리는 코드는 필요한 실장비가 연결된 세션에서 직접 실행해야만 검증할 수 있다.** 하드웨어 없이 돌아가는 것은 `[extra] PRE-SCA`(Unicorn 에뮬레이션)와 `[extra] Physical-AI-SCA`의 **에뮬레이션 경로**다. Physical-AI-SCA의 `cw_power`는 통합 데모 006·007에서 실행되었지만, 새 장비나 변경된 코드는 별도 실행 근거가 필요하다. 코드가 맞아 보인다는 이유로 동작한다고 말하지 말고, 검증에 쓴 장치·경로와 실행 결과를 명시한다.
 
 ## 펌웨어 빌드 (`workspace/base/` + 튜토리얼별 `simpleserial_main/`)
 
@@ -84,7 +84,7 @@ Dataset 수집에서는 16처럼 셀마다 다시 정한다. 둘은 같은 정�
 
 주의할 함정 두 가지: OPTIMIST의 **Attributes**(`trace` 등)는 HDF5에서 *배열*로, OPTIMIST의 **Metadata**는 HDF5 *attrs*로 저장되어 이름이 엇갈린다(`GLOSSARY.md` §6). 그리고 **모르는 메타데이터는 추정치로 채우지 않는다** — 비워 두고 검증기가 "부분 준수"로 보고하게 둔다(`SCHEMA.md` §5.3).
 
-준수 여부는 **`workspace/lib/sca_schema.py`의 `validate_dataset(path=…)`**로 검사한다. 세 수집 경로(실물 전력·디버그 트레이스·에뮬레이션)가 같은 검증기를 통과해야 "준수"의 뜻이 하나로 유지되므로 저장소 공용 트리에 있다. `[extra] SCALib/scalib_common.py`는 이것을 **재노출**하므로 그 프로젝트 노트북 12개는 종전대로 `validate_dataset(target=…)`을 쓴다 — 승격하면서 노트북을 한 줄도 고치지 않기 위한 장치다.
+준수 여부는 **`workspace/lib/sca_schema.py`의 `validate_dataset(path=…)`**로 검사한다. 실물 전력과 에뮬레이션이 같은 검증기를 통과해야 "준수"의 뜻이 하나로 유지되므로 저장소 공용 트리에 있다. `[extra] SCALib/scalib_common.py`는 이것을 **재노출**하므로 그 프로젝트 노트북 12개는 종전대로 `validate_dataset(target=…)`을 쓴다 — 승격하면서 노트북을 한 줄도 고치지 않기 위한 장치다.
 
 검증기는 파일에 적힌 판번호의 규칙을 적용한다. 나중 규칙으로 기존 Dataset을 소급
 판정하지 말고, 수집기는 실제로 기록하는 필드에 맞는 판번호를 써야 한다.
@@ -95,7 +95,7 @@ Dataset 수집에서는 16처럼 셀마다 다시 정한다. 둘은 같은 정�
 
 | 위치 | 내용 | 쓰는 곳 |
 |---|---|---|
-| `workspace/lib/sca_schema.py` | 스키마 상수·검증기·경로 기반 로더 | 세 수집 경로 전부 |
+| `workspace/lib/sca_schema.py` | 스키마 상수·검증기·경로 기반 로더 | 서로 다른 관측 경로 전부 |
 | `workspace/lib/aes_ref.py` | `SBOX`·`HW`·`sbox_out`·`aes_ecb_encrypt`·**`intermediates()`** | 수집기의 골든 검증, 분석의 민감값 라벨 |
 | `workspace/iut/{tiny-AES-c,masked-aes-c}/` | IUT(테스트 대상 구현) 암호 라이브러리 | SCALib 펌웨어 2종 + 에뮬 하네스 2종 |
 
@@ -118,7 +118,7 @@ Dataset 수집에서는 16처럼 셀마다 다시 정한다. 둘은 같은 정�
 - **`[extra] PRE-SCA/`** — ARM 펌웨어(tiny-AES)를 Unicorn/Capstone으로 에뮬레이션하는 pre-silicon SCA/FI 실험. 하드웨어가 필요 없다(`[extra] Physical-AI-SCA`의 에뮬 경로도 그렇다). 그 프로젝트가 이 트리의 **`elfParser.ElfParser`를 재사용**한다 — ELF 파싱 정의는 여기 한 곳이다. 다만 `logger.py`/`emul.py`는 쓰지 않는다. 전역 로거가 실행마다 CSV를 쓰고 에뮬레이션 훅이 명령어마다 입력 CSV를 다시 읽는 구조라, 오류주입 디버깅에는 맞지만 수천 Record 수집에는 I/O 비용이 지나치게 크기 때문이다. `[naive] PRE-SCA/`는 스크립트 버전으로 `python3 main.py`(또는 N회 반복 `./run_main.sh <N>`)로 실행하며, 설정은 전부 `config.py`에 있다. `config.py`의 snake_case 변수명은 `elfParser`·`emul`·`logger`가 이름으로 참조하므로 바꾸면 안 된다. 노트북 결과는 `nb_output/`에 쌓인다.
 - **`[extra] SCALib/`** — SCALib 0.6.4의 기능을 **기능 하나당 노트북 하나**로 보이되, **Normal AES(`tiny-AES-c`) ∥ Masked AES(`masked-aes-c`) 이중 타겟**을 단계마다 나란히 비교하는 예제 모음(SNR·Quantizer·Ttest·MTtest·CPA·LDA·MultiLDA·RLDA·SASCA·KeyRank). **하드웨어가 필요한 노트북은 `0.0.Dataset_Collect_tiny-AES-c.ipynb`와 `0.1.Dataset_Collect_masked-aes-c.ipynb` 둘**이고, CW308+STM32F3에서 수집한 전력 Trace를 `traces/scalib_dataset_{tiny-AES-c,masked-aes-c}.h5`에 만든다. 분석 노트북 10개는 그 파일을 읽지만 GB 단위 생성물이라 Git에서 제외한다. 로컬 파일의 존재·준수 여부는 실제 경로와 검증기 결과로 확인한다. Trace 길이는 수집 시 `scope.adc.trig_count`에서 정하며 AES 연산 전체(키 스케줄+10라운드)를 담도록 설계되어 있다.
 
-  **암호 라이브러리는 이 서브프로젝트 밖에 있다** — `workspace/iut/{tiny-AES-c,masked-aes-c}/`. 펌웨어 makefile이 `../../iut/<lib>/aes.c`를 직접 컴파일한다. 세 수집 경로(실물 전력·디버그 트레이스·에뮬레이션)가 **같은 소스**를 봐야 결과를 나란히 놓을 수 있어서 저장소 공용 트리로 올렸다. 출처·패치 내역은 `workspace/iut/README.md`.
+  **암호 라이브러리는 이 서브프로젝트 밖에 있다** — `workspace/iut/{tiny-AES-c,masked-aes-c}/`. 펌웨어 makefile이 `../../iut/<lib>/aes.c`를 직접 컴파일한다. 실물 전력과 에뮬레이션이 **같은 소스**를 봐야 결과를 나란히 놓을 수 있어서 저장소 공용 트리로 올렸다. 출처·패치 내역은 `workspace/iut/README.md`.
 
   경로·타겟 레지스트리·AES 상수·데이터셋 로더는 `scalib_common.py`(`TARGETS`, `load_group(target=…)`, `group_len`) 한 곳에만, 수집 공용 로직은 `dataset_collect_lib.py` 한 곳에만 있다. **분석 로직은 노트북이 직접 보여 준다** — 교육 목적이라 공용 모듈로 빼지 않는다.
 
@@ -130,7 +130,7 @@ Dataset 수집에서는 16처럼 셀마다 다시 정한다. 둘은 같은 정�
   3. **트레이스 수는 목표치가 아니라 실제 보유량** — `N_PROFILING` 같은 상수는 수집 목표다. 분석은 `group_len()`으로 실제 트레이스 수를 읽고, 타겟 간 비교는 양쪽을 같은 예산으로 맞춘다.
 
   저장된 수집 노트북 출력은 두 과거 실행이 profiling 목표 100,000 Record를 채웠고 검증기에서 위반을 보고하지 않았다고 기록한다. Masked 출력에는 `reflash`·`reconnect`·`reconnect` 복구 이력도 있다. 이는 현재 파일의 준수 증거가 아니므로 HDF5를 다시 만들면 검증기를 재실행한다. 마스크 RNG 패치는 벤더 원본 `rand() % 0xFF`가 제외하던 `0xFF`를 `rand() & 0xFF`로 포함하지만, `rand()`를 암호학적으로 안전한 RNG로 만들지는 않는다(`workspace/iut/masked-aes-c/aes.c`). 커스텀 프로토콜은 공통 `0x81 k/p/l`·`0x82 c`·`0x83 r`에 더해 Masked 전용 `0x81 's'`(마스크 시드)·`0x83 'm'`(마스크 회수)이 있다.
-- **`[extra] Physical-AI-SCA/`** — **AI가 실험 설계·수집·분석·보고를 나누어 수행하는 사전 진단 환경.** 한 암호 구현을 세 방식으로 관측해(에뮬레이션·실물 전력·디버그 트레이스) 하나의 스키마·하나의 판정 규칙 위에 놓는다. Git에는 문서와 데모 출력만 추적하며, 생성되는 `runs/`·`traces/`는 제외한다. 로컬 번들은 `verify`를 통과해야만 현재 증거로 쓸 수 있다. 실물 수집기 2종(`cw_power.py`·`cw_debugtrace.py`)은 미실행 골격이므로 동작한다고 주장하지 않는다.
+- **`[extra] Physical-AI-SCA/`** — **AI가 실험 설계·수집·분석·보고를 나누어 수행하는 사전 진단 환경.** 한 암호 구현을 에뮬레이션과 실물 전력으로 관측해 하나의 스키마·하나의 판정 규칙 위에 놓는다. Git에는 문서와 데모 출력만 추적하며, 생성되는 `runs/`·`traces/`는 제외한다. 로컬 번들은 `verify`를 통과해야만 현재 증거로 쓸 수 있다. `cw_power.py`의 현재 동작 근거는 통합 데모 006·007의 Dataset과 manifest다.
 
   ISO/IEC 17825:2024 를 **준용**하되 **적합성 평가가 아니라 사전 진단(pre-assessment)**이다. §1 Scope 가 이 표준을 ISO/IEC 19790 적합성 판정용으로 정하고 24759 와 함께 암호모듈의 정의된 경계에서 쓰도록 하는데, 여기 IUT 는 모듈이 아니라 라이브러리이고 벤더와 시험자가 동일하며 승인 기관이 없다. 그래서 spec 의 `scope.not_claimed` 가 **비울 수 없는 필수 필드**다 — 무엇을 주장하지 않는지 적지 않으면 나머지가 전부 주장으로 읽힌다.
 
