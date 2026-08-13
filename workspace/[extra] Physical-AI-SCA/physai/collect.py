@@ -19,7 +19,7 @@ import h5py
 import numpy as np
 
 from . import paths, spec as spec_mod
-from .collectors import emulation
+from .collectors import cw_power, emulation
 
 import sca_schema as S          # noqa: E402  (paths 가 workspace/lib 를 넣는다)
 
@@ -73,13 +73,12 @@ def _make_inputs(sub, rng, fixed_key, fixed_pt, n):
 #   different-data-random  → key_mode=fixed,  pt_mode=random  (평문이 다르다)
 
 
-def collect_emulation(spec, out_path, verbose=True):
+def collect_emulation(spec, out_path, verbose=True, resume=False):
     """명세의 Subset을 순서대로 에뮬레이션해 Dataset을 담은 HDF5 파일을 만든다.
 
-    첫 실행의 누설 모델 산출물에서 Trace 길이를 확인한 뒤 `out_path`를 새로 쓰며, 기존
-    파일이 있으면 h5py의
-    `w` 모드로 덮어쓴다. ELF·심볼·명세·파일 I/O 오류는 호출자에게 전파된다. 반환값은
-    완성된 경로이고, `verbose=True`이면 진행률을 stdout에 출력한다. 이 채널의 값은 물리
+    첫 실행의 누설 모델 산출물에서 Trace 길이를 확인한다. 기존 파일은 ``resume=True``일
+    때만 열고 명세·seed·입력 prefix·행 정렬이 일치하는 경우 각 Subset의 다음 완성 행부터
+    이어받는다. ELF·심볼·명세·파일 I/O 오류는 호출자에게 전파된다. 이 채널의 값은 물리
     측정치가 아니라 누설 모델의 산출값이다.
     """
     iut = spec["iut"]["name"]
@@ -103,11 +102,24 @@ def collect_emulation(spec, out_path, verbose=True):
               % (tgt.n_instr, len(tgt.components), ns))
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
+    if out_path.exists() and not resume:
+        raise FileExistsError("기존 Dataset을 덮어쓰지 않는다. 이어받으려면 --resume: %s"
+                              % out_path)
     t_start = time.time()
 
-    with h5py.File(out_path, "w") as h5:
-        _write_root_metadata(h5, spec, tgt, ns)
-        h5.create_dataset(S.F_SAMPLE_MAP, data=tgt.sample_map(), dtype=np.uint32)
+    mode = "a" if out_path.exists() else "w"
+    with h5py.File(out_path, mode) as h5:
+        if mode == "w":
+            _write_root_metadata(h5, spec, tgt, ns)
+            h5.create_dataset(S.F_SAMPLE_MAP, data=tgt.sample_map(), dtype=np.uint32)
+        else:
+            for key, expected in (("spec_id", spec["id"]), ("rng_seed", seed)):
+                if key not in h5.attrs or h5.attrs[key] != expected:
+                    raise RuntimeError("resume 계약 불일치: %s (파일=%r, 명세=%r)"
+                                       % (key, h5.attrs.get(key), expected))
+            if int(h5.attrs.get("samples_per_trace", -1)) != ns or \
+                    not np.array_equal(h5[S.F_SAMPLE_MAP][:], tgt.sample_map()):
+                raise RuntimeError("resume sample_map 또는 Trace 길이가 현재 ELF와 다르다")
 
         for sub in spec["subsets"]:
             n = int(sub["n"])
@@ -115,26 +127,44 @@ def collect_emulation(spec, out_path, verbose=True):
             keys, pts = _make_inputs(sub, rng, fixed_key, fixed_pt, n)
             seeds = rng.randint(0, 2 ** 31, n).astype(np.uint32)
 
-            g = h5.create_group(sub["name"])
-            g.attrs["role"] = sub["role"]
-            g.attrs["n_records"] = n
-            g.attrs["key_mode"] = sub["key_mode"]
-            g.attrs["pt_mode"] = sub["pt_mode"]
-            if "spa_pair_kind" in sub:
-                g.attrs["spa_pair_kind"] = sub["spa_pair_kind"]
-            if has_masks:
-                g.attrs["mask_seeds"] = seeds
+            if sub["name"] in h5:
+                g = h5[sub["name"]]
+                rows = {name: d.shape[0] for name, d in g.items()}
+                if len(set(rows.values())) != 1:
+                    raise RuntimeError("resume 행 정렬 불일치 /%s: %s" % (sub["name"], rows))
+                have = next(iter(rows.values()), 0)
+                if have > n or not np.array_equal(g[S.F_KEY][:], keys[:have]) or \
+                        not np.array_equal(g[S.F_PLAINTEXT][:], pts[:have]):
+                    raise RuntimeError("resume 입력 prefix 또는 목표 수 불일치: /%s"
+                                       % sub["name"])
+            else:
+                g = h5.create_group(sub["name"])
+                g.attrs["role"] = sub["role"]
+                g.attrs["n_records"] = 0
+                g.attrs["key_mode"] = sub["key_mode"]
+                g.attrs["pt_mode"] = sub["pt_mode"]
+                if "spa_pair_kind" in sub:
+                    g.attrs["spa_pair_kind"] = sub["spa_pair_kind"]
+                if has_masks:
+                    g.attrs["mask_seeds"] = seeds
+                g.create_dataset(S.F_TRACE, shape=(0, ns), dtype=np.int16,
+                                 chunks=(min(BATCH, n), ns), maxshape=(None, ns))
+                g.create_dataset(S.F_KEY, shape=(0, 16), dtype=np.uint8,
+                                 chunks=True, maxshape=(None, 16))
+                g.create_dataset(S.F_PLAINTEXT, shape=(0, 16), dtype=np.uint8,
+                                 chunks=True, maxshape=(None, 16))
+                g.create_dataset(S.F_CIPHERTEXT, shape=(0, 16), dtype=np.uint8,
+                                 chunks=True, maxshape=(None, 16))
+                g.create_dataset(S.F_EXEC_TIME, shape=(0,), dtype=np.uint32,
+                                 chunks=True, maxshape=(None,))
+                if has_masks:
+                    g.create_dataset(S.F_MASK, shape=(0, 10), dtype=np.uint8,
+                                     chunks=True, maxshape=(None, 10))
+                have = 0
 
-            d_t = g.create_dataset(S.F_TRACE, shape=(n, ns), dtype=np.int16,
-                                   chunks=(min(BATCH, n), ns), maxshape=(None, ns))
-            d_k = g.create_dataset(S.F_KEY, data=keys, maxshape=(None, 16))
-            d_p = g.create_dataset(S.F_PLAINTEXT, data=pts, maxshape=(None, 16))
-            d_o = g.create_dataset(S.F_CIPHERTEXT, shape=(n, 16), dtype=np.uint8,
-                                   maxshape=(None, 16))
-            d_e = g.create_dataset(S.F_EXEC_TIME, shape=(n,), dtype=np.uint32,
-                                   maxshape=(None,))
-            d_m = (g.create_dataset(S.F_MASK, shape=(n, 10), dtype=np.uint8,
-                                    maxshape=(None, 10)) if has_masks else None)
+            d_t, d_k, d_p = g[S.F_TRACE], g[S.F_KEY], g[S.F_PLAINTEXT]
+            d_o, d_e = g[S.F_CIPHERTEXT], g[S.F_EXEC_TIME]
+            d_m = g[S.F_MASK] if has_masks else None
 
             t0 = time.time()
             buf_t = np.empty((BATCH, ns), dtype=np.int16)
@@ -142,8 +172,8 @@ def collect_emulation(spec, out_path, verbose=True):
             buf_e = np.empty(BATCH, dtype=np.uint32)
             buf_m = np.empty((BATCH, 10), dtype=np.uint8) if has_masks else None
             fill = 0
-            base = 0
-            for i in range(n):
+            base = have
+            for i in range(have, n):
                 ct, mk, tr, et = tgt.run(bytes(keys[i]), bytes(pts[i]),
                                          int(seeds[i]), trace=True)
                 buf_t[fill] = tr
@@ -153,12 +183,20 @@ def collect_emulation(spec, out_path, verbose=True):
                     buf_m[fill] = np.frombuffer(mk, dtype=np.uint8)
                 fill += 1
                 if fill == BATCH or i == n - 1:
+                    for dset in (d_t, d_k, d_p, d_o, d_e):
+                        dset.resize(base + fill, axis=0)
+                    if d_m is not None:
+                        d_m.resize(base + fill, axis=0)
                     d_t[base:base + fill] = buf_t[:fill]
+                    d_k[base:base + fill] = keys[base:base + fill]
+                    d_p[base:base + fill] = pts[base:base + fill]
                     d_o[base:base + fill] = buf_o[:fill]
                     d_e[base:base + fill] = buf_e[:fill]
                     if has_masks:
                         d_m[base:base + fill] = buf_m[:fill]
                     base += fill
+                    g.attrs["n_records"] = base
+                    h5.flush()
                     fill = 0
                     if verbose:
                         pct = 100.0 * base / n
@@ -247,6 +285,8 @@ def main(argv=None):
                                  description="spec → SCHEMA.md 검증을 통과하는 Dataset 생성")
     ap.add_argument("--spec", required=True)
     ap.add_argument("--out", default=None, help="생략하면 traces/<spec.id>.h5")
+    ap.add_argument("--resume", action="store_true",
+                    help="기존 파일의 계약·입력 prefix가 일치할 때 다음 완성 레코드부터 재개")
     ap.add_argument("--quiet", action="store_true")
     a = ap.parse_args(argv)
 
@@ -267,13 +307,14 @@ def main(argv=None):
     out = paths.TRACES / ("%s.h5" % sp["id"]) if a.out is None else paths.Path(a.out)
     kind = sp["collector"]["kind"]
     if kind == "emulation":
-        collect_emulation(sp, out, verbose=not a.quiet)
+        collect_emulation(sp, out, verbose=not a.quiet, resume=a.resume)
+    elif kind == "cw_power":
+        cw_power.collect(sp, out, verbose=not a.quiet, resume=a.resume)
     else:
         raise SystemExit(
-            "수집기 '%s'는 실장비가 필요하며 아직 CLI에 구현·검증되지 않았다. "
-            "현재 CLI는 collector.kind=emulation만 실행한다. physai/collectors/%s.py의 "
-            "구현도 자동 연결되지 않는다. 실장비 수집은 소량 캡처로 골든 AES 일치와 "
-            "Metadata 기록을 먼저 확인한 뒤 별도로 연결해야 한다." % (kind, kind))
+            "수집기 '%s'는 이 데모 범위에서 제외되어 CLI에 연결하지 않았다. "
+            "cw_debugtrace 하드웨어가 준비될 때 별도 Dataset으로 구현·검증해야 한다."
+            % kind)
 
     bad = S.validate_dataset(path=out)
     result = {"ok": not bad, "spec": sp["id"], "dataset": str(out),

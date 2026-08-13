@@ -12,7 +12,7 @@ rationale: >
   이 실험이 확인하려는 것이다.
 
   **분석만 한다** — `analyze --dataset` 로 기존 파일을 가리킨다. `collect` 를 돌리지
-  않으며, 돌리려 해도 실물 수집기는 실장비가 없어 실행되지 않는다.
+  않으며, 돌리려 해도 실물 수집기는 아직 구현되지 않아 `NotImplementedError`로 중단된다.
 
 scope:
   standard: "ISO/IEC 17825:2024"

@@ -17,7 +17,7 @@ Normal AES(tiny-AES-c)와 Masked AES(masked-aes-c) 두 타겟이 같은 AES 상�
     workspace/lib/sca_schema.py   스키마 상수·검증기·경로 기반 로더
     workspace/lib/aes_ref.py      SBOX·HW·중간값 참조 계산
 
-**이 파일이 그것을 그대로 재노출한다.** 그래서 분석 노트북 12개는
+**이 파일이 그것을 그대로 재노출한다.** 그래서 수집 2개와 분석 10개를 합친 노트북 12개는
 `from scalib_common import SBOX, validate_dataset` 처럼 종전과 똑같이 쓰면 된다 —
 공용 트리로 옮기면서 노트북을 한 줄도 고치지 않기 위한 장치다. 재노출은 정의를
 복제하는 것이 아니라 참조하는 것이므로 "정의는 한 곳" 원칙을 지킨다.

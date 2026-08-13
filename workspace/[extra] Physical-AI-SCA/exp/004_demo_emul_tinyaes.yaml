@@ -1,0 +1,59 @@
+id: "004_demo_emul_tinyaes"
+title: "통합 데모 에뮬레이션 — tiny-AES-c 양성 대조"
+rationale: >
+  실제 IUT 기계어를 Unicorn에서 실행해 명령어별 HW·HD 누설 벡터와 sample_map을 만든다.
+  같은 seed와 Subset 입력 규칙을 쓰는 실물 전력 실험 006의 구조적 대조 채널이며,
+  비마스킹 구현에서 검출기와 CPA 배관이 반응하는지 확인하는 양성 대조다.
+scope:
+  standard: "ISO/IEC 17825:2024"
+  assessment_type: "pre-assessment"
+  clauses_applied: ["7", "8"]
+  security_function: "AES-128-ECB"
+  csp_classes: ["cryptographic key"]
+  channels: ["emulated-power"]
+  target_level: 3
+  not_claimed:
+    - "ISO/IEC 19790 적합성 — 모듈 경계·CSP 정의가 환경 밖이다"
+    - "독립 시험소 평가 — 벤더와 시험자가 동일하다"
+    - "물리 측정 — 누설 모델 출력이며 글리치·커플링을 포함하지 않는다"
+    - "EM 및 cw_debugtrace 관측 — 이 실험의 채널이 아니다"
+    - "cycle-accurate 타이밍 — Unicorn에는 사이클 모델이 없다"
+    - "SPA 육안 판정 — 사람의 검토가 필요하다"
+iut: {name: "tiny-AES-c", countermeasure: "none"}
+collector:
+  kind: "emulation"
+  components: ["hw_reg", "hd_reg", "hw_mem", "hd_mem"]
+  window:
+    from_symbol: "AES_init_ctx"
+    to_symbol: "AES_ECB_encrypt"
+    semantics: "AES_init_ctx(KeyExpansion) 진입부터 AES_ECB_encrypt 복귀까지; 실물 MY_AES_ECB 트리거와 같은 코드 구간"
+subsets:
+  - {name: ta_rk_fp,    role: timing,                    n: 1000, key_mode: random, pt_mode: fixed}
+  - {name: ta_fk_rp,    role: timing,                    n: 1000, key_mode: fixed,  pt_mode: random}
+  - {name: spa_same,    role: simple-analysis,           n: 4,    key_mode: fixed,  pt_mode: fixed,  spa_pair_kind: same-data}
+  - {name: spa_diffkey, role: simple-analysis,           n: 4,    key_mode: random, pt_mode: fixed,  spa_pair_kind: different-data-fixed}
+  - {name: spa_diffpt,  role: simple-analysis,           n: 4,    key_mode: fixed,  pt_mode: random, spa_pair_kind: different-data-random}
+  - {name: tvla_fk,     role: leakage-detection-fixed,   n: 64,   key_mode: fixed,  pt_mode: fixed}
+  - {name: tvla_rk,     role: leakage-detection-random,  n: 64,   key_mode: fixed,  pt_mode: random}
+  - {name: profiling,   role: profiling,                 n: 300,  key_mode: random, pt_mode: random}
+  - {name: attack,      role: attack,                    n: 128,  key_mode: fixed,  pt_mode: random}
+criteria:
+  security_level: 3
+  effect_size_d: 0.04
+  alpha: 1.0e-5
+  beta: 0.05
+  multiplicity_correction: "bonferroni"
+  t_threshold: 4.5
+  max_acquisition_hours: 6
+  sensitive_leakage_time:
+    from: "0"
+    to: "end"
+    include_round1: true
+    rationale: "첫 라운드 S-box는 분할정복 키 복구의 표준 표적이므로 관측 구간 전체를 민감 경계에 포함한다. Annex H 경계 확정은 이 사전 진단의 주장 범위 밖이다."
+  preprocessing: {average_n: 1, alignment: "none"}
+  vendor_info:
+    algorithms: "AES-128 ECB (tiny-AES-c)"
+    design: "8비트 S-box 표 참조, 메모리 state in-place 갱신, -Os Cortex-M4 빌드, 대책 없음"
+    susceptible_conditions: "비마스킹 구현이므로 1차 값·전이 누설의 양성 대조로 사용한다"
+analyses: ["ta", "spa", "dpa", "soundness", "cpa"]
+seed: 1234

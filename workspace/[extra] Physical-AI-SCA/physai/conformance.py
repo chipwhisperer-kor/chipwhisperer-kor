@@ -317,12 +317,16 @@ def _annex_b_items(attrs):
                      evidence="%s 샘플" % attrs.get("samples_per_trace", "?")))
     shunt = attrs.get("shunt_ohm")
     note = attrs.get("shunt_selection_note")
-    out.append(_item("Annex B [B.05]·[B.06]",
-                     "VCC–IUT 사이 저항, **동작 가능한 최대값**을 고른다",
-                     NR if shunt is None or note is None else OK,
-                     evidence="shunt_ohm=%s, 선택 근거=%s" % (shunt, note),
-                     note=("프로브 구성은 기록되어 있으나 저항값과 선택 절차가 없으면 "
-                           "[B.06] 을 판정할 수 없다.")))
+    max_verified = attrs.get("shunt_max_verified")
+    out.append(_item("Annex B [B.05]", "VCC–IUT 사이 저항값을 기록한다",
+                     NR if shunt is None else OK,
+                     evidence="shunt_ohm=%s" % shunt))
+    out.append(_item("Annex B [B.06]", "IUT가 동작하는 범위의 최대 저항을 고른다",
+                     NR if note is None or max_verified is None else
+                     (OK if bool(max_verified) else NG),
+                     evidence="max_verified=%s, 선택 근거=%s" % (max_verified, note),
+                     note=("공장 설계값에서 동작한 사실과 더 큰 저항까지 비교해 최대값을 "
+                           "확인한 사실은 다르다.")))
     return out
 
 

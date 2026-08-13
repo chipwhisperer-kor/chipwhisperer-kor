@@ -303,12 +303,18 @@ def main(argv=None):
     overall = ("fail" if "fail" in verdicts.values()
                else "inconclusive" if "inconclusive" in verdicts.values()
                else "pass")
-    results_summary = {"ok": True, "spec": sp["id"], "overall": overall,
+    positive_control_ok = not (
+        sp["iut"]["name"] == "tiny-AES-c" and "cpa" in sp["analyses"] and
+        results["reference"]["cpa"]["bytes_recovered"] != 16)
+    results_summary = {"ok": positive_control_ok, "spec": sp["id"], "overall": overall,
                        "verdicts": verdicts, "results": str(out_dir / "results.json")}
     say("-" * 70)
     say("  종합: %s" % overall)
     print(json.dumps(results_summary, ensure_ascii=False))
-    return 0
+    if not positive_control_ok:
+        say("  [실패] tiny-AES-c CPA 양성 대조가 16바이트를 복구하지 못했다. "
+            "수집·정렬·라벨 설정을 점검해야 한다.")
+    return 0 if positive_control_ok else 1
 
 
 def _save_spa_traces(ds, sp, out_dir):

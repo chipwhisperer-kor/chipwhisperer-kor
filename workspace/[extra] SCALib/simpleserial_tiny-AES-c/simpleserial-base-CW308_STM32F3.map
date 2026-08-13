@@ -682,16 +682,16 @@ LOAD /usr/lib/gcc/arm-none-eabi/12.2.1/thumb/v7e-m/nofp/libgcc.a
  .debug_ranges  0x00000260       0xb0 objdir-CW308_STM32F3/stm32f3_hal.o
  .debug_ranges  0x00000310      0x210 objdir-CW308_STM32F3/stm32f3_hal_lowlevel.o
 
-.debug_line     0x00000000     0x2c6f
+.debug_line     0x00000000     0x2c67
  .debug_line    0x00000000       0xfc objdir-CW308_STM32F3/my_crypt.o
- .debug_line    0x000000fc      0x2bd objdir-CW308_STM32F3/simpleserial-base.o
- .debug_line    0x000003b9      0x565 objdir-CW308_STM32F3/aes.o
- .debug_line    0x0000091e      0x595 objdir-CW308_STM32F3/simpleserial.o
- .debug_line    0x00000eb3      0x359 objdir-CW308_STM32F3/stm32f3_hal.o
- .debug_line    0x0000120c     0x16ce objdir-CW308_STM32F3/stm32f3_hal_lowlevel.o
- .debug_line    0x000028da      0x12c /usr/lib/gcc/arm-none-eabi/12.2.1/../../../arm-none-eabi/lib/thumb/v7e-m/nofp/libg_nano.a(lib_a-init.o)
- .debug_line    0x00002a06       0xb9 /usr/lib/gcc/arm-none-eabi/12.2.1/../../../arm-none-eabi/lib/thumb/v7e-m/nofp/libg_nano.a(lib_a-memcpy.o)
- .debug_line    0x00002abf      0x1b0 /usr/lib/gcc/arm-none-eabi/12.2.1/../../../arm-none-eabi/lib/thumb/v7e-m/nofp/libg_nano.a(lib_a-memset.o)
+ .debug_line    0x000000fc      0x2b5 objdir-CW308_STM32F3/simpleserial-base.o
+ .debug_line    0x000003b1      0x565 objdir-CW308_STM32F3/aes.o
+ .debug_line    0x00000916      0x595 objdir-CW308_STM32F3/simpleserial.o
+ .debug_line    0x00000eab      0x359 objdir-CW308_STM32F3/stm32f3_hal.o
+ .debug_line    0x00001204     0x16ce objdir-CW308_STM32F3/stm32f3_hal_lowlevel.o
+ .debug_line    0x000028d2      0x12c /usr/lib/gcc/arm-none-eabi/12.2.1/../../../arm-none-eabi/lib/thumb/v7e-m/nofp/libg_nano.a(lib_a-init.o)
+ .debug_line    0x000029fe       0xb9 /usr/lib/gcc/arm-none-eabi/12.2.1/../../../arm-none-eabi/lib/thumb/v7e-m/nofp/libg_nano.a(lib_a-memcpy.o)
+ .debug_line    0x00002ab7      0x1b0 /usr/lib/gcc/arm-none-eabi/12.2.1/../../../arm-none-eabi/lib/thumb/v7e-m/nofp/libg_nano.a(lib_a-memset.o)
 
 .debug_str      0x00000000     0x16fd
  .debug_str     0x00000000      0x1a7 objdir-CW308_STM32F3/my_crypt.o

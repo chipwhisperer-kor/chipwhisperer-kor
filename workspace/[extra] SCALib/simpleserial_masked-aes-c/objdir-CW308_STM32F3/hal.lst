@@ -221,25 +221,25 @@
  202              	.Letext0:
 DEFINED SYMBOLS
                             *ABS*:00000000 hal.c
-     /tmp/ccktygeE.s:19     .text.led_ok:00000000 $t
-     /tmp/ccktygeE.s:25     .text.led_ok:00000000 led_ok
-     /tmp/ccktygeE.s:39     .text.led_error:00000000 $t
-     /tmp/ccktygeE.s:45     .text.led_error:00000000 led_error
-     /tmp/ccktygeE.s:57     .text._close:00000000 $t
-     /tmp/ccktygeE.s:63     .text._close:00000000 _close
-     /tmp/ccktygeE.s:76     .text._fstat:00000000 $t
-     /tmp/ccktygeE.s:82     .text._fstat:00000000 _fstat
-     /tmp/ccktygeE.s:94     .text._getpid:00000000 $t
-     /tmp/ccktygeE.s:100    .text._getpid:00000000 _getpid
-     /tmp/ccktygeE.s:112    .text._isatty:00000000 $t
-     /tmp/ccktygeE.s:118    .text._isatty:00000000 _isatty
-     /tmp/ccktygeE.s:130    .text._kill:00000000 $t
-     /tmp/ccktygeE.s:136    .text._kill:00000000 _kill
-     /tmp/ccktygeE.s:148    .text._lseek:00000000 $t
-     /tmp/ccktygeE.s:154    .text._lseek:00000000 _lseek
-     /tmp/ccktygeE.s:166    .text._read:00000000 $t
-     /tmp/ccktygeE.s:172    .text._read:00000000 _read
-     /tmp/ccktygeE.s:184    .text._write:00000000 $t
-     /tmp/ccktygeE.s:190    .text._write:00000000 _write
+     /tmp/ccl8hHyv.s:19     .text.led_ok:00000000 $t
+     /tmp/ccl8hHyv.s:25     .text.led_ok:00000000 led_ok
+     /tmp/ccl8hHyv.s:39     .text.led_error:00000000 $t
+     /tmp/ccl8hHyv.s:45     .text.led_error:00000000 led_error
+     /tmp/ccl8hHyv.s:57     .text._close:00000000 $t
+     /tmp/ccl8hHyv.s:63     .text._close:00000000 _close
+     /tmp/ccl8hHyv.s:76     .text._fstat:00000000 $t
+     /tmp/ccl8hHyv.s:82     .text._fstat:00000000 _fstat
+     /tmp/ccl8hHyv.s:94     .text._getpid:00000000 $t
+     /tmp/ccl8hHyv.s:100    .text._getpid:00000000 _getpid
+     /tmp/ccl8hHyv.s:112    .text._isatty:00000000 $t
+     /tmp/ccl8hHyv.s:118    .text._isatty:00000000 _isatty
+     /tmp/ccl8hHyv.s:130    .text._kill:00000000 $t
+     /tmp/ccl8hHyv.s:136    .text._kill:00000000 _kill
+     /tmp/ccl8hHyv.s:148    .text._lseek:00000000 $t
+     /tmp/ccl8hHyv.s:154    .text._lseek:00000000 _lseek
+     /tmp/ccl8hHyv.s:166    .text._read:00000000 $t
+     /tmp/ccl8hHyv.s:172    .text._read:00000000 _read
+     /tmp/ccl8hHyv.s:184    .text._write:00000000 $t
+     /tmp/ccl8hHyv.s:190    .text._write:00000000 _write
 
 NO UNDEFINED SYMBOLS

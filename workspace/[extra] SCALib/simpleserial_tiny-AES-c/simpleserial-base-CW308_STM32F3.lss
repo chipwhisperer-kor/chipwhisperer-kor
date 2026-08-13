@@ -39,19 +39,19 @@ Idx Name          Size      VMA       LMA       File off  Algn
                   CONTENTS, READONLY, DEBUGGING, OCTETS
  17 .debug_ranges 00000520  00000000  00000000  0000bcc8  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 18 .debug_line   00002c6f  00000000  00000000  0000c1e8  2**0
+ 18 .debug_line   00002c67  00000000  00000000  0000c1e8  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 19 .debug_str    000016fd  00000000  00000000  0000ee57  2**0
+ 19 .debug_str    000016fd  00000000  00000000  0000ee4f  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 20 .debug_frame  0000062c  00000000  00000000  00010554  2**2
+ 20 .debug_frame  0000062c  00000000  00000000  0001054c  2**2
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 21 .stab         00000144  00000000  00000000  00010b80  2**2
+ 21 .stab         00000144  00000000  00000000  00010b78  2**2
                   CONTENTS, READONLY, DEBUGGING
- 22 .stabstr      0000003d  00000000  00000000  00010cc4  2**0
+ 22 .stabstr      0000003d  00000000  00000000  00010cbc  2**0
                   CONTENTS, READONLY, DEBUGGING
- 23 .debug_loclists 0000021b  00000000  00000000  00010d01  2**0
+ 23 .debug_loclists 0000021b  00000000  00000000  00010cf9  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 24 .debug_line_str 000000a1  00000000  00000000  00010f1c  2**0
+ 24 .debug_line_str 000000a1  00000000  00000000  00010f14  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
 
 Disassembly of section .text:
@@ -372,10 +372,10 @@ int MY_AES_ECB(uint8_t *output, uint8_t *input_k, uint8_t *input_p, uint8_t len)
  8000476:	e7fa      	b.n	800046e <MY_AES_ECB+0x36>
 
 08000478 <my_init>:
-}
 
 #if SS_VER == SS_VER_2_1
-//SS_VER_2_1 사용이 기본
+/* 0x81 입력 명령: 'k'는 AES 키, 'p'는 평문을 저장하고 같은 바이트를 응답한다. 'l'은
+ * 결과 버퍼를 지운 뒤 연산 길이를 저장한다. 반환값 0은 명령 처리 성공을 뜻한다. */
 uint8_t my_init(uint8_t cmd, uint8_t scmd, uint8_t len, uint8_t *buf)
 {
  8000478:	b570      	push	{r4, r5, r6, lr}
@@ -388,25 +388,19 @@ uint8_t my_init(uint8_t cmd, uint8_t scmd, uint8_t len, uint8_t *buf)
  	if (scmd == (uint8_t)'k') {
  8000482:	d10e      	bne.n	80004a2 <my_init+0x2a>
  8000484:	4a16      	ldr	r2, [pc, #88]	@ (80004e0 <my_init+0x68>)
-		/**********************************
-		* Start user-specific code here. */
-	
 		for(int i = 0; i<len; i++)
  8000486:	2300      	movs	r3, #0
  8000488:	4299      	cmp	r1, r3
  800048a:	dc05      	bgt.n	8000498 <my_init+0x20>
 			global_k[i] = buf[i];
-
-		/* End user-specific code here. *
-		********************************/
 		
 		simpleserial_put(scmd, len, global_k);
  800048c:	4a14      	ldr	r2, [pc, #80]	@ (80004e0 <my_init+0x68>)
  800048e:	206b      	movs	r0, #107	@ 0x6b
-		global_len = buf[0];
+		for(int i = 0; i<MAX_DATA_LEN; i++)
+			global_ret[i] = 0;
 
-		/* End user-specific code here. *
-		********************************/
+		global_len = buf[0];
 		
 		simpleserial_put((char)scmd, 1, &global_len);
  8000490:	f000 f9a8 	bl	80007e4 <simpleserial_put>
@@ -463,6 +457,8 @@ uint8_t my_init(uint8_t cmd, uint8_t scmd, uint8_t len, uint8_t *buf)
  80004e4:	20000111 	.word	0x20000111
 
 080004e8 <my_update>:
+/* 0x82 'c' 명령: 트리거가 HIGH인 동안에만 AES 연산을 수행한다. 따라서 수집된
+ * Trace(트레이스)는 UART 응답을 포함하지 않는다. 연산 뒤에는 완료 바이트 0x82를 보낸다. */
 uint8_t my_update(uint8_t cmd, uint8_t scmd, uint8_t len, uint8_t *buf)
 {
 
@@ -473,9 +469,6 @@ uint8_t my_update(uint8_t cmd, uint8_t scmd, uint8_t len, uint8_t *buf)
  80004ec:	460c      	mov	r4, r1
 	if (scmd == (uint8_t)'c') {
  80004ee:	d10c      	bne.n	800050a <my_update+0x22>
-
-		/**********************************
-		* Start user-specific code here. */
 		trigger_high();
  80004f0:	f000 faf4 	bl	8000adc <trigger_high>
 		
@@ -488,8 +481,6 @@ uint8_t my_update(uint8_t cmd, uint8_t scmd, uint8_t len, uint8_t *buf)
 
 		trigger_low();
  8000506:	f000 faf0 	bl	8000aea <trigger_low>
-		/* End user-specific code here. *
-		********************************/
 				
 	}
 	simpleserial_put((char)scmd, 1, (uint8_t[]){0x82});	
@@ -509,6 +500,8 @@ uint8_t my_update(uint8_t cmd, uint8_t scmd, uint8_t len, uint8_t *buf)
  8000520:	2000001c 	.word	0x2000001c
 
 08000524 <my_final>:
+/* 0x83 'r' 명령: 직전 AES 결과를 'l'로 지정한 길이만큼 반환한다. 이 함수는 결과를
+ * 새로 계산하지 않으므로 호스트는 먼저 0x82 'c'를 완료해야 한다. */
 uint8_t my_final(uint8_t cmd, uint8_t scmd, uint8_t len, uint8_t *buf)
 {
 
@@ -519,11 +512,6 @@ uint8_t my_final(uint8_t cmd, uint8_t scmd, uint8_t len, uint8_t *buf)
  8000528:	4608      	mov	r0, r1
 	if (scmd == (uint8_t)'r') {
  800052a:	d106      	bne.n	800053a <my_final+0x16>
-		* Start user-specific code here. */
-
-		/* End user-specific code here. *
-		********************************/
-		
 		simpleserial_put((char)scmd, global_len, global_ret);
  800052c:	4b04      	ldr	r3, [pc, #16]	@ (8000540 <my_final+0x1c>)
  800052e:	f893 12df 	ldrb.w	r1, [r3, #735]	@ 0x2df
@@ -553,11 +541,9 @@ int main(void)
  800054a:	f000 fa65 	bl	8000a18 <init_uart>
 	trigger_setup();
  800054e:	f000 faa1 	bl	8000a94 <trigger_setup>
-	putch('l');
-	putch('o');
-	putch('\n');
-	*/
 
+	/* 부팅 문자열을 보내지 않는다. 호스트가 첫 바이트부터 SimpleSerial 프레임으로
+	 * 해석하므로 프로토콜 밖의 디버그 출력은 통신을 어긋나게 할 수 있다. */
 	simpleserial_init();
  8000552:	f000 f935 	bl	80007c0 <simpleserial_init>
 #if SS_VER != SS_VER_2_1

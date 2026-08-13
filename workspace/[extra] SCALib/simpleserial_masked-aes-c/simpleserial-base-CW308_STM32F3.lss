@@ -39,21 +39,21 @@ Idx Name          Size      VMA       LMA       File off  Algn
                   CONTENTS, READONLY, DEBUGGING, OCTETS
  17 .debug_ranges 00000688  00000000  00000000  00026d00  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 18 .debug_line   000088ac  00000000  00000000  00027388  2**0
+ 18 .debug_line   000088a4  00000000  00000000  00027388  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 19 .debug_str    00002d73  00000000  00000000  0002fc34  2**0
+ 19 .debug_str    00002d73  00000000  00000000  0002fc2c  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 20 .debug_frame  000011f0  00000000  00000000  000329a8  2**2
+ 20 .debug_frame  000011f0  00000000  00000000  000329a0  2**2
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 21 .stab         00000144  00000000  00000000  00033b98  2**2
+ 21 .stab         00000144  00000000  00000000  00033b90  2**2
                   CONTENTS, READONLY, DEBUGGING
- 22 .stabstr      0000003d  00000000  00000000  00033cdc  2**0
+ 22 .stabstr      0000003d  00000000  00000000  00033cd4  2**0
                   CONTENTS, READONLY, DEBUGGING
- 23 .debug_loclists 00002d14  00000000  00000000  00033d19  2**0
+ 23 .debug_loclists 00002d14  00000000  00000000  00033d11  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 24 .debug_line_str 000000aa  00000000  00000000  00036a2d  2**0
+ 24 .debug_line_str 000000aa  00000000  00000000  00036a25  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 25 .debug_rnglists 0000026e  00000000  00000000  00036ad7  2**0
+ 25 .debug_rnglists 0000026e  00000000  00000000  00036acf  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
 
 Disassembly of section .text:
@@ -3268,9 +3268,9 @@ void MY_AES_get_last_masks(uint8_t out[10])
  8001f2c:	f000 b8f0 	b.w	8002110 <AES_get_last_masks>
 
 08001f30 <my_init>:
-
 #if SS_VER == SS_VER_2_1
-//SS_VER_2_1 사용이 기본
+/* 0x81 입력 명령: 'k'는 AES 키, 'p'는 평문, 's'는 마스크 난수 시드를 저장한다.
+ * 'l'은 결과 버퍼를 지운 뒤 연산 길이를 저장한다. 반환값 0은 명령 처리 성공을 뜻한다. */
 uint8_t my_init(uint8_t cmd, uint8_t scmd, uint8_t len, uint8_t *buf)
 {
  	if (scmd == (uint8_t)'k') {
@@ -3283,26 +3283,20 @@ uint8_t my_init(uint8_t cmd, uint8_t scmd, uint8_t len, uint8_t *buf)
  	if (scmd == (uint8_t)'k') {
  8001f3a:	d10f      	bne.n	8001f5c <my_init+0x2c>
  8001f3c:	4a24      	ldr	r2, [pc, #144]	@ (8001fd0 <my_init+0xa0>)
-		/**********************************
-		* Start user-specific code here. */
-	
 		for(int i = 0; i<len; i++)
  8001f3e:	2300      	movs	r3, #0
  8001f40:	429c      	cmp	r4, r3
  8001f42:	dc06      	bgt.n	8001f52 <my_init+0x22>
 			global_k[i] = buf[i];
-
-		/* End user-specific code here. *
-		********************************/
 		
 		simpleserial_put(scmd, len, global_k);
  8001f44:	4a22      	ldr	r2, [pc, #136]	@ (8001fd0 <my_init+0xa0>)
  8001f46:	4621      	mov	r1, r4
  8001f48:	206b      	movs	r0, #107	@ 0x6b
-		global_len = buf[0];
+		for(int i = 0; i<MAX_DATA_LEN; i++)
+			global_ret[i] = 0;
 
-		/* End user-specific code here. *
-		********************************/
+		global_len = buf[0];
 		
 		simpleserial_put((char)scmd, 1, &global_len);
  8001f4a:	f000 fab1 	bl	80024b0 <simpleserial_put>
@@ -3396,6 +3390,8 @@ uint8_t my_init(uint8_t cmd, uint8_t scmd, uint8_t len, uint8_t *buf)
  8001fd4:	20000175 	.word	0x20000175
 
 08001fd8 <my_update>:
+/* 0x82 'c' 명령: 트리거가 HIGH인 동안에만 AES 연산을 수행한다. 마스크 회수와 UART
+ * 응답은 트리거가 LOW가 된 뒤 처리하므로 수집된 Trace(트레이스)에 섞이지 않는다. */
 uint8_t my_update(uint8_t cmd, uint8_t scmd, uint8_t len, uint8_t *buf)
 {
 
@@ -3406,8 +3402,6 @@ uint8_t my_update(uint8_t cmd, uint8_t scmd, uint8_t len, uint8_t *buf)
  8001fdc:	460d      	mov	r5, r1
 	if (scmd == (uint8_t)'c') {
  8001fde:	d111      	bne.n	8002004 <my_update+0x2c>
-		/**********************************
-		* Start user-specific code here. */
 		/* 트리거 구간 = AES 연산만. 마스크 회수 UART 는 트리거 밖에서. */
 		trigger_high();
 		
@@ -3425,13 +3419,11 @@ uint8_t my_update(uint8_t cmd, uint8_t scmd, uint8_t len, uint8_t *buf)
 		trigger_low();
  8001ff8:	f000 fbe5 	bl	80027c6 <trigger_low>
 
-		/* 연구용: 방금 연산의 mask[10] 보관. 호스트는 0x83 'm' 으로 읽는다. */
+		/* 연구자 관점 분석을 위해 방금 연산의 마스크 10바이트를 보관한다. 호스트는
+		 * 0x83 'm'으로 읽으며 공격자 관점 분석에는 이 값을 제공하지 않는다. */
 		MY_AES_get_last_masks(global_masks);
  8001ffc:	f504 7038 	add.w	r0, r4, #736	@ 0x2e0
  8002000:	f7ff ff94 	bl	8001f2c <MY_AES_get_last_masks>
-
-		/* End user-specific code here. *
-		********************************/
 				
 	}
 	simpleserial_put((char)scmd, 1, (uint8_t[]){0x82});	
@@ -3452,6 +3444,8 @@ uint8_t my_update(uint8_t cmd, uint8_t scmd, uint8_t len, uint8_t *buf)
  800201c:	20000080 	.word	0x20000080
 
 08002020 <my_final>:
+ * 연구자 관점 진단에만 쓰는 직전 마스크 10바이트를 반환한다. 두 값 모두 0x82 'c'
+ * 완료 뒤에만 유효하며 이 함수는 AES를 다시 실행하지 않는다. */
 uint8_t my_final(uint8_t cmd, uint8_t scmd, uint8_t len, uint8_t *buf)
 {
 
@@ -3462,11 +3456,6 @@ uint8_t my_final(uint8_t cmd, uint8_t scmd, uint8_t len, uint8_t *buf)
  8002024:	4608      	mov	r0, r1
 	if (scmd == (uint8_t)'r') {
  8002026:	d108      	bne.n	800203a <my_final+0x1a>
-		* Start user-specific code here. */
-
-		/* End user-specific code here. *
-		********************************/
-		
 		simpleserial_put((char)scmd, global_len, global_ret);
  8002028:	4b06      	ldr	r3, [pc, #24]	@ (8002044 <my_final+0x24>)
  800202a:	f893 12df 	ldrb.w	r1, [r3, #735]	@ 0x2df
@@ -3475,7 +3464,7 @@ uint8_t my_final(uint8_t cmd, uint8_t scmd, uint8_t len, uint8_t *buf)
 
 	if (scmd == (uint8_t)'m') {
 		/* 마지막 암호화에 쓰인 마스크 10바이트.
-		 * 공격자가 모르는 값이지만 실험실 h5 수집(i_m)용. */
+		 * 공격자가 모르는 값이므로 연구자 관점 HDF5 `mask` 배열 수집에만 쓴다. */
 		simpleserial_put((char)scmd, MASK_LEN, global_masks);
  8002032:	f000 fa3d 	bl	80024b0 <simpleserial_put>
 	}
@@ -3517,11 +3506,9 @@ int main(void)
 	srand(1u);
  800205a:	2001      	movs	r0, #1
  800205c:	f7fe f9f6 	bl	800044c <srand>
-	putch('l');
-	putch('o');
-	putch('\n');
-	*/
 
+	/* 부팅 문자열을 보내지 않는다. 호스트가 첫 바이트부터 SimpleSerial 프레임으로
+	 * 해석하므로 프로토콜 밖의 디버그 출력은 통신을 어긋나게 할 수 있다. */
 	simpleserial_init();
  8002060:	f000 fa14 	bl	800248c <simpleserial_init>
 #if SS_VER != SS_VER_2_1

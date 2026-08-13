@@ -23,7 +23,7 @@
 | 어떤 메타데이터가 있어야 하는가 | ISO/IEC 17825:2024 Annex B·7.3, OPTIMIST Metadata 정의 |
 | 필드 이름·레이아웃·필수 여부 | **이 문서 (프로젝트 정의)** |
 
-`schema_version` 은 이 문서의 판번호다. 현재 **1.1**.
+`schema_version` 은 이 문서의 판번호다. 현재 **1.2**.
 
 > **1.1 은 필드를 더하기만 했다.** 기존 1.0 데이터셋은 그대로 유효하며, 검증기는
 > 파일에 적힌 판번호의 규칙으로 검사한다. 나중에 만든 규칙으로 옛 파일을 소급
@@ -32,6 +32,10 @@
 > 1.1 이 더한 것: 물리 측정이 아닌 채널(`emulated-power`·`debug-trace`), 샘플 축의
 > 정체(`sample_axis`), 샘플 → 명령어 역매핑(`sample_map`), 레코드별 실행시간
 > (`exec_time`), 그리고 ISO/IEC 17825 요건을 **판정할 수 있게 하는** 측정 조건 몇 가지.
+>
+> 1.2가 더한 것: Level 3의 같은 입력 10회 평균을 검증할 수 있도록 실물 전력 Dataset에
+> 평균 전 `trace_repeats`·`exec_time_repeats`와 masked IUT의 실제 `mask_repeats`를
+> 보존한다. 명목 대역폭과 교정 실측값, 공장 션트값과 최대값 검증도 Metadata로 구분한다.
 
 ---
 
@@ -73,7 +77,10 @@ Zarr 도 요건을 만족하지만 산출물이 디렉터리라 배포·이동�
       ├─ plaintext   (n, pb)       ← Attribute      [필수]
       ├─ ciphertext  (n, cb)       ← Attribute      [선택]
       ├─ mask        (n, mb)       ← Attribute      [선택, 대책 난수]
-      └─ exec_time   (n,)          ← Attribute      [1.1, 선택] §4.2
+      ├─ exec_time   (n,)          ← Attribute      [1.1, 선택] §4.2
+      ├─ trace_repeats (n, r, ns)  ← 평균 전 원 파형 [1.2 power 필수]
+      ├─ exec_time_repeats (n, r)  ← 반복별 트리거 길이 [1.2 power 필수]
+      └─ mask_repeats (n, r, 10)   ← 반복별 실제 마스크 [1.2 masked 선택]
 ```
 
 **행 정렬 규칙:** 한 Subset 안의 모든 배열은 **행 수 n 이 같고, i 번째 행이 같은 Execution
@@ -161,7 +168,7 @@ Zarr 도 요건을 만족하지만 산출물이 디렉터리라 배포·이동�
 | **`sample_axis`** | str | `"time"` \| `"instruction"` — 샘플 축이 무엇인가 | **1.1 부터 항상** |
 | `sample_rate_hz` | float | 샘플링 속도 | `sample_axis="time"` 일 때 |
 | `sample_resolution_bits` | int | ADC 유효 분해능 | `sample_axis="time"` 일 때 |
-| `bandwidth_hz` | float | 측정 대역폭 | **1.1: `channel_type="power"` 일 때** |
+| `bandwidth_hz` | float | 측정 또는 명목 대역폭 | **1.1: `channel_type="power"` 일 때** |
 
 선택: `synchronous_sampling`(bool).
 
@@ -266,7 +273,7 @@ Zarr 도 요건을 만족하지만 산출물이 디렉터리라 배포·이동�
 > 생기는 방식이 아니고, 조합이 폭발해 오탐만 만든다. 모델 문자열에 `same` 을 적어 이
 > 규약을 명시한다.
 
-### 3.10 실행시간·전처리·프로브 [1.1, 선택]
+### 3.10 실행시간·전처리·프로브 [1.1, 선택; 1.2 power 조건부 필수]
 
 ISO/IEC 17825 의 요건을 **판정 가능하게** 만드는 값들이다. 없으면 위반이 아니라
 "판정 불가(미기록)" 로 보고된다.
@@ -278,6 +285,11 @@ ISO/IEC 17825 의 요건을 **판정 가능하게** 만드는 값들이다. 없�
 | `preprocessing_average_n` | int | 트레이스 1장에 평균한 실행 횟수 (기본 1) | A.2.5 전처리 |
 | `shunt_ohm` | float | VCC–IUT 사이 저항값 | Annex B.5 |
 | `shunt_selection_note` | str | 그 값을 고른 근거 | Annex B.6 (동작 가능한 최대값) |
+| `bandwidth_basis` | str | 대역폭 출처와 측정/명목 구분 | Annex B 판정 근거 |
+| `bandwidth_is_nominal` | bool | 교정 실측값이 아닌 공식 부품 명목값인가 | 오인 방지 |
+| `shunt_max_verified` | bool | 더 큰 저항과 비교해 동작 가능한 최대값을 확인했는가 | Annex B.6 |
+| `platform`·`adc_mul` | str·int | 실제 펌웨어 플랫폼과 동기 ADC 배수 | 재현 조건 |
+| `firmware_sha256` | str | 실행한 IUT 펌웨어 ELF의 SHA-256 | 빌드 동일성 |
 
 > `exec_time` 배열(§4.2)만 있고 `exec_time_unit` 이 없으면 그 숫자가 무엇의 개수인지
 > 알 수 없다. 단위 없는 물리량 필드는 금지다(§5.1).
@@ -329,6 +341,14 @@ Subset **이름은 자유**지만 `role` 은 이 목록에서 고른다. 프로�
 > 나중에 타이밍 분석을 하려 해도 **사후 산출이 불가능**하다 — 트레이스는 잘려 있고 트리거
 > 구간의 원래 길이는 이미 사라졌기 때문이다. ISO/IEC 17825 A.2.4 는 타이밍 측정 수집을
 > Annex A 에서 유일하게 `shall collect` 로 요구한다.
+
+### 4.3 반복 배열 [1.2, 실물 전력]
+
+`r = preprocessing_average_n`이다. `trace`는 `trace_repeats`의 축 1 평균을 반올림한
+`int16`, `exec_time`은 `exec_time_repeats`의 평균을 반올림한 `uint32`여야 한다. 논리
+레코드는 r회가 모두 성공한 뒤에만 모든 배열에 같은 행으로 추가한다. masked IUT는 각
+반복 뒤 트리거 밖에서 실제 회수한 10바이트를 `mask_repeats`에 저장한다. 검증기는 대표값의
+평균 일치와 형상을 확인하므로 불완전 평균이나 행 어긋남이 분석으로 넘어갈 수 없다.
 
 > 에뮬레이션의 `exec_time` 은 **명령어 수이지 사이클 수가 아니다.** Unicorn 에는 사이클
 > 모델이 없다(확인: `Uc` 에 사이클 카운터 API 없음). 명령어 수가 **다르면** 데이터 의존
@@ -391,35 +411,37 @@ Subset **이름은 자유**지만 `role` 은 이 목록에서 고른다. 프로�
 1. `schema` · `schema_version` 존재, 판번호가 아는 값인가
 2. §3 의 필수 Metadata 존재 — **파일에 적힌 판번호의 규칙으로** 검사한다
 3. `channel_type` 이 허용 목록 안 (§3.3)
-4. 1.1: `sample_axis` 존재·허용 목록 안, 축에 따른 조건부 필수 (§3.4)
+4. 1.1 이상: `sample_axis` 존재·허용 목록 안, 축에 따른 조건부 필수 (§3.4)
 5. 1.1: `sample_axis="instruction"` 이면 §3.9 의 에뮬레이션 필드와 루트 `sample_map` 존재
 6. 1.1: `channel_type="power"` 이면 `bandwidth_hz` 존재
-7. Subset 마다 §4 의 필수 항목 존재, `role` 이 허용 목록 안
-8. `trace` · `key` · `plaintext` 존재
-9. **행 정렬** — 한 subset 안 모든 배열의 행 수 일치, `n_records` 와도 일치
-10. `sample_dtype` · `samples_per_trace` 가 실제 `trace` 와 일치
-11. 정수형 `trace` 인데 `sample_scale` 이 없으면 위반
+7. 1.2 power: 반복 배열·실측/명목 구분 Metadata와 평균 일치
+8. Subset 마다 §4 의 필수 항목 존재, `role` 이 허용 목록 안
+9. `trace` · `key` · `plaintext` 존재
+10. **행 정렬** — 한 subset 안 모든 배열의 행 수 일치, `n_records` 와도 일치
+11. `sample_dtype` · `samples_per_trace` 가 실제 `trace` 와 일치
+12. 정수형 `trace` 인데 `sample_scale` 이 없으면 위반
 
 위반 목록을 돌려주며, 비어 있으면 준수다. **수집 직후와 분석 시작 시** 호출한다.
 
-> **1.0 파일에 1.1 규칙을 적용하지 않는다.** 나중에 만든 규칙으로 옛 파일을 소급
+> **이전 판 파일에 1.2 규칙을 적용하지 않는다.** 나중에 만든 규칙으로 옛 파일을 소급
 > 위반 처리하면, "부분 준수" 가 *데이터가 부실하다* 는 뜻인지 *스키마가 나중에 바뀌었다* 는
 > 뜻인지 구분할 수 없게 된다. 판번호는 그 구분을 위해 있다.
 
 ---
 
-## 7. Dataset 생성 경로와 현재 파일 상태
+## 7. Dataset 생성 경로와 Git 추적 정책
 
-| 경로 | 판번호 | 현재 저장소 상태 | 생성 후 확인할 조건 |
+| 경로 | 판번호 | Git 추적 상태 | 생성 후 확인할 조건 |
 |---|---|---|---|
-| `workspace/[extra] SCALib/traces/scalib_dataset_tiny-AES-c.h5` | 1.0 | 현재 checkout에 없음 | 수집 노트북 완료 후 검증기 통과 |
-| `workspace/[extra] SCALib/traces/scalib_dataset_masked-aes-c.h5` | 1.0 | 현재 checkout에 없음 | `mask` 포함, 수집 노트북 완료 후 검증기 통과 |
+| `workspace/[extra] SCALib/traces/scalib_dataset_tiny-AES-c.h5` | 1.0 | `*.h5` 제외 — clone에 포함되지 않음 | 수집 노트북 완료 후 검증기 통과 |
+| `workspace/[extra] SCALib/traces/scalib_dataset_masked-aes-c.h5` | 1.0 | `*.h5` 제외 — clone에 포함되지 않음 | `mask` 포함, 수집 노트북 완료 후 검증기 통과 |
 | `workspace/traces/20260427_143337_SCA_DB.h5` | 1.0 | 파일 있음, 기존 문서 기준 부분 준수 | §7.1의 미기록 Metadata 유지 |
-| `workspace/[extra] Physical-AI-SCA/traces/*.h5` | 1.1 | 현재 checkout에 없음 | 에뮬레이션이면 `sample_map`·`exec_time` 포함 후 검증기 통과 |
+| `workspace/[extra] Physical-AI-SCA/traces/*.h5` | 1.1 | `*.h5` 제외 — clone에 포함되지 않음 | 에뮬레이션이면 `sample_map`·`exec_time` 포함 후 검증기 통과 |
 
-생성 대상 경로가 있다는 사실과 현재 파일이 존재한다는 사실은 다르다. 커밋되지 않은 대용량
-Dataset이나 노트북의 과거 실행 출력만 보고 현재 파일의 준수를 주장하지 않는다. 실제 파일을
-만든 직후 `workspace/lib/sca_schema.py`의 검증기를 통과한 결과만 현재 상태로 보고한다.
+생성 대상 경로가 있다는 사실과 특정 작업 디렉터리에 파일이 존재한다는 사실은 다르다.
+위 제외 대상은 로컬에 있을 수도 없을 수도 있으므로 정적 문서에서 존재 여부를 고정하지
+않는다. 노트북의 과거 실행 출력만 보고 준수를 주장하지 않으며, 실제 파일을 확인하고
+`workspace/lib/sca_schema.py`의 검증기를 통과한 결과만 현재 상태로 보고한다.
 
 > **1.0 Dataset이 1.1의 새 필드를 갖추지 못한 것은 위반이 아니다.** 그 파일들은 1.0
 > Dataset이고 1.0을 완전히 지킨다. 다만 ISO/IEC 17825 요건을 판정하려면 1.1이 요구하는

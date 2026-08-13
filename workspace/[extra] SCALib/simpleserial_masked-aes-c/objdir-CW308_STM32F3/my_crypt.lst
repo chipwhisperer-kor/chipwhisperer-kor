@@ -159,10 +159,10 @@
  130              		.file 5 "/usr/include/newlib/string.h"
 DEFINED SYMBOLS
                             *ABS*:00000000 my_crypt.c
-     /tmp/cct40lYe.s:19     .text.MY_AES_ECB:00000000 $t
-     /tmp/cct40lYe.s:25     .text.MY_AES_ECB:00000000 MY_AES_ECB
-     /tmp/cct40lYe.s:104    .text.MY_AES_get_last_masks:00000000 $t
-     /tmp/cct40lYe.s:110    .text.MY_AES_get_last_masks:00000000 MY_AES_get_last_masks
+     /tmp/cc8pkH0M.s:19     .text.MY_AES_ECB:00000000 $t
+     /tmp/cc8pkH0M.s:25     .text.MY_AES_ECB:00000000 MY_AES_ECB
+     /tmp/cc8pkH0M.s:104    .text.MY_AES_get_last_masks:00000000 $t
+     /tmp/cc8pkH0M.s:110    .text.MY_AES_get_last_masks:00000000 MY_AES_get_last_masks
 
 UNDEFINED SYMBOLS
 AES_init_ctx

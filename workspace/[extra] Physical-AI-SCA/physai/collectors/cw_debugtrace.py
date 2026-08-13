@@ -23,8 +23,8 @@ CoreSight 의 DWT 비교기에 암호화 함수의 진입·복귀 주소를 걸�
 
 ## 왜 아직 구현하지 않았는가
 
-실장비가 없어 검증할 수 없다. 그리고 **검증하지 않은 스키마를 구현으로 굳히면 나중에
-고치기 어렵다.** 그래서 스키마(§3.5·§6.6)와 이 골격만 만들어 두었다.
+작성 당시에는 실장비가 없어 검증할 수 없었다. 그리고 **검증하지 않은 스키마를 구현으로
+굳히면 나중에 고치기 어렵다.** 그래서 스키마(§3.5·§6.6)와 이 골격만 만들어 두었다.
 
 ## 파일을 나누는 이유
 
@@ -45,7 +45,7 @@ from .. import paths
 if str(paths.SCALIB) not in sys.path:
     sys.path.insert(0, str(paths.SCALIB))
 
-STATUS = "미실행 — 실장비 미구성. 스키마와 골격만 있다."
+STATUS = "미실행 — 수집기 미구현. 스키마와 골격만 있다."
 
 
 def collect(spec, out_path, verbose=True):
@@ -55,7 +55,7 @@ def collect(spec, out_path, verbose=True):
     실행된 적이 없고 항상 구현·검증 절차를 담은 `NotImplementedError`를 발생시킨다.
     """
     raise NotImplementedError(
-        "디버그 트레이스 수집기는 실장비가 필요하고 이번 사이클에서 구현·검증하지 않았다.\n"
+        "디버그 트레이스 수집기는 실장비가 필요하며 아직 구현·검증하지 않았다.\n"
         "  현재 상태: %s\n"
         "  실장비가 준비되면 다음 순서로 만든다:\n"
         "   1) 1.0.TraceWhisperer_main.ipynb 의 SWO 설정 절차를 그대로 따른다\n"

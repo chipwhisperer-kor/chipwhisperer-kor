@@ -166,15 +166,27 @@ def run(dataset_path, spec):
             stages.append({"stage": label, "verdict": "not-applicable",
                            "reason": "해당 규약의 subset 이 없다"})
             continue
-        g = S.load_group(dataset_path, sub["name"],
-                         fields=[S.F_EXEC_TIME, split_field])
+        try:
+            g = S.load_group(dataset_path, sub["name"],
+                             fields=[S.F_EXEC_TIME_REPEATS, split_field])
+            repeats = int(g[S.F_EXEC_TIME_REPEATS].shape[1])
+            exec_time = g[S.F_EXEC_TIME_REPEATS].reshape(-1)
+            split_values = np.repeat(g[split_field][:, 0], repeats)
+        except KeyError:
+            g = S.load_group(dataset_path, sub["name"],
+                             fields=[S.F_EXEC_TIME, split_field])
+            repeats = 1
+            exec_time = g[S.F_EXEC_TIME]
+            split_values = g[split_field][:, 0]
         # 트레이스 수는 **목표치가 아니라 실보유량**으로 센다. spec 의 n 을 믿으면 수집이
         # 중간에 끊긴 데이터셋에서 요건 충족을 거짓으로 보고하게 된다.
-        have = int(g[S.F_EXEC_TIME].shape[0])
+        have = int(exec_time.shape[0])
         if have < need:
             shortfall.append("%s: %d장 (요구 %d장)" % (sub["name"], have, need))
-        r = _stage(g[S.F_EXEC_TIME], g[split_field][:, 0], eps, alpha, label)
+        r = _stage(exec_time, split_values, eps, alpha, label)
         r["subset"] = sub["name"]
+        r["logical_records"] = int(g[split_field].shape[0])
+        r["repeats_per_record"] = repeats
         stages.append(r)
         if r["verdict"] == "fail":
             # §7.3.2 — 1단계가 실패하면 2단계로 가지 않는다.
@@ -186,6 +198,8 @@ def run(dataset_path, spec):
     elif all(v in ("pass", "not-applicable") for v in verdicts) and "pass" in verdicts:
         overall = "pass"
     else:
+        overall = "inconclusive"
+    if shortfall and overall == "pass":
         overall = "inconclusive"
 
     cycle_accurate = unit != "instruction"
@@ -207,6 +221,9 @@ def run(dataset_path, spec):
             "shortfall": shortfall,
         },
     }
+    if shortfall and overall == "inconclusive":
+        out["reason"] = ("실행시간 반복을 펼쳐 분석했지만 요구량이 부족하다: %s. "
+                         "누설 미검출을 pass로 해석하지 않는다." % "; ".join(shortfall))
     if not cycle_accurate:
         out["caveat"] = (
             "실행시간을 **명령어 수**로 쟀다. Unicorn 에는 사이클 모델이 없으므로, "

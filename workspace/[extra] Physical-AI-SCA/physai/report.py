@@ -33,6 +33,8 @@ import numpy as np
 
 from . import conformance, llm, paths, spec as spec_mod
 
+import sca_schema as S  # noqa: E402  # paths가 workspace/lib를 import 경로에 넣는다
+
 # SVG 안의 래스터 요소를 화면에서 읽을 수 있게 하는 렌더링 해상도다. 판정 수치에는
 # 영향을 주지 않으며 보고서 파일 크기가 불필요하게 커지지 않는 수준으로 둔다.
 FIG_DPI = 110
@@ -143,6 +145,8 @@ def write_analysis(spec, results, out_dir, dataset_path):
     figs = _make_figures(spec, results, out_dir, dataset_path)
     rep = conformance.check(dataset_path=dataset_path, spec=spec, results=results,
                             level=spec["criteria"]["security_level"])
+    dataset_attrs = S.root_attrs(dataset_path)
+    channel_type = str(dataset_attrs.get("channel_type", ""))
 
     tests = results["tests"]
     overall = ("fail" if any(t.get("verdict") == "fail" for t in tests.values())
@@ -157,6 +161,37 @@ def write_analysis(spec, results, out_dir, dataset_path):
          "| **종합** | **%s** |" % overall, ""]
 
     L += [conformance.to_markdown(rep), ""]
+
+    if channel_type == "power":
+        recoveries = dataset_attrs.get("recoveries", [])
+        recovery_names = [x.decode() if isinstance(x, bytes) else str(x) for x in recoveries]
+        L += ["## 실물 측정 메타데이터", "",
+              "| 항목 | 실행 기록 |", "|---|---|",
+              "| 플랫폼 | `%s` |" % dataset_attrs.get("platform", "미기록"),
+              "| 타깃 클럭 | `%s Hz` |" % dataset_attrs.get("target_clock_hz", "미기록"),
+              "| ADC | `%s Hz`, `%s-bit`, 타깃 클럭 × `%s` |"
+              % (dataset_attrs.get("sample_rate_hz", "미기록"),
+                 dataset_attrs.get("sample_resolution_bits", "미기록"),
+                 dataset_attrs.get("adc_mul", "미기록")),
+              "| 이득 | `%s dB` |" % dataset_attrs.get("channel_gain_db", "미기록"),
+              "| 파형 길이 | `%s samples` |" % dataset_attrs.get("samples_per_trace", "미기록"),
+              "| 같은 입력 평균 | `%s회` (원 파형 보존) |"
+              % dataset_attrs.get("preprocessing_average_n", "미기록"),
+              "| 대역폭 | `%s Hz`; %s |"
+              % (dataset_attrs.get("bandwidth_hz", "미기록"),
+                 _c(str(dataset_attrs.get("bandwidth_basis", "미기록")))),
+              "| 션트 | `%s Ω`; 최대값 검증=`%s`; %s |"
+              % (dataset_attrs.get("shunt_ohm", "미기록"),
+                 dataset_attrs.get("shunt_max_verified", "미기록"),
+                 _c(str(dataset_attrs.get("shunt_selection_note", "미기록")))),
+              "| IUT 펌웨어 SHA-256 | `%s` |" % dataset_attrs.get("firmware_sha256", "미기록"),
+              "| 자연 발생 복구 | `%d회`: %s |"
+              % (len(recovery_names), ", ".join(recovery_names) or "없음"), "",
+              "> `bandwidth_is_nominal=%s`: 위 대역폭은 현재 실험대에서 교정한 실측값이 "
+              "아니라 공식 부품 구성의 명목값이다. `shunt_max_verified=%s`이므로 공장 "
+              "저항에서 동작했다는 사실을 ‘동작 가능한 최대 저항을 확인했다’로 확대하지 않는다."
+              % (dataset_attrs.get("bandwidth_is_nominal", "미기록"),
+                 dataset_attrs.get("shunt_max_verified", "미기록")), ""]
 
     L += ["## 필수 시험 3종 (§7.3.2 `shall [07.03]`)", ""]
     for k, title in (("ta", "TA — 타이밍 분석 (constant-time 검증)"),
@@ -193,8 +228,11 @@ def write_analysis(spec, results, out_dir, dataset_path):
         if c["bytes_recovered"] == 16:
             L += ["> 배관(입력 주입·정렬·라벨링)이 정상이라는 뜻이다. "
                   "이 대조가 실패하면 데이터가 아니라 도구를 먼저 의심해야 한다.", ""]
+        elif spec["iut"]["name"] == "tiny-AES-c":
+            L += ["> **양성 대조 실패**: 비마스킹 tiny-AES-c에서 16바이트를 복구하지 "
+                  "못했으므로 정상 완료가 아니다. 수집·정렬·라벨 설정을 점검해야 한다.", ""]
         else:
-            L += ["> 마스킹 등으로 키가 복구되지 않는 것은 정상일 수 있다. "
+            L += ["> 마스킹 구현에서 키가 복구되지 않는 것은 정상일 수 있다. "
                   "**이 수치는 판정 근거가 아니다** — 표준은 누설 관측만으로 판정한다(§7.2).", ""]
 
     L += _narrative(results, overall)
@@ -203,9 +241,14 @@ def write_analysis(spec, results, out_dir, dataset_path):
           "| 고리 | 본 도구 | 이번에 봤나 |", "|---|---|---|",
           "| 이론 (마스킹 수식) | 논문·형식 검증 | **아니오** — 범위 밖 |",
           "| 구현 (소스→기계어) | 에뮬레이션 | %s |"
-          % ("예" if "soundness" in tests else "아니오"),
-          "| 물리 (실제 칩) | 실물 전력 수집 | **아니오** — 실장비 미구성 |",
-          "| 실행 흐름 | 디버그 트레이스 | **아니오** — 실장비 미구성 |", "",
+          % ("**예** — 에뮬레이션 Dataset 분석"
+             if channel_type == "emulated-power" else "아니오 — 이 Dataset의 채널이 아님"),
+          "| 물리 (실제 칩) | 전력·EM 관측 | %s |"
+          % ("**예** — `%s` Dataset 분석" % channel_type
+             if channel_type in ("power", "em") else "아니오 — 이 Dataset의 채널이 아님"),
+          "| 실행 흐름 | 디버그 트레이스 | %s |"
+          % ("**예** — 디버그 트레이스 Dataset 분석"
+             if channel_type == "debug-trace" else "아니오 — 이 Dataset의 채널이 아님"), "",
           "> **어느 하나가 깨끗하다는 사실만으로 안전을 주장할 수 없다.** 에뮬레이션의 HW/HD "
           "모델은 글리치·커플링 같은 물리 효과를 담지 않으므로, 여기서 깨끗해도 실물에서 샐 수 "
           "있다. 반대로 실측에서 잡음에 묻힌 누설이 여기서는 보인다. 세 관측은 상보재다.", "",

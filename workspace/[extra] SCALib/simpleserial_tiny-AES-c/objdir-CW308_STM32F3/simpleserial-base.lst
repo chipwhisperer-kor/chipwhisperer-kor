@@ -50,47 +50,50 @@
   24:simpleserial-base.c **** 
   25:simpleserial-base.c **** #include "my_crypt.h"
   26:simpleserial-base.c **** 
-  27:simpleserial-base.c **** // SS_VER_2_1의 최대 패킷 크기는 249 바이트. 패킷에는 데이터 이외에 정보가 
-  28:simpleserial-base.c **** #define MAX_DATA_LEN 245
-  29:simpleserial-base.c **** uint8_t global_k[MAX_DATA_LEN] ={0, };
-  30:simpleserial-base.c **** uint8_t global_p[MAX_DATA_LEN] ={0, };
-  31:simpleserial-base.c **** uint8_t global_ret[MAX_DATA_LEN] = {0,};
-  32:simpleserial-base.c **** uint8_t global_len = 0;
-  33:simpleserial-base.c **** 
-  34:simpleserial-base.c **** 
-  35:simpleserial-base.c **** uint8_t get_key(uint8_t* k, uint8_t len)
-  36:simpleserial-base.c **** {
-  37:simpleserial-base.c **** 	// Load key here
-  38:simpleserial-base.c **** 	return 0x00;
-  39:simpleserial-base.c **** }
-  40:simpleserial-base.c **** 
-  41:simpleserial-base.c **** //SS_VER_1_1는 사용을 고려하지 않음
-  42:simpleserial-base.c **** uint8_t get_pt(uint8_t* pt, uint8_t len)
-  43:simpleserial-base.c **** {
-  44:simpleserial-base.c ****  
-  45:simpleserial-base.c **** 	simpleserial_put('r', 16, pt);
-  46:simpleserial-base.c **** 
-  47:simpleserial-base.c **** 	return 0x00;
-  48:simpleserial-base.c **** }
+  27:simpleserial-base.c **** /* SimpleSerial 2.1의 249바이트 프레임에는 명령 정보도 들어가므로 사용자 데�
+  28:simpleserial-base.c ****  * 245바이트로 제한한다. 아래 전역 버퍼는 0x81 입력, 0x82 연산, 0x83 출력 명�
+  29:simpleserial-base.c ****  * 상태를 보존한다. 호스트는 'l'에 1바이트 길이를 보내며 그 값은 MAX_DATA_L
+  30:simpleserial-base.c ****  * 한다. 이 펌웨어는 잘못된 길이를 별도로 검증하지 않는다. */
+  31:simpleserial-base.c **** #define MAX_DATA_LEN 245
+  32:simpleserial-base.c **** uint8_t global_k[MAX_DATA_LEN] ={0, };
+  33:simpleserial-base.c **** uint8_t global_p[MAX_DATA_LEN] ={0, };
+  34:simpleserial-base.c **** uint8_t global_ret[MAX_DATA_LEN] = {0,};
+  35:simpleserial-base.c **** uint8_t global_len = 0;
+  36:simpleserial-base.c **** 
+  37:simpleserial-base.c **** 
+  38:simpleserial-base.c **** uint8_t get_key(uint8_t* k, uint8_t len)
+  39:simpleserial-base.c **** {
+  40:simpleserial-base.c **** 	return 0x00;
+  41:simpleserial-base.c **** }
+  42:simpleserial-base.c **** 
+  43:simpleserial-base.c **** /* SimpleSerial 1.1 콜백은 빌드 호환성만 유지한다. 수집기의 키·평문·길이 �
+  44:simpleserial-base.c ****  * SimpleSerial 2.1의 my_init()에서만 완전하게 구현된다. */
+  45:simpleserial-base.c **** uint8_t get_pt(uint8_t* pt, uint8_t len)
+  46:simpleserial-base.c **** {
+  47:simpleserial-base.c ****  
+  48:simpleserial-base.c **** 	simpleserial_put('r', 16, pt);
   49:simpleserial-base.c **** 
-  50:simpleserial-base.c **** uint8_t reset(uint8_t* x, uint8_t len)
-  51:simpleserial-base.c **** {
-  52:simpleserial-base.c **** 	// Reset key here if needed
-  53:simpleserial-base.c **** 	return 0x00;
-  54:simpleserial-base.c **** }
-  55:simpleserial-base.c **** 
-  56:simpleserial-base.c **** #if SS_VER == SS_VER_2_1
-  57:simpleserial-base.c **** //SS_VER_2_1 사용이 기본
-  58:simpleserial-base.c **** uint8_t my_init(uint8_t cmd, uint8_t scmd, uint8_t len, uint8_t *buf)
-  59:simpleserial-base.c **** {
-  28              		.loc 1 59 1 view -0
+  50:simpleserial-base.c **** 	return 0x00;
+  51:simpleserial-base.c **** }
+  52:simpleserial-base.c **** 
+  53:simpleserial-base.c **** uint8_t reset(uint8_t* x, uint8_t len)
+  54:simpleserial-base.c **** {
+  55:simpleserial-base.c **** 	return 0x00;
+  56:simpleserial-base.c **** }
+  57:simpleserial-base.c **** 
+  58:simpleserial-base.c **** #if SS_VER == SS_VER_2_1
+  59:simpleserial-base.c **** /* 0x81 입력 명령: 'k'는 AES 키, 'p'는 평문을 저장하고 같은 바이트를 응답한�
+  60:simpleserial-base.c ****  * 결과 버퍼를 지운 뒤 연산 길이를 저장한다. 반환값 0은 명령 처리 성공�
+  61:simpleserial-base.c **** uint8_t my_init(uint8_t cmd, uint8_t scmd, uint8_t len, uint8_t *buf)
+  62:simpleserial-base.c **** {
+  28              		.loc 1 62 1 view -0
   29              		.cfi_startproc
   30              		@ args = 0, pretend = 0, frame = 0
   31              		@ frame_needed = 0, uses_anonymous_args = 0
-  60:simpleserial-base.c ****  	if (scmd == (uint8_t)'k') {
-  32              		.loc 1 60 3 view .LVU1
-  59:simpleserial-base.c ****  	if (scmd == (uint8_t)'k') {
-  33              		.loc 1 59 1 is_stmt 0 view .LVU2
+  63:simpleserial-base.c ****  	if (scmd == (uint8_t)'k') {
+  32              		.loc 1 63 3 view .LVU1
+  62:simpleserial-base.c ****  	if (scmd == (uint8_t)'k') {
+  33              		.loc 1 62 1 is_stmt 0 view .LVU2
   34 0000 70B5     		push	{r4, r5, r6, lr}
   35              	.LCFI0:
   36              		.cfi_def_cfa_offset 16
@@ -98,26 +101,23 @@
   38              		.cfi_offset 5, -12
   39              		.cfi_offset 6, -8
   40              		.cfi_offset 14, -4
-  59:simpleserial-base.c ****  	if (scmd == (uint8_t)'k') {
-  41              		.loc 1 59 1 view .LVU3
+  62:simpleserial-base.c ****  	if (scmd == (uint8_t)'k') {
+  41              		.loc 1 62 1 view .LVU3
   42 0002 0C46     		mov	r4, r1
-  43              		.loc 1 60 6 view .LVU4
+  43              		.loc 1 63 6 view .LVU4
   44 0004 6B2C     		cmp	r4, #107
-  59:simpleserial-base.c ****  	if (scmd == (uint8_t)'k') {
-  45              		.loc 1 59 1 view .LVU5
+  62:simpleserial-base.c ****  	if (scmd == (uint8_t)'k') {
+  45              		.loc 1 62 1 view .LVU5
   46 0006 1146     		mov	r1, r2
   47              	.LVL1:
-  59:simpleserial-base.c ****  	if (scmd == (uint8_t)'k') {
-  48              		.loc 1 59 1 view .LVU6
+  62:simpleserial-base.c ****  	if (scmd == (uint8_t)'k') {
+  48              		.loc 1 62 1 view .LVU6
   49 0008 1D46     		mov	r5, r3
-  50              		.loc 1 60 6 view .LVU7
+  50              		.loc 1 63 6 view .LVU7
   51 000a 0ED1     		bne	.L2
   52 000c 164A     		ldr	r2, .L10
   53              	.LVL2:
   54              	.LBB2:
-  61:simpleserial-base.c **** 		/**********************************
-  62:simpleserial-base.c **** 		* Start user-specific code here. */
-  63:simpleserial-base.c **** 	
   64:simpleserial-base.c **** 		for(int i = 0; i<len; i++)
   55              		.loc 1 64 11 view .LVU8
   56 000e 0023     		movs	r3, #0
@@ -128,70 +128,54 @@
   61 0012 05DC     		bgt	.L4
   62              	.LBE2:
   65:simpleserial-base.c **** 			global_k[i] = buf[i];
-  66:simpleserial-base.c **** 
-  67:simpleserial-base.c **** 		/* End user-specific code here. *
-  68:simpleserial-base.c **** 		********************************/
-  69:simpleserial-base.c **** 		
-  70:simpleserial-base.c **** 		simpleserial_put(scmd, len, global_k);
-  63              		.loc 1 70 3 view .LVU10
+  66:simpleserial-base.c **** 		
+  67:simpleserial-base.c **** 		simpleserial_put(scmd, len, global_k);
+  63              		.loc 1 67 3 view .LVU10
   64 0014 144A     		ldr	r2, .L10
   65 0016 6B20     		movs	r0, #107
   66              	.LVL4:
   67              	.L9:
-  71:simpleserial-base.c **** 	
-  72:simpleserial-base.c **** 	}
-  73:simpleserial-base.c **** 
-  74:simpleserial-base.c **** 	if (scmd == (uint8_t)'p') {
-  75:simpleserial-base.c **** 		/**********************************
-  76:simpleserial-base.c **** 		* Start user-specific code here. */
-  77:simpleserial-base.c **** 	
-  78:simpleserial-base.c **** 		for(int i = 0; i<len; i++)
-  79:simpleserial-base.c **** 			global_p[i] = buf[i];
-  80:simpleserial-base.c **** 
-  81:simpleserial-base.c **** 		/* End user-specific code here. *
-  82:simpleserial-base.c **** 		********************************/
-  83:simpleserial-base.c **** 		
-  84:simpleserial-base.c **** 		simpleserial_put((char)scmd, len, global_p);
-  85:simpleserial-base.c **** 	
-  86:simpleserial-base.c **** 	}	
-  87:simpleserial-base.c **** 
-  88:simpleserial-base.c **** 	if (scmd == (uint8_t)'l') {
-  89:simpleserial-base.c **** 
-  90:simpleserial-base.c **** 		/**********************************
-  91:simpleserial-base.c **** 		* Start user-specific code here. */
-  92:simpleserial-base.c **** 		
-  93:simpleserial-base.c **** 		for(int i = 0; i<MAX_DATA_LEN; i++)
-  94:simpleserial-base.c **** 			global_ret[i] = 0;
-  95:simpleserial-base.c **** 
-  96:simpleserial-base.c **** 		global_len = buf[0];
-  97:simpleserial-base.c **** 
-  98:simpleserial-base.c **** 		/* End user-specific code here. *
-  99:simpleserial-base.c **** 		********************************/
- 100:simpleserial-base.c **** 		
- 101:simpleserial-base.c **** 		simpleserial_put((char)scmd, 1, &global_len);
-  68              		.loc 1 101 3 is_stmt 0 view .LVU11
+  68:simpleserial-base.c **** 	
+  69:simpleserial-base.c **** 	}
+  70:simpleserial-base.c **** 
+  71:simpleserial-base.c **** 	if (scmd == (uint8_t)'p') {
+  72:simpleserial-base.c **** 		for(int i = 0; i<len; i++)
+  73:simpleserial-base.c **** 			global_p[i] = buf[i];
+  74:simpleserial-base.c **** 		
+  75:simpleserial-base.c **** 		simpleserial_put((char)scmd, len, global_p);
+  76:simpleserial-base.c **** 	
+  77:simpleserial-base.c **** 	}	
+  78:simpleserial-base.c **** 
+  79:simpleserial-base.c **** 	if (scmd == (uint8_t)'l') {
+  80:simpleserial-base.c **** 		for(int i = 0; i<MAX_DATA_LEN; i++)
+  81:simpleserial-base.c **** 			global_ret[i] = 0;
+  82:simpleserial-base.c **** 
+  83:simpleserial-base.c **** 		global_len = buf[0];
+  84:simpleserial-base.c **** 		
+  85:simpleserial-base.c **** 		simpleserial_put((char)scmd, 1, &global_len);
+  68              		.loc 1 85 3 is_stmt 0 view .LVU11
   69 0018 FFF7FEFF 		bl	simpleserial_put
   70              	.LVL5:
   71              	.L5:
- 102:simpleserial-base.c **** 		
- 103:simpleserial-base.c **** 	}
- 104:simpleserial-base.c **** 
- 105:simpleserial-base.c **** 	return 0x00;
-  72              		.loc 1 105 2 is_stmt 1 view .LVU12
- 106:simpleserial-base.c **** 
- 107:simpleserial-base.c **** }
-  73              		.loc 1 107 1 is_stmt 0 view .LVU13
+  86:simpleserial-base.c **** 		
+  87:simpleserial-base.c **** 	}
+  88:simpleserial-base.c **** 
+  89:simpleserial-base.c **** 	return 0x00;
+  72              		.loc 1 89 2 is_stmt 1 view .LVU12
+  90:simpleserial-base.c **** 
+  91:simpleserial-base.c **** }
+  73              		.loc 1 91 1 is_stmt 0 view .LVU13
   74 001c 0020     		movs	r0, #0
   75 001e 70BD     		pop	{r4, r5, r6, pc}
   76              	.LVL6:
   77              	.L4:
   78              	.LBB3:
-  65:simpleserial-base.c **** 
+  65:simpleserial-base.c **** 		
   79              		.loc 1 65 4 is_stmt 1 discriminator 3 view .LVU14
-  65:simpleserial-base.c **** 
+  65:simpleserial-base.c **** 		
   80              		.loc 1 65 21 is_stmt 0 discriminator 3 view .LVU15
   81 0020 E85C     		ldrb	r0, [r5, r3]	@ zero_extendqisi2
-  65:simpleserial-base.c **** 
+  65:simpleserial-base.c **** 		
   82              		.loc 1 65 16 discriminator 3 view .LVU16
   83 0022 02F8010B 		strb	r0, [r2], #1
   64:simpleserial-base.c **** 			global_k[i] = buf[i];
@@ -206,86 +190,86 @@
   64:simpleserial-base.c **** 			global_k[i] = buf[i];
   91              		.loc 1 64 26 discriminator 3 view .LVU19
   92              	.LBE3:
-  74:simpleserial-base.c **** 		/**********************************
-  93              		.loc 1 74 2 is_stmt 1 view .LVU20
-  74:simpleserial-base.c **** 		/**********************************
-  94              		.loc 1 74 5 is_stmt 0 view .LVU21
+  71:simpleserial-base.c **** 		for(int i = 0; i<len; i++)
+  93              		.loc 1 71 2 is_stmt 1 view .LVU20
+  71:simpleserial-base.c **** 		for(int i = 0; i<len; i++)
+  94              		.loc 1 71 5 is_stmt 0 view .LVU21
   95 002a 702C     		cmp	r4, #112
   96 002c 0BD1     		bne	.L6
   97 002e 0F4A     		ldr	r2, .L10+4
   98              	.LVL9:
   99              	.LBB4:
-  78:simpleserial-base.c **** 			global_p[i] = buf[i];
- 100              		.loc 1 78 11 view .LVU22
+  72:simpleserial-base.c **** 			global_p[i] = buf[i];
+ 100              		.loc 1 72 11 view .LVU22
  101 0030 0023     		movs	r3, #0
  102              	.LVL10:
  103              	.L7:
-  78:simpleserial-base.c **** 			global_p[i] = buf[i];
- 104              		.loc 1 78 19 is_stmt 1 discriminator 1 view .LVU23
+  72:simpleserial-base.c **** 			global_p[i] = buf[i];
+ 104              		.loc 1 72 19 is_stmt 1 discriminator 1 view .LVU23
  105 0032 9942     		cmp	r1, r3
  106 0034 02DC     		bgt	.L8
  107              	.LBE4:
-  84:simpleserial-base.c **** 	
- 108              		.loc 1 84 3 view .LVU24
+  75:simpleserial-base.c **** 	
+ 108              		.loc 1 75 3 view .LVU24
  109 0036 0D4A     		ldr	r2, .L10+4
  110 0038 7020     		movs	r0, #112
  111 003a EDE7     		b	.L9
  112              	.L8:
  113              	.LBB5:
-  79:simpleserial-base.c **** 
- 114              		.loc 1 79 4 discriminator 3 view .LVU25
-  79:simpleserial-base.c **** 
- 115              		.loc 1 79 21 is_stmt 0 discriminator 3 view .LVU26
+  73:simpleserial-base.c **** 		
+ 114              		.loc 1 73 4 discriminator 3 view .LVU25
+  73:simpleserial-base.c **** 		
+ 115              		.loc 1 73 21 is_stmt 0 discriminator 3 view .LVU26
  116 003c E85C     		ldrb	r0, [r5, r3]	@ zero_extendqisi2
-  79:simpleserial-base.c **** 
- 117              		.loc 1 79 16 discriminator 3 view .LVU27
+  73:simpleserial-base.c **** 		
+ 117              		.loc 1 73 16 discriminator 3 view .LVU27
  118 003e 02F8010B 		strb	r0, [r2], #1
-  78:simpleserial-base.c **** 			global_p[i] = buf[i];
- 119              		.loc 1 78 26 is_stmt 1 discriminator 3 view .LVU28
+  72:simpleserial-base.c **** 			global_p[i] = buf[i];
+ 119              		.loc 1 72 26 is_stmt 1 discriminator 3 view .LVU28
  120 0042 0133     		adds	r3, r3, #1
  121              	.LVL11:
-  78:simpleserial-base.c **** 			global_p[i] = buf[i];
- 122              		.loc 1 78 26 is_stmt 0 discriminator 3 view .LVU29
+  72:simpleserial-base.c **** 			global_p[i] = buf[i];
+ 122              		.loc 1 72 26 is_stmt 0 discriminator 3 view .LVU29
  123 0044 F5E7     		b	.L7
  124              	.LVL12:
  125              	.L6:
-  78:simpleserial-base.c **** 			global_p[i] = buf[i];
- 126              		.loc 1 78 26 discriminator 3 view .LVU30
+  72:simpleserial-base.c **** 			global_p[i] = buf[i];
+ 126              		.loc 1 72 26 discriminator 3 view .LVU30
  127              	.LBE5:
-  88:simpleserial-base.c **** 
- 128              		.loc 1 88 2 is_stmt 1 view .LVU31
-  88:simpleserial-base.c **** 
- 129              		.loc 1 88 5 is_stmt 0 view .LVU32
+  79:simpleserial-base.c **** 		for(int i = 0; i<MAX_DATA_LEN; i++)
+ 128              		.loc 1 79 2 is_stmt 1 view .LVU31
+  79:simpleserial-base.c **** 		for(int i = 0; i<MAX_DATA_LEN; i++)
+ 129              		.loc 1 79 5 is_stmt 0 view .LVU32
  130 0046 6C2C     		cmp	r4, #108
  131 0048 E8D1     		bne	.L5
  132              	.LBB6:
-  94:simpleserial-base.c **** 
- 133              		.loc 1 94 18 view .LVU33
+  81:simpleserial-base.c **** 
+ 133              		.loc 1 81 18 view .LVU33
  134 004a 074E     		ldr	r6, .L10
  135 004c F522     		movs	r2, #245
  136              	.LVL13:
-  94:simpleserial-base.c **** 
- 137              		.loc 1 94 18 view .LVU34
+  81:simpleserial-base.c **** 
+ 137              		.loc 1 81 18 view .LVU34
  138 004e 0021     		movs	r1, #0
  139 0050 06F5F570 		add	r0, r6, #490
  140              	.LVL14:
-  94:simpleserial-base.c **** 
- 141              		.loc 1 94 18 view .LVU35
+  81:simpleserial-base.c **** 
+ 141              		.loc 1 81 18 view .LVU35
  142 0054 FFF7FEFF 		bl	memset
  143              	.LVL15:
-  94:simpleserial-base.c **** 
- 144              		.loc 1 94 18 view .LVU36
+  81:simpleserial-base.c **** 
+ 144              		.loc 1 81 18 view .LVU36
  145              	.LBE6:
-  96:simpleserial-base.c **** 
- 146              		.loc 1 96 3 is_stmt 1 view .LVU37
-  96:simpleserial-base.c **** 
- 147              		.loc 1 96 19 is_stmt 0 view .LVU38
+  83:simpleserial-base.c **** 		
+ 146              		.loc 1 83 3 is_stmt 1 view .LVU37
+  83:simpleserial-base.c **** 		
+ 147              		.loc 1 83 19 is_stmt 0 view .LVU38
  148 0058 2B78     		ldrb	r3, [r5]	@ zero_extendqisi2
-  96:simpleserial-base.c **** 
- 149              		.loc 1 96 14 view .LVU39
+  83:simpleserial-base.c **** 		
+ 149              		.loc 1 83 14 view .LVU39
  150 005a 86F8DF32 		strb	r3, [r6, #735]
- 101:simpleserial-base.c **** 		
- 151              		.loc 1 101 3 is_stmt 1 view .LVU40
+  85:simpleserial-base.c **** 		
+ 151              		.loc 1 85 3 is_stmt 1 view .LVU40
  152 005e 06F2DF22 		addw	r2, r6, #735
  153 0062 0121     		movs	r1, #1
  154 0064 2046     		mov	r0, r4
@@ -306,74 +290,71 @@
  171              	my_update:
  172              	.LVL16:
  173              	.LFB4:
- 108:simpleserial-base.c **** uint8_t my_update(uint8_t cmd, uint8_t scmd, uint8_t len, uint8_t *buf)
- 109:simpleserial-base.c **** {
- 174              		.loc 1 109 1 view -0
+  92:simpleserial-base.c **** /* 0x82 'c' 명령: 트리거가 HIGH인 동안에만 AES 연산을 수행한다. 따라서 수집�
+  93:simpleserial-base.c ****  * Trace(트레이스)는 UART 응답을 포함하지 않는다. 연산 뒤에는 완료 바이트 
+  94:simpleserial-base.c **** uint8_t my_update(uint8_t cmd, uint8_t scmd, uint8_t len, uint8_t *buf)
+  95:simpleserial-base.c **** {
+ 174              		.loc 1 95 1 view -0
  175              		.cfi_startproc
  176              		@ args = 0, pretend = 0, frame = 8
  177              		@ frame_needed = 0, uses_anonymous_args = 0
- 110:simpleserial-base.c **** 
- 111:simpleserial-base.c **** 	if (scmd == (uint8_t)'c') {
- 178              		.loc 1 111 2 view .LVU42
- 179              		.loc 1 111 5 is_stmt 0 view .LVU43
+  96:simpleserial-base.c **** 
+  97:simpleserial-base.c **** 	if (scmd == (uint8_t)'c') {
+ 178              		.loc 1 97 2 view .LVU42
+ 179              		.loc 1 97 5 is_stmt 0 view .LVU43
  180 0000 6329     		cmp	r1, #99
- 109:simpleserial-base.c **** 
- 181              		.loc 1 109 1 view .LVU44
+  95:simpleserial-base.c **** 
+ 181              		.loc 1 95 1 view .LVU44
  182 0002 13B5     		push	{r0, r1, r4, lr}
  183              	.LCFI1:
  184              		.cfi_def_cfa_offset 16
  185              		.cfi_offset 4, -8
  186              		.cfi_offset 14, -4
- 109:simpleserial-base.c **** 
- 187              		.loc 1 109 1 view .LVU45
+  95:simpleserial-base.c **** 
+ 187              		.loc 1 95 1 view .LVU45
  188 0004 0C46     		mov	r4, r1
- 189              		.loc 1 111 5 view .LVU46
+ 189              		.loc 1 97 5 view .LVU46
  190 0006 0CD1     		bne	.L13
- 112:simpleserial-base.c **** 
- 113:simpleserial-base.c **** 		/**********************************
- 114:simpleserial-base.c **** 		* Start user-specific code here. */
- 115:simpleserial-base.c **** 		trigger_high();
- 191              		.loc 1 115 3 is_stmt 1 view .LVU47
+  98:simpleserial-base.c **** 		trigger_high();
+ 191              		.loc 1 98 3 is_stmt 1 view .LVU47
  192 0008 FFF7FEFF 		bl	trigger_high
  193              	.LVL17:
- 116:simpleserial-base.c **** 		
- 117:simpleserial-base.c **** 		MY_AES_ECB(global_ret, global_k, global_p, global_len);
- 194              		.loc 1 117 3 view .LVU48
+  99:simpleserial-base.c **** 		
+ 100:simpleserial-base.c **** 		MY_AES_ECB(global_ret, global_k, global_p, global_len);
+ 194              		.loc 1 100 3 view .LVU48
  195 000c 0A49     		ldr	r1, .L14
  196 000e 91F8DF32 		ldrb	r3, [r1, #735]	@ zero_extendqisi2
  197 0012 01F1F502 		add	r2, r1, #245
  198 0016 01F5F570 		add	r0, r1, #490
  199 001a FFF7FEFF 		bl	MY_AES_ECB
  200              	.LVL18:
- 118:simpleserial-base.c **** 
- 119:simpleserial-base.c **** 		trigger_low();
- 201              		.loc 1 119 3 view .LVU49
+ 101:simpleserial-base.c **** 
+ 102:simpleserial-base.c **** 		trigger_low();
+ 201              		.loc 1 102 3 view .LVU49
  202 001e FFF7FEFF 		bl	trigger_low
  203              	.LVL19:
  204              	.L13:
- 120:simpleserial-base.c **** 		/* End user-specific code here. *
- 121:simpleserial-base.c **** 		********************************/
- 122:simpleserial-base.c **** 				
- 123:simpleserial-base.c **** 	}
- 124:simpleserial-base.c **** 	simpleserial_put((char)scmd, 1, (uint8_t[]){0x82});	
- 205              		.loc 1 124 2 view .LVU50
- 206              		.loc 1 124 45 is_stmt 0 view .LVU51
+ 103:simpleserial-base.c **** 				
+ 104:simpleserial-base.c **** 	}
+ 105:simpleserial-base.c **** 	simpleserial_put((char)scmd, 1, (uint8_t[]){0x82});	
+ 205              		.loc 1 105 2 view .LVU50
+ 206              		.loc 1 105 45 is_stmt 0 view .LVU51
  207 0022 8223     		movs	r3, #130
- 208              		.loc 1 124 2 view .LVU52
+ 208              		.loc 1 105 2 view .LVU52
  209 0024 2046     		mov	r0, r4
  210 0026 01AA     		add	r2, sp, #4
  211 0028 0121     		movs	r1, #1
- 212              		.loc 1 124 45 view .LVU53
+ 212              		.loc 1 105 45 view .LVU53
  213 002a 8DF80430 		strb	r3, [sp, #4]
- 214              		.loc 1 124 2 view .LVU54
+ 214              		.loc 1 105 2 view .LVU54
  215 002e FFF7FEFF 		bl	simpleserial_put
  216              	.LVL20:
- 125:simpleserial-base.c **** 
- 126:simpleserial-base.c **** 	return 0x00;
- 217              		.loc 1 126 2 is_stmt 1 view .LVU55
- 127:simpleserial-base.c **** 
- 128:simpleserial-base.c **** }
- 218              		.loc 1 128 1 is_stmt 0 view .LVU56
+ 106:simpleserial-base.c **** 
+ 107:simpleserial-base.c **** 	return 0x00;
+ 217              		.loc 1 107 2 is_stmt 1 view .LVU55
+ 108:simpleserial-base.c **** 
+ 109:simpleserial-base.c **** }
+ 218              		.loc 1 109 1 is_stmt 0 view .LVU56
  219 0032 0020     		movs	r0, #0
  220 0034 02B0     		add	sp, sp, #8
  221              	.LCFI2:
@@ -395,69 +376,64 @@
  239              	my_final:
  240              	.LVL21:
  241              	.LFB5:
- 129:simpleserial-base.c **** uint8_t my_final(uint8_t cmd, uint8_t scmd, uint8_t len, uint8_t *buf)
- 130:simpleserial-base.c **** {
- 242              		.loc 1 130 1 is_stmt 1 view -0
+ 110:simpleserial-base.c **** /* 0x83 'r' 명령: 직전 AES 결과를 'l'로 지정한 길이만큼 반환한다. 이 함수는 
+ 111:simpleserial-base.c ****  * 새로 계산하지 않으므로 호스트는 먼저 0x82 'c'를 완료해야 한다. */
+ 112:simpleserial-base.c **** uint8_t my_final(uint8_t cmd, uint8_t scmd, uint8_t len, uint8_t *buf)
+ 113:simpleserial-base.c **** {
+ 242              		.loc 1 113 1 is_stmt 1 view -0
  243              		.cfi_startproc
  244              		@ args = 0, pretend = 0, frame = 0
  245              		@ frame_needed = 0, uses_anonymous_args = 0
- 131:simpleserial-base.c **** 
- 132:simpleserial-base.c **** 	if (scmd == (uint8_t)'r') {
- 246              		.loc 1 132 2 view .LVU58
- 247              		.loc 1 132 5 is_stmt 0 view .LVU59
+ 114:simpleserial-base.c **** 
+ 115:simpleserial-base.c **** 	if (scmd == (uint8_t)'r') {
+ 246              		.loc 1 115 2 view .LVU58
+ 247              		.loc 1 115 5 is_stmt 0 view .LVU59
  248 0000 7229     		cmp	r1, #114
- 130:simpleserial-base.c **** 
- 249              		.loc 1 130 1 view .LVU60
+ 113:simpleserial-base.c **** 
+ 249              		.loc 1 113 1 view .LVU60
  250 0002 08B5     		push	{r3, lr}
  251              	.LCFI3:
  252              		.cfi_def_cfa_offset 8
  253              		.cfi_offset 3, -8
  254              		.cfi_offset 14, -4
- 130:simpleserial-base.c **** 
- 255              		.loc 1 130 1 view .LVU61
+ 113:simpleserial-base.c **** 
+ 255              		.loc 1 113 1 view .LVU61
  256 0004 0846     		mov	r0, r1
  257              	.LVL22:
- 258              		.loc 1 132 5 view .LVU62
+ 258              		.loc 1 115 5 view .LVU62
  259 0006 06D1     		bne	.L17
  260              	.LBB9:
  261              	.LBI9:
- 129:simpleserial-base.c **** uint8_t my_final(uint8_t cmd, uint8_t scmd, uint8_t len, uint8_t *buf)
- 262              		.loc 1 129 9 is_stmt 1 view .LVU63
+ 112:simpleserial-base.c **** {
+ 262              		.loc 1 112 9 is_stmt 1 view .LVU63
  263              	.LVL23:
  264              	.LBB10:
- 133:simpleserial-base.c **** 
- 134:simpleserial-base.c **** 		/**********************************
- 135:simpleserial-base.c **** 		* Start user-specific code here. */
- 136:simpleserial-base.c **** 
- 137:simpleserial-base.c **** 		/* End user-specific code here. *
- 138:simpleserial-base.c **** 		********************************/
- 139:simpleserial-base.c **** 		
- 140:simpleserial-base.c **** 		simpleserial_put((char)scmd, global_len, global_ret);
- 265              		.loc 1 140 3 view .LVU64
+ 116:simpleserial-base.c **** 		simpleserial_put((char)scmd, global_len, global_ret);
+ 265              		.loc 1 116 3 view .LVU64
  266 0008 044B     		ldr	r3, .L18
  267              	.LVL24:
- 268              		.loc 1 140 3 is_stmt 0 view .LVU65
+ 268              		.loc 1 116 3 is_stmt 0 view .LVU65
  269 000a 93F8DF12 		ldrb	r1, [r3, #735]	@ zero_extendqisi2
  270              	.LVL25:
- 271              		.loc 1 140 3 view .LVU66
+ 271              		.loc 1 116 3 view .LVU66
  272 000e 03F5F572 		add	r2, r3, #490
  273              	.LVL26:
- 274              		.loc 1 140 3 view .LVU67
+ 274              		.loc 1 116 3 view .LVU67
  275 0012 FFF7FEFF 		bl	simpleserial_put
  276              	.LVL27:
  277              	.L17:
- 278              		.loc 1 140 3 view .LVU68
+ 278              		.loc 1 116 3 view .LVU68
  279              	.LBE10:
  280              	.LBE9:
- 141:simpleserial-base.c **** 		
- 142:simpleserial-base.c **** 	}
- 143:simpleserial-base.c **** 	
- 144:simpleserial-base.c **** 
- 145:simpleserial-base.c **** 	return 0x00;
- 281              		.loc 1 145 2 is_stmt 1 view .LVU69
- 146:simpleserial-base.c **** 
- 147:simpleserial-base.c **** }
- 282              		.loc 1 147 1 is_stmt 0 view .LVU70
+ 117:simpleserial-base.c **** 		
+ 118:simpleserial-base.c **** 	}
+ 119:simpleserial-base.c **** 	
+ 120:simpleserial-base.c **** 
+ 121:simpleserial-base.c **** 	return 0x00;
+ 281              		.loc 1 121 2 is_stmt 1 view .LVU69
+ 122:simpleserial-base.c **** 
+ 123:simpleserial-base.c **** }
+ 282              		.loc 1 123 1 is_stmt 0 view .LVU70
  283 0016 0020     		movs	r0, #0
  284 0018 08BD     		pop	{r3, pc}
  285              	.L19:
@@ -475,20 +451,20 @@
  299              	get_key:
  300              	.LVL28:
  301              	.LFB0:
-  36:simpleserial-base.c **** 	// Load key here
- 302              		.loc 1 36 1 is_stmt 1 view -0
+  39:simpleserial-base.c **** 	return 0x00;
+ 302              		.loc 1 39 1 is_stmt 1 view -0
  303              		.cfi_startproc
  304              		@ args = 0, pretend = 0, frame = 0
  305              		@ frame_needed = 0, uses_anonymous_args = 0
  306              		@ link register save eliminated.
-  38:simpleserial-base.c **** }
- 307              		.loc 1 38 2 view .LVU72
-  39:simpleserial-base.c **** 
- 308              		.loc 1 39 1 is_stmt 0 view .LVU73
+  40:simpleserial-base.c **** }
+ 307              		.loc 1 40 2 view .LVU72
+  41:simpleserial-base.c **** 
+ 308              		.loc 1 41 1 is_stmt 0 view .LVU73
  309 0000 0020     		movs	r0, #0
  310              	.LVL29:
-  39:simpleserial-base.c **** 
- 311              		.loc 1 39 1 view .LVU74
+  41:simpleserial-base.c **** 
+ 311              		.loc 1 41 1 view .LVU74
  312 0002 7047     		bx	lr
  313              		.cfi_endproc
  314              	.LFE0:
@@ -501,39 +477,39 @@
  323              	get_pt:
  324              	.LVL30:
  325              	.LFB1:
-  43:simpleserial-base.c ****  
- 326              		.loc 1 43 1 is_stmt 1 view -0
+  46:simpleserial-base.c ****  
+ 326              		.loc 1 46 1 is_stmt 1 view -0
  327              		.cfi_startproc
  328              		@ args = 0, pretend = 0, frame = 0
  329              		@ frame_needed = 0, uses_anonymous_args = 0
-  45:simpleserial-base.c **** 
- 330              		.loc 1 45 2 view .LVU76
-  43:simpleserial-base.c ****  
- 331              		.loc 1 43 1 is_stmt 0 view .LVU77
+  48:simpleserial-base.c **** 
+ 330              		.loc 1 48 2 view .LVU76
+  46:simpleserial-base.c ****  
+ 331              		.loc 1 46 1 is_stmt 0 view .LVU77
  332 0000 08B5     		push	{r3, lr}
  333              	.LCFI4:
  334              		.cfi_def_cfa_offset 8
  335              		.cfi_offset 3, -8
  336              		.cfi_offset 14, -4
-  43:simpleserial-base.c ****  
- 337              		.loc 1 43 1 view .LVU78
+  46:simpleserial-base.c ****  
+ 337              		.loc 1 46 1 view .LVU78
  338 0002 0246     		mov	r2, r0
-  45:simpleserial-base.c **** 
- 339              		.loc 1 45 2 view .LVU79
+  48:simpleserial-base.c **** 
+ 339              		.loc 1 48 2 view .LVU79
  340 0004 1021     		movs	r1, #16
  341              	.LVL31:
-  45:simpleserial-base.c **** 
- 342              		.loc 1 45 2 view .LVU80
+  48:simpleserial-base.c **** 
+ 342              		.loc 1 48 2 view .LVU80
  343 0006 7220     		movs	r0, #114
  344              	.LVL32:
-  45:simpleserial-base.c **** 
- 345              		.loc 1 45 2 view .LVU81
+  48:simpleserial-base.c **** 
+ 345              		.loc 1 48 2 view .LVU81
  346 0008 FFF7FEFF 		bl	simpleserial_put
  347              	.LVL33:
-  47:simpleserial-base.c **** }
- 348              		.loc 1 47 2 is_stmt 1 view .LVU82
-  48:simpleserial-base.c **** 
- 349              		.loc 1 48 1 is_stmt 0 view .LVU83
+  50:simpleserial-base.c **** }
+ 348              		.loc 1 50 2 is_stmt 1 view .LVU82
+  51:simpleserial-base.c **** 
+ 349              		.loc 1 51 1 is_stmt 0 view .LVU83
  350 000c 0020     		movs	r0, #0
  351 000e 08BD     		pop	{r3, pc}
  352              		.cfi_endproc
@@ -547,8 +523,8 @@
  362              	reset:
  363              	.LFB9:
  364              		.cfi_startproc
-  50:simpleserial-base.c **** {
- 365              		.loc 1 50 9 is_stmt 1 view -0
+  53:simpleserial-base.c **** {
+ 365              		.loc 1 53 9 is_stmt 1 view -0
  366              		@ args = 0, pretend = 0, frame = 0
  367              		@ frame_needed = 0, uses_anonymous_args = 0
  368              		@ link register save eliminated.
@@ -564,87 +540,79 @@
  379              		.thumb_func
  381              	main:
  382              	.LFB6:
- 148:simpleserial-base.c **** #endif
- 149:simpleserial-base.c **** 
- 150:simpleserial-base.c **** 
- 151:simpleserial-base.c **** int main(void)
- 152:simpleserial-base.c **** {
- 383              		.loc 1 152 1 view -0
+ 124:simpleserial-base.c **** #endif
+ 125:simpleserial-base.c **** 
+ 126:simpleserial-base.c **** 
+ 127:simpleserial-base.c **** int main(void)
+ 128:simpleserial-base.c **** {
+ 383              		.loc 1 128 1 view -0
  384              		.cfi_startproc
  385              		@ Volatile: function does not return.
  386              		@ args = 0, pretend = 0, frame = 0
  387              		@ frame_needed = 0, uses_anonymous_args = 0
- 153:simpleserial-base.c ****     platform_init();
- 388              		.loc 1 153 5 view .LVU86
- 152:simpleserial-base.c ****     platform_init();
- 389              		.loc 1 152 1 is_stmt 0 view .LVU87
+ 129:simpleserial-base.c ****     platform_init();
+ 388              		.loc 1 129 5 view .LVU86
+ 128:simpleserial-base.c ****     platform_init();
+ 389              		.loc 1 128 1 is_stmt 0 view .LVU87
  390 0000 08B5     		push	{r3, lr}
  391              	.LCFI5:
  392              		.cfi_def_cfa_offset 8
  393              		.cfi_offset 3, -8
  394              		.cfi_offset 14, -4
- 395              		.loc 1 153 5 view .LVU88
+ 395              		.loc 1 129 5 view .LVU88
  396 0002 FFF7FEFF 		bl	platform_init
  397              	.LVL34:
- 154:simpleserial-base.c **** 	init_uart();
- 398              		.loc 1 154 2 is_stmt 1 view .LVU89
+ 130:simpleserial-base.c **** 	init_uart();
+ 398              		.loc 1 130 2 is_stmt 1 view .LVU89
  399 0006 FFF7FEFF 		bl	init_uart
  400              	.LVL35:
- 155:simpleserial-base.c **** 	trigger_setup();
- 401              		.loc 1 155 2 view .LVU90
+ 131:simpleserial-base.c **** 	trigger_setup();
+ 401              		.loc 1 131 2 view .LVU90
  402 000a FFF7FEFF 		bl	trigger_setup
  403              	.LVL36:
- 156:simpleserial-base.c **** 
- 157:simpleserial-base.c ****  	/* Uncomment this to get a HELLO message for debug */
- 158:simpleserial-base.c **** 	/*
- 159:simpleserial-base.c **** 	putch('h');
- 160:simpleserial-base.c **** 	putch('e');
- 161:simpleserial-base.c **** 	putch('l');
- 162:simpleserial-base.c **** 	putch('l');
- 163:simpleserial-base.c **** 	putch('o');
- 164:simpleserial-base.c **** 	putch('\n');
- 165:simpleserial-base.c **** 	*/
- 166:simpleserial-base.c **** 
- 167:simpleserial-base.c **** 	simpleserial_init();
- 404              		.loc 1 167 2 view .LVU91
+ 132:simpleserial-base.c **** 
+ 133:simpleserial-base.c **** 	/* 부팅 문자열을 보내지 않는다. 호스트가 첫 바이트부터 SimpleSerial 프레�
+ 134:simpleserial-base.c **** 	 * 해석하므로 프로토콜 밖의 디버그 출력은 통신을 어긋나게 할 수 있다. 
+ 135:simpleserial-base.c **** 	simpleserial_init();
+ 404              		.loc 1 135 2 view .LVU91
  405 000e FFF7FEFF 		bl	simpleserial_init
  406              	.LVL37:
- 168:simpleserial-base.c **** #if SS_VER != SS_VER_2_1
- 169:simpleserial-base.c **** 	simpleserial_addcmd('p', MAX_DATA_LEN, get_pt);
- 170:simpleserial-base.c **** 	simpleserial_addcmd('k', MAX_DATA_LEN, get_key);
- 171:simpleserial-base.c **** 	simpleserial_addcmd('x', 0, reset);
- 172:simpleserial-base.c **** #else
- 173:simpleserial-base.c **** 	simpleserial_addcmd(0x81, MAX_DATA_LEN, my_init);
- 407              		.loc 1 173 2 view .LVU92
+ 136:simpleserial-base.c **** #if SS_VER != SS_VER_2_1
+ 137:simpleserial-base.c **** 	simpleserial_addcmd('p', MAX_DATA_LEN, get_pt);
+ 138:simpleserial-base.c **** 	simpleserial_addcmd('k', MAX_DATA_LEN, get_key);
+ 139:simpleserial-base.c **** 	simpleserial_addcmd('x', 0, reset);
+ 140:simpleserial-base.c **** #else
+ 141:simpleserial-base.c **** 	simpleserial_addcmd(0x81, MAX_DATA_LEN, my_init);
+ 407              		.loc 1 141 2 view .LVU92
  408 0012 094A     		ldr	r2, .L25
  409 0014 F521     		movs	r1, #245
  410 0016 8120     		movs	r0, #129
  411 0018 FFF7FEFF 		bl	simpleserial_addcmd
  412              	.LVL38:
- 174:simpleserial-base.c ****     simpleserial_addcmd(0x82, MAX_DATA_LEN, my_update);
- 413              		.loc 1 174 5 view .LVU93
+ 142:simpleserial-base.c ****     simpleserial_addcmd(0x82, MAX_DATA_LEN, my_update);
+ 413              		.loc 1 142 5 view .LVU93
  414 001c 074A     		ldr	r2, .L25+4
  415 001e F521     		movs	r1, #245
  416 0020 8220     		movs	r0, #130
  417 0022 FFF7FEFF 		bl	simpleserial_addcmd
  418              	.LVL39:
- 175:simpleserial-base.c **** 	simpleserial_addcmd(0x83, MAX_DATA_LEN, my_final);
- 419              		.loc 1 175 2 view .LVU94
+ 143:simpleserial-base.c **** 	simpleserial_addcmd(0x83, MAX_DATA_LEN, my_final);
+ 419              		.loc 1 143 2 view .LVU94
  420 0026 064A     		ldr	r2, .L25+8
  421 0028 F521     		movs	r1, #245
  422 002a 8320     		movs	r0, #131
  423 002c FFF7FEFF 		bl	simpleserial_addcmd
  424              	.LVL40:
  425              	.L24:
- 176:simpleserial-base.c **** #endif
- 177:simpleserial-base.c **** 	while(1)
- 426              		.loc 1 177 2 discriminator 1 view .LVU95
- 178:simpleserial-base.c **** 		simpleserial_get();
- 427              		.loc 1 178 3 discriminator 1 view .LVU96
+ 144:simpleserial-base.c **** #endif
+ 145:simpleserial-base.c **** 	while(1)
+ 426              		.loc 1 145 2 discriminator 1 view .LVU95
+ 146:simpleserial-base.c **** 		simpleserial_get();
+ 427              		.loc 1 146 3 discriminator 1 view .LVU96
  428 0030 FFF7FEFF 		bl	simpleserial_get
  429              	.LVL41:
- 177:simpleserial-base.c **** 		simpleserial_get();
- 430              		.loc 1 177 7 discriminator 1 view .LVU97
+ 145:simpleserial-base.c **** 		simpleserial_get();
+ 430              		.loc 1 145 7 discriminator 1 view .LVU97
  431 0034 FCE7     		b	.L24
  432              	.L26:
  433 0036 00BF     		.align	2
@@ -690,29 +658,29 @@
  470              		.file 7 "<built-in>"
 DEFINED SYMBOLS
                             *ABS*:00000000 simpleserial-base.c
-     /tmp/ccgDTtzR.s:19     .text.my_init:00000000 $t
-     /tmp/ccgDTtzR.s:25     .text.my_init:00000000 my_init
-     /tmp/ccgDTtzR.s:159    .text.my_init:00000068 $d
-     /tmp/ccgDTtzR.s:165    .text.my_update:00000000 $t
-     /tmp/ccgDTtzR.s:171    .text.my_update:00000000 my_update
-     /tmp/ccgDTtzR.s:228    .text.my_update:00000038 $d
-     /tmp/ccgDTtzR.s:233    .text.my_final:00000000 $t
-     /tmp/ccgDTtzR.s:239    .text.my_final:00000000 my_final
-     /tmp/ccgDTtzR.s:288    .text.my_final:0000001c $d
-     /tmp/ccgDTtzR.s:293    .text.get_key:00000000 $t
-     /tmp/ccgDTtzR.s:299    .text.get_key:00000000 get_key
-     /tmp/ccgDTtzR.s:317    .text.get_pt:00000000 $t
-     /tmp/ccgDTtzR.s:323    .text.get_pt:00000000 get_pt
-     /tmp/ccgDTtzR.s:356    .text.reset:00000000 $t
-     /tmp/ccgDTtzR.s:362    .text.reset:00000000 reset
-     /tmp/ccgDTtzR.s:375    .text.startup.main:00000000 $t
-     /tmp/ccgDTtzR.s:381    .text.startup.main:00000000 main
-     /tmp/ccgDTtzR.s:435    .text.startup.main:00000038 $d
-     /tmp/ccgDTtzR.s:461    .bss:000002df global_len
-     /tmp/ccgDTtzR.s:457    .bss:000001ea global_ret
-     /tmp/ccgDTtzR.s:453    .bss:000000f5 global_p
-     /tmp/ccgDTtzR.s:449    .bss:00000000 global_k
-     /tmp/ccgDTtzR.s:450    .bss:00000000 $d
+     /tmp/cch31m7s.s:19     .text.my_init:00000000 $t
+     /tmp/cch31m7s.s:25     .text.my_init:00000000 my_init
+     /tmp/cch31m7s.s:159    .text.my_init:00000068 $d
+     /tmp/cch31m7s.s:165    .text.my_update:00000000 $t
+     /tmp/cch31m7s.s:171    .text.my_update:00000000 my_update
+     /tmp/cch31m7s.s:228    .text.my_update:00000038 $d
+     /tmp/cch31m7s.s:233    .text.my_final:00000000 $t
+     /tmp/cch31m7s.s:239    .text.my_final:00000000 my_final
+     /tmp/cch31m7s.s:288    .text.my_final:0000001c $d
+     /tmp/cch31m7s.s:293    .text.get_key:00000000 $t
+     /tmp/cch31m7s.s:299    .text.get_key:00000000 get_key
+     /tmp/cch31m7s.s:317    .text.get_pt:00000000 $t
+     /tmp/cch31m7s.s:323    .text.get_pt:00000000 get_pt
+     /tmp/cch31m7s.s:356    .text.reset:00000000 $t
+     /tmp/cch31m7s.s:362    .text.reset:00000000 reset
+     /tmp/cch31m7s.s:375    .text.startup.main:00000000 $t
+     /tmp/cch31m7s.s:381    .text.startup.main:00000000 main
+     /tmp/cch31m7s.s:435    .text.startup.main:00000038 $d
+     /tmp/cch31m7s.s:461    .bss:000002df global_len
+     /tmp/cch31m7s.s:457    .bss:000001ea global_ret
+     /tmp/cch31m7s.s:453    .bss:000000f5 global_p
+     /tmp/cch31m7s.s:449    .bss:00000000 global_k
+     /tmp/cch31m7s.s:450    .bss:00000000 $d
 
 UNDEFINED SYMBOLS
 simpleserial_put

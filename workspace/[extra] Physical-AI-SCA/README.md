@@ -21,8 +21,8 @@ AI 가 사람 개입 최소로 **실험 설계 → 수집 → 분석 → 보고*
 | 고리 | 깨지는 방식 | 도구 | 이 프로젝트 |
 |---|---|---|---|
 | 이론 (마스킹 수식) | 증명의 가정이 실제와 안 맞음 | 논문·형식 검증 | **범위 밖** |
-| 구현 (소스 → 기계어) | 전이 누설, share 재사용, 컴파일러가 만든 스필 | **에뮬레이션** | 과거 데모 출력 있음, 현재 증거 번들 없음 |
-| 물리 (실제 칩) | 글리치·커플링·파이프라인 | **실물 전력 수집** | 골격만 — **미실행** |
+| 구현 (소스 → 기계어) | 전이 누설, share 재사용, 컴파일러가 만든 스필 | **에뮬레이션** | 데모 출력만 Git 추적, 생성 증거 번들은 Git 제외 |
+| 물리 (실제 칩) | 글리치·커플링·파이프라인 | **실물 전력 수집** | `0.1.Demo_without_TraceWhisperer.ipynb`에서 두 IUT 실행·검증 |
 | 실행 흐름 | 데이터 의존 분기·타이밍 | **디버그 트레이스** | 골격만 — **미실행** |
 
 **에뮬레이션에서 깨끗해도 실물에서 샐 수 있다** — HW/HD 모델은 물리 효과를 담지 않는다.
@@ -230,12 +230,12 @@ trace = [ hw_reg | hd_reg | hw_mem | hd_mem ]
 | 한계 | 영향 |
 |---|---|
 | **Unicorn 에 사이클 모델이 없다** | 에뮬 TA 는 명령어 수 기준이다. 수가 **다르면** 데이터 의존 제어흐름의 확정 소견이지만, **같아도** constant-time 을 증명하지 못한다 |
-| **실물 수집기 2종 미실행** | `cw_power.py`·`cw_debugtrace.py` 는 한 번도 실행된 적이 없다. 각 파일 머리말에 명시 |
+| **디버그 트레이스 미실행** | `cw_debugtrace.py`는 준비된 하드웨어가 없어 실행하지 않았다. 실물 전력 `cw_power.py`와 혼동하지 않는다 |
 | **A.2.5 전처리 미적용** | Level 3 은 같은 입력 10회 평균을 `shall` 로 요구한다. `preprocessing_average_n=1` 이며 대조표에 그대로 나온다 |
 | **SPA 판정 불가** | 육안 검사가 사람의 행위이고, 잡음 바닥이 0인 결정적 채널에서는 "키가 다르면 트레이스도 다르다"가 거의 항상 참이라 그것만으로 fail을 내면 판별력이 없다. **언제나 `inconclusive`**를 내고 관측값(`statistical_verdict`)으로 사람이 판정한다 |
 | **STM32F303 캐시 유무 미확인** | §8.2 면제의 전제인데 저장소 안에 근거 문서가 없다. 대조표에 `미기록` 으로 나온다 |
 | **EM 채널 없음** | 근접 자기장 프로브 미보유. Annex E 는 오히려 EM 을 선호한다고 적는다 |
-| **현재 DPA 판정 근거 없음** | 저장소에 현재 결과 파일이 없다. 제공된 데모 명세의 수집량도 Formula (1)의 N보다 작으므로, 그 규모로 실행하면 DPA는 `inconclusive`가 된다. |
+| **Git 추적 파일만으로 DPA 판정 불가** | 결과·Dataset은 Git에서 제외된다. 로컬 번들이 있어도 `verify`를 통과해야 현재 근거로 쓸 수 있다. 제공된 데모 명세의 수집량은 Formula (1)의 N보다 작으므로 그 규모의 DPA는 `inconclusive`다. |
 
 ---
 
@@ -249,11 +249,12 @@ trace = [ hw_reg | hd_reg | hw_mem | hd_mem ]
 physai/
   paths.py         저장소 경로 해결 (workspace/lib 를 sys.path 에 넣는다)
   spec.py          실험 명세 로드·검증, Formula (1)·보정 임계 계산
-  collect.py       CLI: spec → HDF5 생성 → SCHEMA 1.1 검증(위반 시 실패)
+  collect.py       CLI: spec → HDF5 생성/resume → SCHEMA 1.2 검증(위반 시 실패)
   collectors/
-    emulation.py   ★ 에뮬레이션 수집기 (과거 데모 출력 있음, 현재 증거 번들 없음)
-    cw_power.py    실물 전력 (미실행)
+    emulation.py   ★ 에뮬레이션 수집기 (데모 출력 추적, 생성 증거 번들은 Git 제외)
+    cw_power.py    실물 전력 10회 반복·평균·resume·단계별 자연 복구
     cw_debugtrace.py  디버그 트레이스 (미실행)
+  demo.py          네 Dataset 교차 검증·Grok 구조화 감사 경계
   analyze.py       CLI: TA→SPA→DPA 순서 수행 → results.json
   tests/{ta,spa,dpa}.py   필수 시험 3종
   soundness.py     구현 층 1차 누설 검출 + 명령어 지목

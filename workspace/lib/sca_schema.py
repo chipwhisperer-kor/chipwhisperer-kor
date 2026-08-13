@@ -13,10 +13,10 @@
 읽지만 수정하지 않으며, 파일 생성과 수집은 각 수집기의 책임이다.
 
 판번호
-    현재 문서 판번호는 SCHEMA_VERSION = "1.1" 이다.
-    **1.0 파일은 1.0 규칙으로, 1.1 파일은 1.1 규칙으로 검사한다.** 1.1 은 필드를
-    더하기만 했으므로 기존 1.0 데이터셋은 그대로 유효하다 — 나중에 만든 규칙으로
-    옛 파일을 소급 위반 처리하면 "부분 준수"의 뜻이 무너진다.
+    현재 문서 판번호는 SCHEMA_VERSION = "1.2" 이다.
+    파일에 기록된 판번호의 규칙으로 검사한다. 1.2는 같은 입력의 원 파형과 실행시간을
+    보존하는 반복 배열을 실물 전력 채널에 추가한다. 이전 판 파일에 새 규칙을 소급하지
+    않는다 — 나중에 만든 규칙으로 옛 파일을 위반 처리하면 판번호의 의미가 무너진다.
 """
 
 from pathlib import Path
@@ -26,8 +26,8 @@ import numpy as np
 
 # ── 스키마 식별 ────────────────────────────────────────────
 SCHEMA = "sca-hdf5"
-SCHEMA_VERSION = "1.1"
-KNOWN_VERSIONS = ("1.0", "1.1")
+SCHEMA_VERSION = "1.2"
+KNOWN_VERSIONS = ("1.0", "1.1", "1.2")
 
 # ── Attributes(OPTIMIST) = HDF5 배열 이름 ──────────────────
 # GLOSSARY.md §6.1 의 용어 충돌에 주의한다: OPTIMIST 의 Attributes 는 HDF5 배열로,
@@ -39,6 +39,9 @@ F_CIPHERTEXT = "ciphertext"
 F_MASK = "mask"
 F_EXEC_TIME = "exec_time"          # 1.1 신설 — 레코드별 실행시간 (타이밍 분석 입력)
 F_SAMPLE_MAP = "sample_map"        # 1.1 신설 — 루트 배열 (샘플 → 명령어 역매핑)
+F_TRACE_REPEATS = "trace_repeats"  # 1.2 신설 — 평균 전 원 파형 (n, r, ns)
+F_EXEC_TIME_REPEATS = "exec_time_repeats"  # 1.2 신설 — 반복별 트리거 길이 (n, r)
+F_MASK_REPEATS = "mask_repeats"    # 1.2 신설 — masked 반복별 실제 회수 마스크
 
 # ── 루트 Metadata(메타데이터) (SCHEMA.md §3) ────────────────────────
 # 1.0 의 필수 목록. 1.1 도 이 항목을 그대로 요구한다.
@@ -73,6 +76,14 @@ REQUIRED_METADATA_EMULATED = (
 # 전력 채널의 측정 장비 요건 판정에 필요한 값 (ISO/IEC 17825 Annex B).
 # 1.1 에서 선택 → 필수로 올렸다. 없으면 대역폭 요건을 **판정할 수 없다**.
 REQUIRED_METADATA_POWER_1_1 = ("bandwidth_hz",)
+
+# 1.2 실물 전력 수집 계약. 명목값은 측정값과 구분할 수 있도록 근거와 값의 성격을
+# 함께 기록한다.
+REQUIRED_METADATA_POWER_1_2 = REQUIRED_METADATA_POWER_1_1 + (
+    "bandwidth_basis", "bandwidth_is_nominal",
+    "shunt_ohm", "shunt_selection_note", "shunt_max_verified",
+    "preprocessing_average_n", "platform", "adc_mul", "firmware_sha256",
+)
 
 # ── Subset metadata(서브셋 메타데이터) (SCHEMA.md §4) ─────────────────
 REQUIRED_SUBSET_METADATA = ("role", "n_records", "key_mode", "pt_mode")
@@ -133,7 +144,7 @@ def validate_dataset(path=None):
         if not subsets:
             bad.append("subset 그룹이 하나도 없다")
         for name in subsets:
-            bad += _check_subset(h5, name, a)
+            bad += _check_subset(h5, name, a, ver)
     return bad
 
 
@@ -157,7 +168,7 @@ def _check_root_metadata(a, ver):
     if ver == "1.0":
         return bad
 
-    # ── 아래는 1.1 전용 분기 ──────────────────────────────
+    # ── 아래는 1.1 이상 공통 분기 ─────────────────────────
     axis = str(a.get("sample_axis", ""))
     if axis and axis not in SAMPLE_AXES:
         bad.append("sample_axis 가 허용 목록 밖: %r (허용 %s)" % (axis, list(SAMPLE_AXES)))
@@ -180,7 +191,9 @@ def _check_root_metadata(a, ver):
                        "에뮬레이션 트레이스의 축은 명령어여야 한다" % axis)
 
     if str(ch) == "power":
-        for key in REQUIRED_METADATA_POWER_1_1:
+        power_required = (REQUIRED_METADATA_POWER_1_2
+                          if ver == "1.2" else REQUIRED_METADATA_POWER_1_1)
+        for key in power_required:
             if key not in a:
                 bad.append("루트 attrs 누락 (channel_type=power): %s "
                            "— 없으면 ISO/IEC 17825 Annex B 대역폭 요건을 판정할 수 없다" % key)
@@ -219,7 +232,7 @@ def _check_sample_map(h5, a, ver):
     return bad
 
 
-def _check_subset(h5, name, a):
+def _check_subset(h5, name, a, ver):
     """한 Subset의 배열·HDF5 attrs·행 정렬 위반을 문자열 목록으로 반환한다.
 
     ``name``이 가리키는 그룹의 필수 배열, 역할, Record 수, Trace 형상·dtype을 루트
@@ -263,7 +276,51 @@ def _check_subset(h5, name, a):
     if F_EXEC_TIME in g and g[F_EXEC_TIME].ndim != 1:
         bad.append("/%s %s 는 (n,) 이어야 한다. 현재 %s"
                    % (name, F_EXEC_TIME, g[F_EXEC_TIME].shape))
+
+    if ver == "1.2" and str(a.get("channel_type", "")) == "power":
+        repeats = int(a.get("preprocessing_average_n", 0))
+        for field in (F_TRACE_REPEATS, F_EXEC_TIME_REPEATS):
+            if field not in g:
+                bad.append("/%s 필수 배열 누락 (schema 1.2 power): %s" % (name, field))
+        if F_TRACE_REPEATS in g:
+            shape = g[F_TRACE_REPEATS].shape
+            expected = (g[F_TRACE].shape[0], repeats, g[F_TRACE].shape[1])
+            if shape != expected:
+                bad.append("/%s %s 형상 %s != %s" % (name, F_TRACE_REPEATS, shape, expected))
+            elif not _mean_matches(g[F_TRACE_REPEATS], g[F_TRACE]):
+                bad.append("/%s trace가 trace_repeats의 반올림 평균과 일치하지 않는다" % name)
+        if F_EXEC_TIME_REPEATS in g:
+            shape = g[F_EXEC_TIME_REPEATS].shape
+            expected = (g[F_TRACE].shape[0], repeats)
+            if shape != expected:
+                bad.append("/%s %s 형상 %s != %s"
+                           % (name, F_EXEC_TIME_REPEATS, shape, expected))
+            elif F_EXEC_TIME not in g:
+                bad.append("/%s 필수 배열 누락 (schema 1.2 power): %s" % (name, F_EXEC_TIME))
+            elif not _mean_matches(g[F_EXEC_TIME_REPEATS], g[F_EXEC_TIME]):
+                bad.append("/%s exec_time이 exec_time_repeats의 반올림 평균과 일치하지 않는다"
+                           % name)
+        if F_MASK_REPEATS in g:
+            shape = g[F_MASK_REPEATS].shape
+            expected = (g[F_TRACE].shape[0], repeats, 10)
+            if shape != expected:
+                bad.append("/%s %s 형상 %s != %s" % (name, F_MASK_REPEATS, shape, expected))
     return bad
+
+
+def _mean_matches(repeat_dset, mean_dset, batch=32):
+    """반복 배열의 행별 반올림 평균이 대표 배열과 같은지 제한된 메모리로 검사한다.
+
+    실물 파형은 한 Subset만으로도 수 GB가 될 수 있으므로 전체 반복 배열을 한 번에 읽지
+    않는다. 불일치가 하나라도 있으면 즉시 ``False``를 반환하며 파일은 변경하지 않는다.
+    """
+    for beg in range(0, repeat_dset.shape[0], batch):
+        end = min(repeat_dset.shape[0], beg + batch)
+        expected = np.rint(np.asarray(repeat_dset[beg:end], dtype=np.float64).mean(axis=1))
+        expected = expected.astype(mean_dset.dtype)
+        if not np.array_equal(expected, mean_dset[beg:end]):
+            return False
+    return True
 
 
 def require_schema(path):

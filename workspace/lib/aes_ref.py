@@ -7,7 +7,7 @@
 여기 있는 것은 **하드웨어와 무관한 순수 계산**뿐이다. 장비 제어는 각 프로젝트에 있다.
 
 쓰는 곳
-    workspace/[extra] SCALib/scalib_common.py        (재노출 → 분석 노트북 12개)
+    workspace/[extra] SCALib/scalib_common.py        (재노출 → SCALib 노트북 12개)
     workspace/[extra] SCALib/dataset_collect_lib.py  (수집 중 골든 검증)
     workspace/[extra] Physical-AI-SCA/physai/        (에뮬 수집·누설 검정)
 """

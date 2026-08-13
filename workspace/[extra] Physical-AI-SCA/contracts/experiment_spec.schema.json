@@ -59,6 +59,42 @@
       "additionalProperties": false,
       "properties": {
         "kind": { "enum": ["emulation", "cw_power", "cw_debugtrace"] },
+        "platform": {
+          "type": "string",
+          "description": "실물 펌웨어 빌드·플래시에 쓰는 ChipWhisperer PLATFORM. 실행 시 실제 값도 Dataset에 기록한다."
+        },
+        "adc_mul": {
+          "type": "integer", "minimum": 1,
+          "description": "Husky ADC 주파수의 타깃 클럭 배수. 실제 ADC Hz는 장비에서 다시 읽어 기록한다."
+        },
+        "gain_db": {
+          "type": "number",
+          "description": "Husky 이득 설정(dB). 설정 뒤 장비에서 읽은 실제 값이 Dataset의 정본이다."
+        },
+        "bandwidth_hz": {
+          "type": "number", "exclusiveMinimum": 0,
+          "description": "전력 관측 경로 대역폭. 실측값인지 명목값인지 bandwidth_basis로 구분한다."
+        },
+        "bandwidth_basis": {
+          "type": "string", "minLength": 1,
+          "description": "대역폭 값의 출처와 성격. 부품 명목값을 교정 실측값처럼 서술하지 않는다."
+        },
+        "bandwidth_is_nominal": {
+          "type": "boolean",
+          "description": "true이면 현재 실험대 교정값이 아니라 공식 부품 구성의 명목값이다."
+        },
+        "shunt_ohm": {
+          "type": "number", "exclusiveMinimum": 0,
+          "description": "CW308 보드에 실장된 션트 저항값."
+        },
+        "shunt_selection_note": {
+          "type": "string", "minLength": 1,
+          "description": "저항값의 출처와 선택 한계. 공장값과 동작 가능한 최대값 검증을 구분한다."
+        },
+        "shunt_max_verified": {
+          "type": "boolean",
+          "description": "더 큰 저항과 비교해 동작 가능한 최대값임을 검증했는가."
+        },
         "components": {
           "type": "array",
           "items": { "enum": ["hw_reg", "hd_reg", "hw_mem", "hd_mem"] },

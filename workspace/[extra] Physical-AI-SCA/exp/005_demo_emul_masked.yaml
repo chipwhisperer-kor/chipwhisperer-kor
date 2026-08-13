@@ -1,0 +1,63 @@
+id: "005_demo_emul_masked"
+title: "통합 데모 에뮬레이션 — masked-aes-c soundness"
+rationale: >
+  실제 masked-aes-c 기계어의 명령어별 HW·HD 종속성을 검사하고 sample_map으로 결함 후보를
+  주소에 연결한다. 실물 전력 실험 007과 입력은 공유하지만, 물리 파형에 명령어 주소를
+  임의 대응시키지 않는다.
+scope:
+  standard: "ISO/IEC 17825:2024"
+  assessment_type: "pre-assessment"
+  clauses_applied: ["7", "8"]
+  security_function: "AES-128-ECB"
+  csp_classes: ["cryptographic key"]
+  channels: ["emulated-power"]
+  target_level: 3
+  not_claimed:
+    - "ISO/IEC 19790 적합성 — 모듈 경계·CSP 정의가 환경 밖이다"
+    - "독립 시험소 평가 — 벤더와 시험자가 동일하다"
+    - "물리 측정 — 누설 모델 출력이며 글리치·커플링을 포함하지 않는다"
+    - "고차 DPA 저항성 — 1차 부울 마스킹의 2차 분석은 범위 밖이다"
+    - "EM 및 cw_debugtrace 관측 — 이 실험의 채널이 아니다"
+    - "cycle-accurate 타이밍 — Unicorn에는 사이클 모델이 없다"
+    - "SPA 육안 판정 — 사람의 검토가 필요하다"
+    - "KeyExpansion 보호 — 이 구현은 CipherMasked만 보호한다"
+iut:
+  name: "masked-aes-c"
+  countermeasure: "1st-order Boolean masking (CipherMasked only; KeyExpansion unprotected)"
+collector:
+  kind: "emulation"
+  components: ["hw_reg", "hd_reg", "hw_mem", "hd_mem"]
+  window:
+    from_symbol: "AES_init_ctx"
+    to_symbol: "AES_ECB_encrypt"
+    semantics: "비보호 KeyExpansion 진입부터 CipherMasked를 포함한 AES_ECB_encrypt 복귀까지; 실물 MY_AES_ECB 트리거와 같은 코드 구간"
+subsets:
+  - {name: ta_rk_fp,    role: timing,                    n: 1000, key_mode: random, pt_mode: fixed}
+  - {name: ta_fk_rp,    role: timing,                    n: 1000, key_mode: fixed,  pt_mode: random}
+  - {name: spa_same,    role: simple-analysis,           n: 4,    key_mode: fixed,  pt_mode: fixed,  spa_pair_kind: same-data}
+  - {name: spa_diffkey, role: simple-analysis,           n: 4,    key_mode: random, pt_mode: fixed,  spa_pair_kind: different-data-fixed}
+  - {name: spa_diffpt,  role: simple-analysis,           n: 4,    key_mode: fixed,  pt_mode: random, spa_pair_kind: different-data-random}
+  - {name: tvla_fk,     role: leakage-detection-fixed,   n: 64,   key_mode: fixed,  pt_mode: fixed}
+  - {name: tvla_rk,     role: leakage-detection-random,  n: 64,   key_mode: fixed,  pt_mode: random}
+  - {name: profiling,   role: profiling,                 n: 300,  key_mode: random, pt_mode: random}
+  - {name: attack,      role: attack,                    n: 128,  key_mode: fixed,  pt_mode: random}
+criteria:
+  security_level: 3
+  effect_size_d: 0.04
+  alpha: 1.0e-5
+  beta: 0.05
+  multiplicity_correction: "bonferroni"
+  t_threshold: 4.5
+  max_acquisition_hours: 6
+  sensitive_leakage_time:
+    from: "CipherMasked"
+    to: "end"
+    include_round1: true
+    rationale: "보호 대상인 CipherMasked부터 복귀까지를 민감 경계로 삼아 비보호 KeyExpansion 검출과 분리한다. 첫 라운드 S-box는 실무 공격 표적이므로 포함한다."
+  preprocessing: {average_n: 1, alignment: "none"}
+  vendor_info:
+    algorithms: "AES-128 ECB (masked-aes-c)"
+    design: "CipherMasked에 1차 부울 마스킹을 적용하며 KeyExpansion은 비보호; -Os Cortex-M4 빌드"
+    susceptible_conditions: "share를 같은 저장소에 연속 기록할 때 HW/HD 전이 누설이 재결합할 수 있다"
+analyses: ["ta", "spa", "dpa", "soundness", "cpa"]
+seed: 1234

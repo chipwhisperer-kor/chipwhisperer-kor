@@ -135,8 +135,8 @@
  108              		.file 5 "/usr/include/newlib/string.h"
 DEFINED SYMBOLS
                             *ABS*:00000000 my_crypt.c
-     /tmp/ccBLWrXz.s:19     .text.MY_AES_ECB:00000000 $t
-     /tmp/ccBLWrXz.s:25     .text.MY_AES_ECB:00000000 MY_AES_ECB
+     /tmp/ccTkltbi.s:19     .text.MY_AES_ECB:00000000 $t
+     /tmp/ccTkltbi.s:25     .text.MY_AES_ECB:00000000 MY_AES_ECB
 
 UNDEFINED SYMBOLS
 AES_init_ctx
