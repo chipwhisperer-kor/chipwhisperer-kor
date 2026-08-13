@@ -1,7 +1,6 @@
 bioinfo.markitdown-vscode
 davidanson.vscode-markdownlint
 hediet.vscode-drawio
-marp-team.marp-vscode
 moshfeu.compare-folders
 ms-azuretools.vscode-containers
 ms-azuretools.vscode-docker

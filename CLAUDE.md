@@ -114,7 +114,6 @@ Dataset 수집에서는 16처럼 셀마다 다시 정한다. 둘은 같은 정�
 
 `[extra]` 접두사가 붙은 디렉터리는 공식 튜토리얼 경로와 무관한 연구·부속 프로젝트다. 각각 자기완결적으로 작성되어 있으므로 손대기 전에 그 프로젝트의 README를 먼저 읽고, 경로는 **그 프로젝트 루트 기준 상대경로**로 유지한다(여러 프로젝트가 호스트 절대경로를 명시적으로 금지한다).
 
-- **`[extra] Paper-Deep-Dive/`** — **자체 `CLAUDE.md`·`AGENTS.md`·`PROMPT.md`가 있고, 그 디렉터리 안에서는 이 파일보다 우선한다.** 역할별 단독 쓰기 소유가 엄격한 4역할 문서 파이프라인이며, Claude는 `director` 역할에 바인딩되어 `Papers/**`, `.Intermediate_Artifacts/papers/**`, `Presentation_Marp/**`에 쓰면 안 된다. 사본이 여러 개 존재하고 낡은 사본도 안에서 보면 구별되지 않으므로 `.Intermediate_Artifacts/SYNC.md`를 제일 먼저 확인한다.
 - **`[extra] PRE-SCA/`** — ARM 펌웨어(tiny-AES)를 Unicorn/Capstone으로 에뮬레이션하는 pre-silicon SCA/FI 실험. 하드웨어가 필요 없다(`[extra] Physical-AI-SCA`의 에뮬 경로도 그렇다). 그 프로젝트가 이 트리의 **`elfParser.ElfParser`를 재사용**한다 — ELF 파싱 정의는 여기 한 곳이다. 다만 `logger.py`/`emul.py`는 쓰지 않는다. 전역 로거가 실행마다 CSV를 쓰고 에뮬레이션 훅이 명령어마다 입력 CSV를 다시 읽는 구조라, 오류주입 디버깅에는 맞지만 수천 Record 수집에는 I/O 비용이 지나치게 크기 때문이다. `[naive] PRE-SCA/`는 스크립트 버전으로 `python3 main.py`(또는 N회 반복 `./run_main.sh <N>`)로 실행하며, 설정은 전부 `config.py`에 있다. `config.py`의 snake_case 변수명은 `elfParser`·`emul`·`logger`가 이름으로 참조하므로 바꾸면 안 된다. 노트북 결과는 `nb_output/`에 쌓인다.
 - **`[extra] SCALib/`** — SCALib 0.6.4의 기능을 **기능 하나당 노트북 하나**로 보이되, **Normal AES(`tiny-AES-c`) ∥ Masked AES(`masked-aes-c`) 이중 타겟**을 단계마다 나란히 비교하는 예제 모음(SNR·Quantizer·Ttest·MTtest·CPA·LDA·MultiLDA·RLDA·SASCA·KeyRank). **하드웨어가 필요한 노트북은 `0.0.Dataset_Collect_tiny-AES-c.ipynb`와 `0.1.Dataset_Collect_masked-aes-c.ipynb` 둘**이고, CW308+STM32F3에서 수집한 전력 Trace를 `traces/scalib_dataset_{tiny-AES-c,masked-aes-c}.h5`에 만든다. 분석 노트북 10개는 그 파일을 읽지만 GB 단위 생성물이라 Git에서 제외한다. 로컬 파일의 존재·준수 여부는 실제 경로와 검증기 결과로 확인한다. Trace 길이는 수집 시 `scope.adc.trig_count`에서 정하며 AES 연산 전체(키 스케줄+10라운드)를 담도록 설계되어 있다.
 
@@ -141,7 +140,6 @@ Dataset 수집에서는 16처럼 셀마다 다시 정한다. 둘은 같은 정�
   누설 벡터는 `[hw_reg | hd_reg | hw_mem | hd_mem]` 연접이며 **HD 는 같은 저장소의 한 명령어 앞뒤 값끼리만** 계산한다(서로 다른 레지스터 쌍은 물리적 근거가 없고 오탐만 만든다). `sample_map` 이 샘플을 명령어 주소로 되짚어 주므로 결함 후보를 `addr2line` 으로 소스 행까지 옮길 수 있다 — 하네스를 `-gdwarf-2` 로 빌드하는 이유다.
 
   저장된 데모·진행 문서는 과거 실행에서 에뮬 명령어 수가 tiny 6,030 / masked 10,147로 일정했고, 골든 AES가 일치했으며, 비마스킹 대조군의 결함 후보에 `AddRoundKey`와 `SubBytes`가 포함됐다고 기록한다. 이 값과 소스 위치는 로컬 `results.json`·보고서·해시 번들이 함께 존재하고 `verify`를 통과할 때만 현재 증거로 인용한다.
-- **`[extra] Presentation_Marp/`** — Marp 발표자료. `0. Template/presentation.md`가 템플릿이자 문법 레퍼런스다(`marp: true`, `size: "16:9"`, `lang: ko`, `math: mathjax`; 클래스 `lead`, `divider`, `small`, `tiny`, `code-small`, `code-tiny`). `marp` 바이너리는 설치되어 있지 않다 — 슬라이드는 에디터 확장에서 미리보기만 하며 여기서 빌드하지 않는다.
 
 ## 실무 메모
 

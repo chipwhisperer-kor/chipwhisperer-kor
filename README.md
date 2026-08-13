@@ -41,7 +41,7 @@ ChipWhisperer 한국어 튜토리얼 & Docker 개발 환경
 
 ## 1. 프로젝트 소개
 
-**ChipWhisperer-KOR**은 [ChipWhisperer](https://www.chipwhisperer.com/) 분석 플랫폼을 **한국어**로 학습·실습하기 위한 저장소입니다. 부채널 분석(SCA)과 오류주입(FA) 실습용 **한국어 노트북**, 재현 가능한 **Docker 개발 환경**, 타겟 보드 **펌웨어·HAL 자료**, 발표용 **Marp 슬라이드**를 한곳에 모았습니다.
+**ChipWhisperer-KOR**은 [ChipWhisperer](https://www.chipwhisperer.com/) 분석 플랫폼을 **한국어**로 학습·실습하기 위한 저장소입니다. 부채널 분석(SCA)과 오류주입(FA) 실습용 **한국어 노트북**, 재현 가능한 **Docker 개발 환경**, 타겟 보드 **펌웨어·HAL 자료**를 한곳에 모았습니다.
 
 기본 워크플로는 *VMware Ubuntu 게스트에 ChipWhisperer 하드웨어를 USB로 연결하고, 그 게스트 안의 컨테이너를 브라우저나 VS Code로 다루며 노트북을 실행*하는 방식입니다.
 
@@ -62,7 +62,6 @@ ChipWhisperer 한국어 튜토리얼 & Docker 개발 환경
 | 🇰🇷 **한국어 튜토리얼** | SCA·FA·TraceWhisperer·Husky 와이어태핑 등 단계별 Jupyter 노트북 |
 | 🐳 **Docker 환경** | Python 3.12 + ChipWhisperer + Jupyter + code-server 일괄 제공 |
 | 🔧 **펌웨어·HAL** | `workspace/base/` — STM32F3, XMEGA, AVR 등 타겟 보드 빌드 자료 |
-| 📊 **발표 자료** | `[extra] Presentation_Marp/` — Marp 슬라이드 발표 자료 |
 | 🔬 **연구 프로젝트** | `[extra] PRE-SCA/` — Unicorn 에뮬레이션 기반 사전(pre-silicon) 분석 실험 |
 | 🧪 **SCALib 예제** | `[extra] SCALib/` — 비마스킹 ∥ 마스킹 AES 이중 타겟 분석 노트북 |
 | 🤖 **AI 사전 진단** | `[extra] Physical-AI-SCA/` — AI가 실험 설계·수집·분석·보고를 나누어 수행하는 환경 |
@@ -196,12 +195,6 @@ flowchart LR
 | `PRE-SCA.ipynb` | Unicorn 기반 ARM 펌웨어 명령어 단위 트레이싱 및 오류주입 실험 (tiny-AES 대상) |
 
 > 공식 학습 경로와 별도이며, 결과 CSV는 `nb_output/`에 저장됩니다. **실하드웨어 없이 실행 가능합니다.**
-
-**[extra] Presentation_Marp/ — 발표 자료**
-
-Marp 기반 한국어 슬라이드. VS Code/code-server의 Marp 확장에서 미리보기·PDF 내보내기가 가능합니다.
-
-- `0. Template/presentation.md` — 슬라이드 작성 템플릿
 
 </details>
 
