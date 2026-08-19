@@ -255,8 +255,6 @@ HDF5 파일은 용량 때문에 저장소에 포함하지 않으므로, 현재 �
   | `enc_start` | 암호화 구간 시작 샘플 |
   | `poi_research`, `poi_research_windows`, `snr_peak_research`, `poi_mask` | **연구자 관점** POI (Masked 전용) |
 
-- `tvla_ref_py39.*` — Python 3.9→3.12 회귀 레퍼런스(역사 자료)
-
 ---
 
 ## 8. 장시간 수집의 자동 복구

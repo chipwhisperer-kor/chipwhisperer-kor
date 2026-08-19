@@ -97,6 +97,7 @@ Dataset 수집에서는 16처럼 셀마다 다시 정한다. 둘은 같은 정�
 |---|---|---|
 | `workspace/lib/sca_schema.py` | 스키마 상수·검증기·경로 기반 로더 | 서로 다른 관측 경로 전부 |
 | `workspace/lib/aes_ref.py` | `SBOX`·`HW`·`sbox_out`·`aes_ecb_encrypt`·**`intermediates()`** | 수집기의 골든 검증, 분석의 민감값 라벨 |
+| `workspace/lib/elfParser.py` | `ElfParser` — ELF 심볼·섹션·메모리 배치 조회 | `[extra] Physical-AI-SCA`의 에뮬레이션 수집기 |
 | `workspace/iut/{tiny-AES-c,masked-aes-c}/` | IUT(테스트 대상 구현) 암호 라이브러리 | SCALib 펌웨어 2종 + 에뮬 하네스 2종 |
 
 **암호 라이브러리를 공용 트리에 둔 이유**: 실물 펌웨어와 에뮬레이션 하네스가 **같은 `aes.c`를 같은 플래그(`-Os`)로** 컴파일해야 "에뮬에서 찾은 결함이 실측 타겟에도 있다"고 말할 근거가 생긴다. 최적화 수준이 전이 누설을 만들기도 하고 없애기도 하므로 플래그가 다르면 다른 구현을 분석하는 셈이다. 경로를 옮기면 makefile 2개·수집 노트북 2개·SCALib README·`workspace/iut/README.md`를 함께 고치고 **`clean` 재빌드**한다(빌드 산출물에 소스 경로가 문자열로 박힌다).
@@ -114,7 +115,7 @@ Dataset 수집에서는 16처럼 셀마다 다시 정한다. 둘은 같은 정�
 
 `[extra]` 접두사가 붙은 디렉터리는 공식 튜토리얼 경로와 무관한 연구·부속 프로젝트다. 각각 자기완결적으로 작성되어 있으므로 손대기 전에 그 프로젝트의 README를 먼저 읽고, 경로는 **그 프로젝트 루트 기준 상대경로**로 유지한다(여러 프로젝트가 호스트 절대경로를 명시적으로 금지한다).
 
-- **`[extra] PRE-SCA/`** — ARM 펌웨어(tiny-AES)를 Unicorn/Capstone으로 에뮬레이션하는 pre-silicon SCA/FI 실험. 하드웨어가 필요 없다(`[extra] Physical-AI-SCA`의 에뮬 경로도 그렇다). 그 프로젝트가 이 트리의 **`elfParser.ElfParser`를 재사용**한다 — ELF 파싱 정의는 여기 한 곳이다. 다만 `logger.py`/`emul.py`는 쓰지 않는다. 전역 로거가 실행마다 CSV를 쓰고 에뮬레이션 훅이 명령어마다 입력 CSV를 다시 읽는 구조라, 오류주입 디버깅에는 맞지만 수천 Record 수집에는 I/O 비용이 지나치게 크기 때문이다. `[naive] PRE-SCA/`는 스크립트 버전으로 `python3 main.py`(또는 N회 반복 `./run_main.sh <N>`)로 실행하며, 설정은 전부 `config.py`에 있다. `config.py`의 snake_case 변수명은 `elfParser`·`emul`·`logger`가 이름으로 참조하므로 바꾸면 안 된다. 노트북 결과는 `nb_output/`에 쌓인다.
+- **`[extra] PRE-SCA/`** — ARM 펌웨어(tiny-AES)를 Unicorn/Capstone으로 에뮬레이션하는 pre-silicon SCA/FI 실험. 하드웨어가 필요 없다(`[extra] Physical-AI-SCA`의 에뮬 경로도 그렇다). 전부 `PRE-SCA.ipynb` 한 파일에 들어 있다 — ELF 파싱·디스어셈블·트레이스 로깅·오류주입 시나리오·결정성 검증까지 셀 순서대로 이어진다. 분석 대상 ELF는 `source/tiny-aes`이고 실행 산출물은 `nb_output/`에 쌓이며 Git에서 제외한다. 초기 스크립트판 `[naive] PRE-SCA/`는 노트북이 같은 내용을 전부 담게 되어 2026-08-19에 삭제했다(공개 메서드·상수·산출물을 대조해 확인했고, 노트북이 만드는 디스어셈블은 스크립트판의 회귀 기준선과 바이트 단위로 같았다). 그때 유일한 외부 소비자였던 `elfParser.py`만 `workspace/lib/`로 옮겼다 — `[extra] Physical-AI-SCA`의 `collectors/emulation.py`가 이것을 import한다.
 - **`[extra] SCALib/`** — SCALib 0.6.4의 기능을 **기능 하나당 노트북 하나**로 보이되, **Normal AES(`tiny-AES-c`) ∥ Masked AES(`masked-aes-c`) 이중 타겟**을 단계마다 나란히 비교하는 예제 모음(SNR·Quantizer·Ttest·MTtest·CPA·LDA·MultiLDA·RLDA·SASCA·KeyRank). **하드웨어가 필요한 노트북은 `0.0.Dataset_Collect_tiny-AES-c.ipynb`와 `0.1.Dataset_Collect_masked-aes-c.ipynb` 둘**이고, CW308+STM32F3에서 수집한 전력 Trace를 `traces/scalib_dataset_{tiny-AES-c,masked-aes-c}.h5`에 만든다. 분석 노트북 10개는 그 파일을 읽지만 GB 단위 생성물이라 Git에서 제외한다. 로컬 파일의 존재·준수 여부는 실제 경로와 검증기 결과로 확인한다. Trace 길이는 수집 시 `scope.adc.trig_count`에서 정하며 AES 연산 전체(키 스케줄+10라운드)를 담도록 설계되어 있다.
 
   **암호 라이브러리는 이 서브프로젝트 밖에 있다** — `workspace/iut/{tiny-AES-c,masked-aes-c}/`. 펌웨어 makefile이 `../../iut/<lib>/aes.c`를 직접 컴파일한다. 실물 전력과 에뮬레이션이 **같은 소스**를 봐야 결과를 나란히 놓을 수 있어서 저장소 공용 트리로 올렸다. 출처·패치 내역은 `workspace/iut/README.md`.

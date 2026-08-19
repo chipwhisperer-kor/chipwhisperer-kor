@@ -5,7 +5,7 @@
 다른 파일을 집는다.
 
 여기서 `workspace/lib` 를 sys.path 에 넣으므로, 이 패키지의 다른 모듈은
-`import sca_schema` / `import aes_ref` 를 그냥 쓰면 된다.
+`import sca_schema` / `import aes_ref` / `import elfParser` 를 그냥 쓰면 된다.
 """
 
 import sys
@@ -18,7 +18,6 @@ WORKSPACE = PROJECT.parent
 LIB = WORKSPACE / "lib"                     # 저장소 공용 파이썬 정의
 IUT = WORKSPACE / "iut"                     # IUT(테스트 대상 구현) 암호 라이브러리
 SCALIB = WORKSPACE / "[extra] SCALib"       # 실측 Dataset·수집 라이브러리
-PRESCA = WORKSPACE / "[extra] PRE-SCA" / "[naive] PRE-SCA"   # ElfParser
 
 HARNESS = PROJECT / "emul_harness"
 HARNESS_BUILD = HARNESS / "build"
@@ -31,11 +30,6 @@ TRACES = PROJECT / "traces"
 if str(LIB) not in sys.path:
     sys.path.insert(0, str(LIB))
 
-# PRE-SCA 는 **뒤에** 붙인다. 그 디렉터리에는 `config.py`·`logger.py`·`main.py` 처럼
-# 흔한 이름의 최상위 모듈이 있어서, 앞에 두면 이 프로세스의 `import logger` 가
-# 전부 그쪽으로 끌려간다. 여기서 필요한 것은 `elfParser` 하나뿐이다.
-if str(PRESCA) not in sys.path:
-    sys.path.append(str(PRESCA))
 
 
 def harness_elf(iut_name):
