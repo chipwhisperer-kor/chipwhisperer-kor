@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "physai/study/2.0",
+  "title": "Physical-AI-SCA study",
+  "type": "object",
+  "required": ["schema_version", "id", "title", "assessment_profile", "campaign_stage", "algorithm", "experiments", "publication"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": 2},
+    "id": {"type": "string", "pattern": "^[0-9A-Za-z._-]+$"},
+    "title": {"type": "string", "minLength": 1},
+    "assessment_profile": {"enum": ["iso-17825-l3", "iso-17825-l4"]},
+    "campaign_stage": {"enum": ["smoke", "cw-lab-pilot", "full"]},
+    "algorithm": {"type": "string", "minLength": 1},
+    "experiments": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "required": ["spec", "role"], "additionalProperties": false,
+        "properties": {
+          "spec": {"type": "string", "pattern": "^[^/].*\\.yaml$"},
+          "role": {"enum": ["positive-control", "iut", "supporting-channel"]},
+          "compare_with": {"type": "string"}
+        }
+      }
+    },
+    "publication": {
+      "type": "object", "required": ["grok_assist", "grok_audit"], "additionalProperties": false,
+      "properties": {"grok_assist": {"type": "boolean"}, "grok_audit": {"const": true}}
+    }
+  }
+}

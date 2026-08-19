@@ -1,16 +1,15 @@
-id: "006_demo_hw_tinyaes"
+schema_version: 2
+id: "demo_l3lab_hw_tinyaes"
 title: "통합 데모 실물 전력 — tiny-AES-c CPA 양성 대조"
 rationale: >
-  CW308T-STM32F3에서 tiny-AES-c를 실행하고 Husky로 같은 입력을 10회씩 캡처해 평균한다.
+  CW308T-STM32F3에서 tiny-AES-c를 실행하고 Husky로 같은 입력을 10회씩 각각 보존한 뒤 분석 파생물에서 평균한다.
   CPA 16바이트 복구는 수집·정렬·라벨 배관의 필수 양성 대조이며 실패하면 완료로 처리하지 않는다.
 scope:
   standard: "ISO/IEC 17825:2024"
   assessment_type: "pre-assessment"
   clauses_applied: ["7", "8"]
-  security_function: "AES-128-ECB"
   csp_classes: ["cryptographic key"]
   channels: ["power"]
-  target_level: 3
   not_claimed:
     - "ISO/IEC 19790 적합성 — 모듈 경계·CSP 정의가 환경 밖이다"
     - "독립 시험소 평가 — 벤더와 시험자가 동일하다"
@@ -36,31 +35,27 @@ collector:
     to_symbol: "AES_ECB_encrypt"
     semantics: "MY_AES_ECB 트리거 HIGH; AES_init_ctx(KeyExpansion)와 AES_ECB_encrypt 전체"
 subsets:
-  - {name: ta_rk_fp,    role: timing,                    n: 32,  key_mode: random, pt_mode: fixed}
-  - {name: ta_fk_rp,    role: timing,                    n: 32,  key_mode: fixed,  pt_mode: random}
-  - {name: spa_same,    role: simple-analysis,           n: 4,   key_mode: fixed,  pt_mode: fixed,  spa_pair_kind: same-data}
-  - {name: spa_diffkey, role: simple-analysis,           n: 4,   key_mode: random, pt_mode: fixed,  spa_pair_kind: different-data-fixed}
-  - {name: spa_diffpt,  role: simple-analysis,           n: 4,   key_mode: fixed,  pt_mode: random, spa_pair_kind: different-data-random}
-  - {name: tvla_fk,     role: leakage-detection-fixed,   n: 64,  key_mode: fixed,  pt_mode: fixed}
-  - {name: tvla_rk,     role: leakage-detection-random,  n: 64,  key_mode: fixed,  pt_mode: random}
-  - {name: attack,      role: attack,                    n: 128, key_mode: fixed,  pt_mode: random}
-criteria:
-  security_level: 3
-  effect_size_d: 0.04
-  alpha: 1.0e-5
-  beta: 0.05
-  multiplicity_correction: "bonferroni"
-  t_threshold: 4.5
-  max_acquisition_hours: 6
+  - {name: ta_rk_fp,    role: timing,  key_mode: random, pt_mode: fixed}
+  - {name: ta_fk_rp,    role: timing,  key_mode: fixed,  pt_mode: random}
+  - {name: spa_same,    role: simple-analysis,   key_mode: fixed,  pt_mode: fixed,  spa_pair_kind: same-data}
+  - {name: spa_diffkey, role: simple-analysis,   key_mode: random, pt_mode: fixed,  spa_pair_kind: different-data-fixed}
+  - {name: spa_diffpt,  role: simple-analysis,   key_mode: fixed,  pt_mode: random, spa_pair_kind: different-data-random}
+  - {name: tvla_fk,     role: leakage-detection-fixed,  key_mode: fixed,  pt_mode: fixed}
+  - {name: tvla_rk,     role: leakage-detection-random,  key_mode: fixed,  pt_mode: random}
+  - {name: attack,      role: attack, key_mode: fixed,  pt_mode: random}
+criteria_context:
   sensitive_leakage_time:
     from: "0"
     to: "end"
     include_round1: true
     rationale: "물리 트리거 전체를 분석하되 명령어 주소를 대응시키지 않는다. 첫 라운드 S-box는 분할정복 키 복구의 표준 표적이므로 포함한다."
-  preprocessing: {average_n: 10, alignment: "none"}
   vendor_info:
     algorithms: "AES-128 ECB (tiny-AES-c)"
     design: "CW308_STM32F3, -Os Cortex-M4 펌웨어, 대책 없음"
     susceptible_conditions: "비마스킹 구현의 전력 누설을 CPA 양성 대조로 확인한다"
-analyses: ["ta", "spa", "dpa", "cpa"]
+analyses: ["ta", "spa", "tvla", "dpa", "cpa"]
+analysis_inputs:
+  tvla: {fixed: "tvla_fk", random: "tvla_rk"}
+  dpa: {subset: "attack", target: "round1-sbox-byte0-bit0"}
+  cpa: {subset: "attack"}
 seed: 1234

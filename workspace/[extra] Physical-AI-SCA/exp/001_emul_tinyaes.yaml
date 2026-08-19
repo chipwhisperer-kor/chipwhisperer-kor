@@ -1,4 +1,8 @@
+schema_version: 2
 id: "001_emul_tinyaes"
+assessment_profile: "iso-17825-l3"
+campaign_stage: "cw-lab-pilot"
+algorithm: "aes-128-ecb"
 title: "에뮬레이션 — 비마스킹 AES (검출기 양성 대조군)"
 rationale: >
   이 실험의 목적은 tiny-AES-c 의 취약성을 밝히는 것이 아니다. 비마스킹 구현이므로
@@ -10,10 +14,8 @@ scope:
   standard: "ISO/IEC 17825:2024"
   assessment_type: "pre-assessment"
   clauses_applied: ["7", "8"]
-  security_function: "AES-128-ECB"
   csp_classes: ["cryptographic key"]
   channels: ["emulated-power"]
-  target_level: 3
   not_claimed:
     - "ISO/IEC 19790 적합성 — 모듈 경계·CSP 정의가 이 환경 밖이다"
     - "독립 시험소 평가 — 벤더와 시험자가 동일하다(자기시험)"
@@ -37,24 +39,17 @@ collector:
       실측 펌웨어의 MY_AES_ECB 트리거와 같은 구간이라 두 채널을 나란히 놓을 수 있다.
 
 subsets:
-  - {name: ta_rk_fp,   role: timing,                    n: 1000, key_mode: random, pt_mode: fixed}
-  - {name: ta_fk_rp,   role: timing,                    n: 1000, key_mode: fixed,  pt_mode: random}
-  - {name: spa_same,   role: simple-analysis,           n: 6,    key_mode: fixed,  pt_mode: fixed,  spa_pair_kind: same-data}
-  - {name: spa_diffkey, role: simple-analysis,          n: 6,    key_mode: random, pt_mode: fixed,  spa_pair_kind: different-data-fixed}
-  - {name: spa_diffpt,  role: simple-analysis,          n: 6,    key_mode: fixed,  pt_mode: random, spa_pair_kind: different-data-random}
-  - {name: tvla_fk,    role: leakage-detection-fixed,   n: 2000, key_mode: fixed,  pt_mode: fixed}
-  - {name: tvla_rk,    role: leakage-detection-random,  n: 2000, key_mode: fixed,  pt_mode: random}
-  - {name: profiling,  role: profiling,                 n: 4000, key_mode: random, pt_mode: random}
-  - {name: attack,     role: attack,                    n: 2000, key_mode: fixed,  pt_mode: random}
+  - {name: ta_rk_fp,   role: timing, key_mode: random, pt_mode: fixed}
+  - {name: ta_fk_rp,   role: timing, key_mode: fixed,  pt_mode: random}
+  - {name: spa_same,   role: simple-analysis,    key_mode: fixed,  pt_mode: fixed,  spa_pair_kind: same-data}
+  - {name: spa_diffkey, role: simple-analysis,    key_mode: random, pt_mode: fixed,  spa_pair_kind: different-data-fixed}
+  - {name: spa_diffpt,  role: simple-analysis,    key_mode: fixed,  pt_mode: random, spa_pair_kind: different-data-random}
+  - {name: tvla_fk,    role: leakage-detection-fixed, key_mode: fixed,  pt_mode: fixed}
+  - {name: tvla_rk,    role: leakage-detection-random, key_mode: fixed,  pt_mode: random}
+  - {name: profiling,  role: profiling, key_mode: random, pt_mode: random}
+  - {name: attack,     role: attack, key_mode: fixed,  pt_mode: random}
 
-criteria:
-  security_level: 3
-  effect_size_d: 0.04
-  alpha: 1.0e-5
-  beta: 0.05
-  multiplicity_correction: "bonferroni"
-  t_threshold: 4.5
-  max_acquisition_hours: 6
+criteria_context:
   sensitive_leakage_time:
     from: "0"
     to: "end"
@@ -67,9 +62,6 @@ criteria:
       키 로딩·언로딩 경계가 존재하지 않는다. (3) 1라운드 SBox 는 분할정복 키 복구의
       표준 표적이므로 실무 위협 모형에서 민감하다. 이 판단은 합/부를 직접 바꾸므로
       보고서에 그대로 실린다.
-  preprocessing:
-    average_n: 1
-    alignment: "none"
   vendor_info:
     algorithms: "AES-128 ECB (tiny-AES-c, kokke/tiny-AES-c 벤더 원본 무수정)"
     design: >
@@ -80,5 +72,9 @@ criteria:
       대책이 없으므로 1차 DPA 에 그대로 노출된다. 이 실험은 그 사실을 확인해
       검출기의 유효성을 입증하는 데 쓴다.
 
-analyses: ["ta", "spa", "dpa", "soundness", "cpa"]
+analyses: ["ta", "spa", "tvla", "dpa", "soundness", "cpa"]
+analysis_inputs:
+  tvla: {fixed: "tvla_fk", random: "tvla_rk"}
+  dpa: {subset: "attack", target: "round1-sbox-byte0-bit0"}
+  cpa: {subset: "attack"}
 seed: 1234

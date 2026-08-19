@@ -1,0 +1,62 @@
+{
+  "profile": "iso-17825-l3",
+  "source": "/workspace/[extra] Physical-AI-SCA/traces/raw/demo_l3lab_emul_tinyaes/69e646c0dcbb77911b2629ccd6bd25f0ceb879760ecc6cce4d6b217c94d7b091.h5",
+  "source_sha256": "2beff24b41df507fabf5a7645756ab62d6a9eefbb60e468f41133cada37f4747",
+  "derived": "/workspace/[extra] Physical-AI-SCA/traces/derived/demo_l3lab_emul_tinyaes/fa579f8d03c566e228e442425758cef86c9201735bed9237bfa6cf8e27acfc67.h5",
+  "derived_sha256": "97d2d1f74e3bdea9600bf2e5a17fa5d9c8278e530dc319659da396cdbd29ce37",
+  "derivation_contract_sha256": "fa579f8d03c566e228e442425758cef86c9201735bed9237bfa6cf8e27acfc67",
+  "contract": {
+    "pipeline_version": 1,
+    "source_dataset_sha256": "2beff24b41df507fabf5a7645756ab62d6a9eefbb60e468f41133cada37f4747",
+    "assessment_profile": "iso-17825-l3",
+    "preprocessing": {
+      "average_n": 10,
+      "alignment": "trigger-checked",
+      "filter": null
+    },
+    "aggregation_kind": "mean",
+    "aggregation_n": 10,
+    "trace_dtype": "float64"
+  },
+  "pipeline": "mean-10",
+  "metrics": {
+    "attack": {
+      "records": 128,
+      "repeats": 10
+    },
+    "profiling": {
+      "records": 128,
+      "repeats": 10
+    },
+    "spa_diffkey": {
+      "records": 4,
+      "repeats": 10
+    },
+    "spa_diffpt": {
+      "records": 4,
+      "repeats": 10
+    },
+    "spa_same": {
+      "records": 4,
+      "repeats": 10
+    },
+    "ta_fk_rp": {
+      "records": 32,
+      "repeats": 10
+    },
+    "ta_rk_fp": {
+      "records": 32,
+      "repeats": 10
+    },
+    "tvla_fk": {
+      "records": 64,
+      "repeats": 10
+    },
+    "tvla_rk": {
+      "records": 64,
+      "repeats": 10
+    }
+  },
+  "alignment_mapping_sha256": null,
+  "evidence_npz": null
+}

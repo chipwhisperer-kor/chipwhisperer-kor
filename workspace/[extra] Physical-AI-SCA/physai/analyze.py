@@ -35,14 +35,14 @@ import time
 
 import numpy as np
 
-from . import paths, spec as spec_mod
+from . import artifacts, paths, spec as spec_mod, preprocess
 from . import soundness as soundness_mod
-from .tests import dpa as dpa_mod, spa as spa_mod, ta as ta_mod
+from .tests import dpa as dpa_mod, spa as spa_mod, ta as ta_mod, tvla as tvla_mod
+from .algorithms import get as get_algorithm
 
 import sca_schema as S          # noqa: E402
-from aes_ref import HW, sbox_out   # noqa: E402
-
 MANDATORY = ("ta", "spa", "dpa")
+ANALYSIS_ORDER = ("ta", "spa", "tvla", "dpa")
 
 
 def window_boundaries(dataset_path):
@@ -107,7 +107,9 @@ def run_cpa(dataset_path, spec, n=None):
     # 정답 키는 attack subset 이 고정 키를 쓰므로 그 첫 행에서 읽는다.
     # 루트 HDF5 attrs에 fixed_key를 복제하지 않는다. 정답 키의 정본은 attack Subset 첫
     # 레코드이며 두 곳에 두면 한쪽만 갱신될 수 있다.
-    g = S.load_group(dataset_path, "attack", n=n,
+    algo = get_algorithm(spec["algorithm"])
+    subset = spec["analysis_inputs"]["cpa"]["subset"]
+    g = S.load_group(dataset_path, subset, n=n,
                      fields=[S.F_TRACE, S.F_KEY, S.F_PLAINTEXT])
     tr = g[S.F_TRACE].astype(np.float64)
     pt = g[S.F_PLAINTEXT]
@@ -118,10 +120,10 @@ def run_cpa(dataset_path, spec, n=None):
     denom_t[denom_t == 0] = np.inf
 
     recovered, ranks, rhos = [], [], []
-    for j in range(16):
+    for j in range(algo.KEY_BYTES):
         guesses = np.arange(256, dtype=np.uint8)
         # (256, n) 예측: HW(SBOX[p_j ^ g])
-        pred = HW[sbox_out(pt[:, j][None, :], guesses[:, None])].astype(np.float64)
+        pred = algo.cpa_predictions(pt[:, j], guesses).astype(np.float64)
         pred -= pred.mean(axis=1, keepdims=True)
         denom_p = np.sqrt((pred ** 2).sum(axis=1))
         denom_p[denom_p == 0] = np.inf
@@ -139,6 +141,8 @@ def run_cpa(dataset_path, spec, n=None):
         "note": ("판정이 아니다. 배관(입력 주입·정렬·라벨링)이 옳은지 확인하는 양성 대조다. "
                  "ISO/IEC 17825 Fig.1 NOTE 3 — CPA 는 필수 시험이 아니다."),
         "n_traces": int(tr.shape[0]),
+        "subset": subset,
+        "key_bytes": int(algo.KEY_BYTES),
         "bytes_recovered": ok,
         "mean_rank": float(np.mean(ranks)),
         "ranks": ranks,
@@ -157,11 +161,12 @@ def main(argv=None):
     판정 기준은 변경하지 않는다.
     """
     ap = argparse.ArgumentParser(prog="physai.analyze")
-    ap.add_argument("--spec", required=True)
+    ap.add_argument("--spec", default=None, help="독립 v2 experiment YAML")
+    ap.add_argument("--study", default=None, help="v2 study YAML")
+    ap.add_argument("--experiment", default=None, help="--study에서 분석할 experiment id")
     ap.add_argument("--dataset", default=None)
     ap.add_argument("--n-soundness", type=int, default=None,
                     help="soundness 에 쓸 트레이스 수 (기본 전부)")
-    ap.add_argument("--n-perm", type=int, default=8, help="귀무분포용 라벨 순열 횟수")
     # CPA 는 (256 × n) 예측 행렬과 (n × ns) 트레이스를 곱한다. 실측 데이터셋처럼
     # n·ns 가 크면 float64 중간 배열이 수 GB 로 불어나 메모리가 터진다. 배관 검증이
     # 목적이므로 전량이 필요하지 않다 — 기본을 제한하고 필요하면 늘린다.
@@ -170,13 +175,27 @@ def main(argv=None):
     ap.add_argument("--quiet", action="store_true")
     a = ap.parse_args(argv)
 
-    sp = spec_mod.load(a.spec)
-    ds = paths.TRACES / ("%s.h5" % sp["id"]) if a.dataset is None else paths.Path(a.dataset)
-    bad = S.validate_dataset(path=ds)
+    if bool(a.spec) == bool(a.study):
+        ap.error("--spec 또는 --study 중 정확히 하나가 필요하다")
+    if a.study and not a.experiment:
+        ap.error("--study에는 --experiment가 필요하다")
+    sp = (spec_mod.load(a.spec) if a.spec else
+          spec_mod.load_from_study(a.study, a.experiment))
+    fixed_permutations = int(sp["analysis_parameters"]["soundness_permutations"])
+    if a.dataset is None:
+        source_ds, _ = artifacts.load_capture_manifest(sp["id"], sp)
+    else:
+        source_ds = paths.Path(a.dataset)
+    bad = S.validate_dataset(path=source_ds)
     if bad:
         raise SystemExit("Dataset이 스키마를 어긴다 (%d건):\n  - %s"
                          % (len(bad), "\n  - ".join(bad)))
 
+    ds = preprocess.prepare(source_ds, sp)
+    bad = S.validate_dataset(path=ds)
+    if bad:
+        raise SystemExit("전처리 Dataset이 스키마를 어긴다 (%d건):\n  - %s"
+                         % (len(bad), "\n  - ".join(bad)))
     attrs = S.root_attrs(ds)
     ns = int(attrs["samples_per_trace"])
     n_instr = ns // len(sp["collector"].get("components", ["x"])) \
@@ -204,6 +223,7 @@ def main(argv=None):
         "spec_id": sp["id"],
         "title": sp["title"],
         "dataset": str(ds),
+        "source_dataset": str(source_ds),
         "dataset_sha_note": "manifest.json 이 해시를 기록한다",
         "generated": time.strftime("%Y-%m-%dT%H:%M:%S"),
         "scope": sp["scope"],
@@ -212,10 +232,17 @@ def main(argv=None):
                     "window_boundaries": bounds,
                     "sensitive_window_instructions": list(win),
                     "samples_per_trace": ns, "instructions": n_instr},
+        "assessment_profile": sp["assessment_profile"],
+        "campaign_stage": sp["campaign_stage"],
+        "algorithm": sp["algorithm"],
+        "analysis_parameters": sp["analysis_parameters"],
         "grades": {"mandatory": list(MANDATORY),
-                   "judgement": ["soundness"],
+                   "judgement": (["soundness"] if "soundness" in sp["analyses"] else []),
+                   "independent": ["tvla"],
                    "reference_only": ["snr"],
-                   "positive_control": ["cpa"]},
+                   "positive_control": (["cpa"] if
+                                        sp["iut"]["countermeasure"] == "none" and
+                                        "cpa" in sp["analyses"] else [])},
         "tests": {},
         "reference": {},
     }
@@ -232,14 +259,14 @@ def main(argv=None):
     # 유일한 예외는 TA 내부의 2단계다 — §7.3.4 가 1단계 실패 시 2단계로 가지 않는다고
     # 명시하므로 그것은 tests/ta.py 안에서 지킨다.
     failed_earlier = []
-    for name in MANDATORY:
+    for name in ANALYSIS_ORDER:
         if name not in sp["analyses"]:
             results["tests"][name] = {"verdict": "not-run",
                                       "reason": "spec 의 analyses 에 없다"}
             continue
 
         if name == "ta":
-            r = ta_mod.run(ds, sp)
+            r = ta_mod.run(source_ds, sp)
         elif name == "spa":
             ks = (bounds.get(sp["collector"]["window"]["from_symbol"], 0),
                   bounds.get(sp["collector"]["window"]["to_symbol"], n_instr)) \
@@ -249,12 +276,17 @@ def main(argv=None):
             # 육안 검사용 Trace를 증거로 남긴다. SPA Subset은 Trace가 십여 장뿐이라
             # 통째로 저장해도 부담이 없고, 사람이 확인하려면 반드시 있어야 한다.
             _save_spa_traces(ds, sp, paths.run_dir(sp["id"], create=True))
+        elif name == "tvla":
+            r = tvla_mod.run(ds, sp, th, need["n_required"])
+            t_arr = r.pop("_t", None)
+            if t_arr is not None:
+                np.save(paths.run_dir(sp["id"], create=True) / "tvla_t.npy", t_arr)
         else:
             r = dpa_mod.run(ds, sp, th, need["n_required"], sensitive_window=win)
             t_arr = r.pop("_t", None)
             if t_arr is not None:
                 np.save(paths.run_dir(sp["id"], create=True) / "dpa_t.npy", t_arr)
-        if failed_earlier:
+        if failed_earlier and name in MANDATORY:
             r["preceded_by_failure"] = list(failed_earlier)
             r["note_order"] = ("앞선 필수 시험 %s 가 이미 fail 이므로 종합 판정은 바뀌지 "
                                "않는다. 그래도 수행한 이유는 §8.1 `shall [08.01]` 이 세 "
@@ -263,14 +295,14 @@ def main(argv=None):
         results["tests"][name] = r
         say("  %-4s : %-14s %s" % (name.upper(), r["verdict"],
                                    r.get("reason", r.get("verdict_scope", ""))[:80]))
-        if r["verdict"] == "fail":
+        if name in MANDATORY and r["verdict"] == "fail":
             failed_earlier.append(name)
 
     # ── 판정: soundness ──
     if "soundness" in sp["analyses"]:
         say("-" * 70)
-        say("  soundness 검정 중 (라벨 순열 %d회)…" % a.n_perm)
-        r = soundness_mod.run(ds, sp, n_traces=a.n_soundness, n_perm=a.n_perm,
+        say("  soundness 검정 중 (라벨 순열 %d회)…" % fixed_permutations)
+        r = soundness_mod.run(ds, sp, n_traces=a.n_soundness, n_perm=fixed_permutations,
                               sensitive_window=win)
         results["tests"]["soundness"] = r
         say("  SOUNDNESS: %-10s 결함 후보 %d개 (경계 안 %d)"
@@ -282,16 +314,49 @@ def main(argv=None):
     if "cpa" in sp["analyses"]:
         r = run_cpa(ds, sp, n=(a.n_cpa or None))
         results["reference"]["cpa"] = r
-        say("  CPA(대조): %d/16 바이트 복구, 평균 순위 %.1f"
-            % (r["bytes_recovered"], r["mean_rank"]))
+        say("  CPA(대조): %d/%d 바이트 복구, 평균 순위 %.1f"
+            % (r["bytes_recovered"], r["key_bytes"], r["mean_rank"]))
+
+    mandatory_verdicts = {name: results["tests"].get(name, {}).get("verdict")
+                          for name in MANDATORY}
+    local_control_required = (sp["iut"]["countermeasure"] == "none" and
+                              "cpa" in sp["analyses"])
+    positive_control_ok = not (
+        local_control_required and
+        results["reference"]["cpa"]["bytes_recovered"] !=
+        results["reference"]["cpa"]["key_bytes"])
+    if "fail" in mandatory_verdicts.values():
+        overall = "fail"
+    elif not positive_control_ok or any(v != "pass" for v in mandatory_verdicts.values()):
+        overall = "inconclusive"
+    else:
+        overall = "pass"
+    if not positive_control_ok and results["tests"].get("dpa", {}).get("verdict") != "fail":
+        results["tests"]["dpa"]["control_status"] = "failed"
+        results["tests"]["dpa"]["preassessment_verdict"] = "inconclusive"
+        results["tests"]["dpa"]["verdict"] = "inconclusive"
+        results["tests"]["dpa"]["reason"] += " 양성 대조 실패로 미검출 해석을 차단한다."
+        mandatory_verdicts["dpa"] = "inconclusive"
+    results["overall"] = {
+        "preassessment_verdict": overall,
+        "procedure_status": ("complete" if all(
+            results["tests"].get(x, {}).get("procedure_status") == "complete"
+            for x in MANDATORY) else "incomplete"),
+        "human_review": {"spa": "pending"},
+        # CPA는 비마스킹 기준 구현에서 수집·정렬·라벨 배관을 확인하는 양성 대조다.
+        # 대책 구현의 CPA 미복구는 안전 판정도 대조 실패도 아니므로 적용불가로 구분한다.
+        "positive_control": (("pass" if positive_control_ok else "fail")
+                             if local_control_required else "not-applicable"),
+        "claim_scope": "ISO/IEC 17825:2024 방법론 준용 사전진단; 적합성 평가는 주장하지 않음",
+    }
 
     results["json_conventions"] = {
         "non_finite": ("무한대는 문자열 \"+inf\"/\"-inf\" 로, NaN 은 null 로 적는다. "
                        "JSON 표준에는 Infinity·NaN 리터럴이 없어 그대로 쓰면 엄격한 "
                        "파서가 읽지 못한다 — 계약 파일이므로 표준을 지킨다."),
-        "snr_inf_meaning": ("SNR 이 무한대인 것은 클래스 내 분산이 0 이라는 뜻이며, "
-                            "잡음 없는 에뮬레이션에서 그 샘플이 민감값에 **완전히 결정적으로** "
-                            "종속한다는 의미다. 오류가 아니라 가장 강한 누설이다."),
+        "snr_inf_meaning": ("SNR 무한대는 클래스 내 분산이 0이라는 수치 상태다. 유효한 "
+                            "귀무 임계가 함께 산정된 경우에만 강한 종속 소견으로 해석하며, "
+                            "임계 산정 실패 시에는 판정 근거로 쓰지 않는다."),
     }
     out_dir = paths.run_dir(sp["id"], create=True)
     (out_dir / "results.json").write_text(
@@ -300,12 +365,6 @@ def main(argv=None):
         encoding="utf-8")
 
     verdicts = {k: v.get("verdict") for k, v in results["tests"].items()}
-    overall = ("fail" if "fail" in verdicts.values()
-               else "inconclusive" if "inconclusive" in verdicts.values()
-               else "pass")
-    positive_control_ok = not (
-        sp["iut"]["name"] == "tiny-AES-c" and "cpa" in sp["analyses"] and
-        results["reference"]["cpa"]["bytes_recovered"] != 16)
     results_summary = {"ok": positive_control_ok, "spec": sp["id"], "overall": overall,
                        "verdicts": verdicts, "results": str(out_dir / "results.json")}
     say("-" * 70)

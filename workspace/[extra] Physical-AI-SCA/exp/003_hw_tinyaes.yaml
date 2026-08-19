@@ -1,4 +1,8 @@
+schema_version: 2
 id: "003_hw_tinyaes"
+assessment_profile: "iso-17825-l3"
+campaign_stage: "cw-lab-pilot"
+algorithm: "aes-128-ecb"
 title: "실측 전력 파형 — 기존 SCHEMA 1.0 데이터셋으로 분석·보고 파이프라인 검증"
 rationale: >
   이 실험은 새로 수집하지 않는다. `[extra] SCALib` 이 실장비로 이미 받아 둔
@@ -18,10 +22,8 @@ scope:
   standard: "ISO/IEC 17825:2024"
   assessment_type: "pre-assessment"
   clauses_applied: ["7", "8"]
-  security_function: "AES-128-ECB"
   csp_classes: ["cryptographic key"]
   channels: ["power"]
-  target_level: 3
   not_claimed:
     - "ISO/IEC 19790 적합성 — 모듈 경계·CSP 정의가 이 환경 밖이다"
     - "독립 시험소 평가 — 벤더와 시험자가 동일하다(자기시험)"
@@ -40,20 +42,13 @@ collector:
   kind: "cw_power"
 
 subsets:
-  - {name: explore,   role: exploration,               n: 5000,   key_mode: random, pt_mode: random}
-  - {name: profiling, role: profiling,                 n: 100000, key_mode: random, pt_mode: random}
-  - {name: attack,    role: attack,                    n: 10000,  key_mode: fixed,  pt_mode: random}
-  - {name: tvla_fk,   role: leakage-detection-fixed,   n: 1000,   key_mode: fixed,  pt_mode: fixed}
-  - {name: tvla_rk,   role: leakage-detection-random,  n: 1000,   key_mode: random, pt_mode: fixed}
+  - {name: explore,   role: exploration,   key_mode: random, pt_mode: random}
+  - {name: profiling, role: profiling, key_mode: random, pt_mode: random}
+  - {name: attack,    role: attack,  key_mode: fixed,  pt_mode: random}
+  - {name: tvla_fk,   role: leakage-detection-fixed,   key_mode: fixed,  pt_mode: fixed}
+  - {name: tvla_rk,   role: leakage-detection-random,   key_mode: random, pt_mode: fixed}
 
-criteria:
-  security_level: 3
-  effect_size_d: 0.04
-  alpha: 1.0e-5
-  beta: 0.05
-  multiplicity_correction: "bonferroni"
-  t_threshold: 4.5
-  max_acquisition_hours: 6
+criteria_context:
   sensitive_leakage_time:
     from: "0"
     to: "end"
@@ -65,9 +60,6 @@ criteria:
       authority 가 대체할 수 있고, 1라운드 SBox 는 분할정복 키 복구의 표준 표적이다.
       다만 이 트리거는 KeyExpansion 까지 감싸므로(`trigger_semantics` 참고) 앞부분의
       검출은 키 스케줄 누설이며 CipherMasked 구간의 것과 구분해 읽어야 한다.
-  preprocessing:
-    average_n: 1
-    alignment: "none"
   vendor_info:
     algorithms: "AES-128 ECB (tiny-AES-c, kokke/tiny-AES-c 벤더 원본 무수정)"
     design: >
@@ -78,5 +70,9 @@ criteria:
       대책이 없으므로 1차 DPA 에 그대로 노출된다. 트리거가 키 스케줄을 포함하므로
       파형 앞부분에서 라운드키 관련 누설도 관측된다.
 
-analyses: ["dpa", "cpa"]
+analyses: ["tvla", "dpa", "cpa"]
+analysis_inputs:
+  tvla: {fixed: "tvla_fk", random: "tvla_rk"}
+  dpa: {subset: "attack", target: "round1-sbox-byte0-bit0"}
+  cpa: {subset: "attack"}
 seed: 1234

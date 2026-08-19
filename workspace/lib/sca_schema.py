@@ -13,10 +13,9 @@
 읽지만 수정하지 않으며, 파일 생성과 수집은 각 수집기의 책임이다.
 
 판번호
-    현재 문서 판번호는 SCHEMA_VERSION = "1.2" 이다.
-    파일에 기록된 판번호의 규칙으로 검사한다. 1.2는 같은 입력의 원 파형과 실행시간을
-    보존하는 반복 배열을 실물 전력 채널에 추가한다. 이전 판 파일에 새 규칙을 소급하지
-    않는다 — 나중에 만든 규칙으로 옛 파일을 위반 처리하면 판번호의 의미가 무너진다.
+    현재 문서 판번호는 SCHEMA_VERSION = "1.3" 이다. 1.3은 Execution 한 번을 Record
+    한 행으로 보존하는 불변 원본과, 그 원본에서 재생성하는 파생 분석 Dataset을 분리한다.
+    이전 판 파일에는 새 규칙을 소급하지 않는다.
 """
 
 from pathlib import Path
@@ -26,8 +25,8 @@ import numpy as np
 
 # ── 스키마 식별 ────────────────────────────────────────────
 SCHEMA = "sca-hdf5"
-SCHEMA_VERSION = "1.2"
-KNOWN_VERSIONS = ("1.0", "1.1", "1.2")
+SCHEMA_VERSION = "1.3"
+KNOWN_VERSIONS = ("1.0", "1.1", "1.2", "1.3")
 
 # ── Attributes(OPTIMIST) = HDF5 배열 이름 ──────────────────
 # GLOSSARY.md §6.1 의 용어 충돌에 주의한다: OPTIMIST 의 Attributes 는 HDF5 배열로,
@@ -42,6 +41,10 @@ F_SAMPLE_MAP = "sample_map"        # 1.1 신설 — 루트 배열 (샘플 → �
 F_TRACE_REPEATS = "trace_repeats"  # 1.2 신설 — 평균 전 원 파형 (n, r, ns)
 F_EXEC_TIME_REPEATS = "exec_time_repeats"  # 1.2 신설 — 반복별 트리거 길이 (n, r)
 F_MASK_REPEATS = "mask_repeats"    # 1.2 신설 — masked 반복별 실제 회수 마스크
+F_REPEAT_GROUP_ID = "repeat_group_id"  # 1.3 — 같은 입력 Execution 묶음
+F_REPEAT_INDEX = "repeat_index"        # 1.3 — 묶음 안 0..capture_repeats-1
+
+DATASET_ROLES = ("raw-acquisition", "derived-analysis")
 
 # ── 루트 Metadata(메타데이터) (SCHEMA.md §3) ────────────────────────
 # 1.0 의 필수 목록. 1.1 도 이 항목을 그대로 요구한다.
@@ -83,6 +86,23 @@ REQUIRED_METADATA_POWER_1_2 = REQUIRED_METADATA_POWER_1_1 + (
     "bandwidth_basis", "bandwidth_is_nominal",
     "shunt_ohm", "shunt_selection_note", "shunt_max_verified",
     "preprocessing_average_n", "platform", "adc_mul", "firmware_sha256",
+)
+
+REQUIRED_METADATA_POWER_1_3 = REQUIRED_METADATA_POWER_1_1 + (
+    "bandwidth_basis", "bandwidth_is_nominal",
+    "shunt_ohm", "shunt_selection_note", "shunt_max_verified",
+    "platform", "adc_mul", "firmware_sha256",
+)
+
+REQUIRED_METADATA_RAW_1_3 = (
+    "dataset_role", "capture_repeats", "capture_contract_sha256",
+    "acquisition_status",
+)
+
+REQUIRED_METADATA_DERIVED_1_3 = (
+    "dataset_role", "source_dataset_sha256", "source_capture_contract_sha256",
+    "derivation_contract_sha256", "aggregation_kind", "aggregation_n",
+    "preprocessing_pipeline",
 )
 
 # ── Subset metadata(서브셋 메타데이터) (SCHEMA.md §4) ─────────────────
@@ -191,12 +211,34 @@ def _check_root_metadata(a, ver):
                        "에뮬레이션 트레이스의 축은 명령어여야 한다" % axis)
 
     if str(ch) == "power":
-        power_required = (REQUIRED_METADATA_POWER_1_2
-                          if ver == "1.2" else REQUIRED_METADATA_POWER_1_1)
+        power_required = (REQUIRED_METADATA_POWER_1_2 if ver == "1.2" else
+                          REQUIRED_METADATA_POWER_1_3 if ver == "1.3" else
+                          REQUIRED_METADATA_POWER_1_1)
         for key in power_required:
             if key not in a:
                 bad.append("루트 attrs 누락 (channel_type=power): %s "
                            "— 없으면 ISO/IEC 17825 Annex B 대역폭 요건을 판정할 수 없다" % key)
+
+    if ver == "1.3":
+        role = str(a.get("dataset_role", ""))
+        if role not in DATASET_ROLES:
+            bad.append("dataset_role 이 허용 목록 밖: %r (허용 %s)"
+                       % (role, list(DATASET_ROLES)))
+        required_role = (REQUIRED_METADATA_RAW_1_3 if role == "raw-acquisition" else
+                         REQUIRED_METADATA_DERIVED_1_3 if role == "derived-analysis" else ())
+        for key in required_role:
+            if key not in a:
+                bad.append("루트 attrs 누락 (schema 1.3 %s): %s" % (role or "?", key))
+        if role == "raw-acquisition":
+            if str(a.get("acquisition_status", "")) != "complete":
+                bad.append("1.3 원본 acquisition_status는 complete여야 한다")
+            if int(a.get("capture_repeats", 0)) < 1:
+                bad.append("1.3 원본 capture_repeats는 1 이상이어야 한다")
+        elif role == "derived-analysis":
+            if str(a.get("aggregation_kind", "")) != "mean":
+                bad.append("1.3 파생 aggregation_kind는 mean이어야 한다")
+            if int(a.get("aggregation_n", 0)) < 1:
+                bad.append("1.3 파생 aggregation_n은 1 이상이어야 한다")
 
     unit = a.get("exec_time_unit")
     if unit is not None and str(unit) not in EXEC_TIME_UNITS:
@@ -305,6 +347,62 @@ def _check_subset(h5, name, a, ver):
             expected = (g[F_TRACE].shape[0], repeats, 10)
             if shape != expected:
                 bad.append("/%s %s 형상 %s != %s" % (name, F_MASK_REPEATS, shape, expected))
+    if ver == "1.3":
+        bad += _check_subset_1_3(name, g, a)
+    return bad
+
+
+def _check_subset_1_3(name, g, attrs):
+    """1.3의 원본 Execution 행과 파생 평균 행 계약을 검사한다."""
+    bad = []
+    role = str(attrs.get("dataset_role", ""))
+    for field in (F_TRACE_REPEATS, F_EXEC_TIME_REPEATS, F_MASK_REPEATS):
+        if field in g:
+            bad.append("/%s Schema 1.3에는 1.2 반복 배열을 저장하지 않는다: %s"
+                       % (name, field))
+    required = [F_CIPHERTEXT, F_REPEAT_GROUP_ID]
+    if role == "raw-acquisition":
+        required += [F_EXEC_TIME, F_REPEAT_INDEX]
+    for field in required:
+        if field not in g:
+            bad.append("/%s 필수 배열 누락 (schema 1.3 %s): %s" % (name, role or "?", field))
+    if any(field not in g for field in required):
+        return bad
+
+    if role == "derived-analysis":
+        if g[F_TRACE].dtype != np.dtype("float64"):
+            bad.append("/%s 파생 trace dtype은 float64여야 한다 (현재 %s)"
+                       % (name, g[F_TRACE].dtype))
+        for field in (F_REPEAT_INDEX, F_EXEC_TIME, F_MASK):
+            if field in g:
+                bad.append("/%s 파생 Dataset에는 %s를 저장하지 않는다" % (name, field))
+        expected_gid = np.arange(g[F_TRACE].shape[0], dtype=np.uint64)
+        if not np.array_equal(np.asarray(g[F_REPEAT_GROUP_ID][:], dtype=np.uint64),
+                              expected_gid):
+            bad.append("/%s 파생 repeat_group_id가 원본 묶음 순서 0..n-1이 아니다" % name)
+        return bad
+
+    if role != "raw-acquisition":
+        return bad
+    repeats = int(attrs.get("capture_repeats", 0))
+    n = int(g[F_TRACE].shape[0])
+    if repeats < 1 or n % repeats:
+        bad.append("/%s 원본 행 수 %d가 capture_repeats=%d의 완성 묶음이 아니다"
+                   % (name, n, repeats))
+        return bad
+    groups = n // repeats
+    expected_gid = np.repeat(np.arange(groups, dtype=np.uint64), repeats)
+    expected_index = np.tile(np.arange(repeats, dtype=np.uint16), groups)
+    actual_gid = np.asarray(g[F_REPEAT_GROUP_ID][:], dtype=np.uint64)
+    actual_index = np.asarray(g[F_REPEAT_INDEX][:], dtype=np.uint16)
+    if not np.array_equal(actual_gid, expected_gid):
+        bad.append("/%s repeat_group_id가 0부터 연속인 완성 묶음이 아니다" % name)
+    if not np.array_equal(actual_index, expected_index):
+        bad.append("/%s repeat_index가 각 묶음의 0..%d가 아니다" % (name, repeats - 1))
+    for field in (F_KEY, F_PLAINTEXT, F_CIPHERTEXT):
+        values = np.asarray(g[field][:]).reshape(groups, repeats, -1)
+        if not np.all(values == values[:, :1, :]):
+            bad.append("/%s 같은 repeat_group 안 %s가 서로 다르다" % (name, field))
     return bad
 
 

@@ -186,7 +186,7 @@ def _annex_a_items(attrs, spec, results, A, level):
     out = []
 
     # A.2.1 / A.3.1 — 수집 시간 상한
-    lim = {3: 6.0, 4: 24.0}[level]
+    lim = float(spec["criteria"]["max_acquisition_hours"])
     secs = attrs.get("acquisition_seconds")
     if secs is None:
         out.append(_item("%s.1 `shall [07.01]`" % A, "수집 시간 상한 %g h" % lim, NR,
@@ -211,7 +211,7 @@ def _annex_a_items(attrs, spec, results, A, level):
     # A.2.4 / A.3.4 — 타이밍 측정 (Annex A 유일의 shall collect)
     r = (results or {}).get("tests", {}).get("ta", {})
     req = r.get("requirement")
-    need = {3: 1000, 4: 10000}[level]
+    need = int(spec["profile_requirements"]["ta_raw_per_block"])
     if req:
         out.append(_item("%s.4 **`shall collect`**" % A,
                          "타이밍 측정 각 %d회 (2블록)" % need,
@@ -240,32 +240,44 @@ def _annex_a_items(attrs, spec, results, A, level):
         out.append(_item("%s.2" % A, "SPA Trace 수·해상도", NR))
 
     # A.2.5 `shall [A.01]` — 전처리 (10회 평균)
-    avg = attrs.get("preprocessing_average_n")
+    if str(attrs.get("schema_version", "")) == "1.3" and \
+            str(attrs.get("dataset_role", "")) == "derived-analysis":
+        avg_key, avg = "aggregation_n", attrs.get("aggregation_n")
+    else:
+        avg_key, avg = "preprocessing_average_n", attrs.get("preprocessing_average_n")
     need_avg = 10
     if avg is None:
         out.append(_item("%s.5 `shall [A.01]` · `shall [07.10]`" % A,
                          "같은 입력 %d회 실행의 평균을 트레이스 1장으로" % need_avg, NR,
-                         note="preprocessing_average_n 이 데이터셋에 없다"))
+                         note="%s 이 데이터셋에 없다" % avg_key))
     else:
         out.append(_item("%s.5 `shall [A.01]` · `shall [07.10]`" % A,
                          "같은 입력 %d회 실행의 평균을 트레이스 1장으로" % need_avg,
                          OK if int(avg) >= need_avg else NG,
-                         evidence="preprocessing_average_n=%s" % avg,
-                         note=("에뮬레이션은 결정적이라 평균이 값을 바꾸지 않는다. 그래도 "
-                               "요건을 충족한 것은 아니므로 미준수로 적는다."
+                         evidence="%s=%s" % (avg_key, avg),
+                         note=("에뮬레이션은 결정적이라 평균값은 달라지지 않지만, 원본 10회 "
+                               "실행을 보존하고 파생 Dataset에서 평균해 절차 요건을 충족한다."
                                if str(attrs.get("channel_type")) == "emulated-power" else "")))
     if level == 4:
-        out.append(_item("A.3.5", "주파수 대역통과 필터 + 정적·동적 정렬", NG,
-                         note="1차 목표는 Level 3 이며 Level 4 전처리는 구현하지 않았다."))
+        pipeline = attrs.get("preprocessing_pipeline")
+        ok = bool(pipeline) and str(attrs.get("alignment")) == "static+dynamic"
+        out.append(_item("A.3.5", "주파수 대역통과 필터 + 정적·동적 정렬",
+                         OK if ok else NR,
+                         evidence=str(pipeline or "미기록"),
+                         note=("원본 반복 파형은 보존하고 파생 Dataset에서만 전처리한다."
+                               if ok else "파이프라인 메타데이터가 없어 수행했다고 주장하지 않는다.")))
 
     # A.2.6 `shall [A.02]` — 정렬
     align = attrs.get("alignment")
+    emulated = str(attrs.get("channel_type")) == "emulated-power"
+    align_note = ("명령어 경계가 결정적이며 sample_map의 동일 인덱스로 정렬된다."
+                  if emulated else
+                  "20회 트리거 길이 측정으로 관측 창을 정하고, 캡처 파형 길이가 다르면 중단한다.")
     out.append(_item("%s.6 `shall [A.02]`" % A,
                      "트레이스가 정렬되지 않으면 통계 시험을 수행하지 않는다",
                      OK if align is not None else NR,
                      evidence="alignment=%s" % align,
-                     note=("트리거(또는 심볼 경계) 동기만으로 정렬된다. 에뮬레이션은 "
-                           "결정적이라 어긋남이 없다." if align is not None else "")))
+                     note=(align_note if align is not None else "")))
     return out
 
 
@@ -366,9 +378,13 @@ def _procedure_items(attrs, spec, results):
     else:
         out.append(_item("§7.3.3 `shall [07.04]`", "벤더 정보 3항목", NR))
 
+    intermediate_evidence = bool(results and (
+        "soundness" in results.get("tests", {}) or
+        "cpa" in results.get("reference", {})))
     out.append(_item("§7.3.6 `shall [07.11]`", "보안 함수의 중간값을 계산한다",
-                     OK if results and "soundness" in results.get("tests", {}) else NR,
-                     evidence="aes_ref.intermediates() 로 라벨을 생성"))
+                     OK if intermediate_evidence else NR,
+                     evidence=("soundness/CPA 라벨 모델로 중간값을 계산"
+                               if intermediate_evidence else "계산 증거 없음")))
     out.append(_item("§7.3.3 `shall [07.05]`", "시험소가 CSP·암호문을 바꿀 수 있다", OK,
                      evidence="수집기가 키·평문을 매 레코드 주입한다"))
     out.append(_item("§7.3.1 `shall [07.02]` · Annex G",

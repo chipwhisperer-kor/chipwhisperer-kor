@@ -23,7 +23,7 @@
 | 어떤 메타데이터가 있어야 하는가 | ISO/IEC 17825:2024 Annex B·7.3, OPTIMIST Metadata 정의 |
 | 필드 이름·레이아웃·필수 여부 | **이 문서 (프로젝트 정의)** |
 
-`schema_version` 은 이 문서의 판번호다. 현재 **1.2**.
+`schema_version` 은 이 문서의 판번호다. 현재 **1.3**.
 
 > **1.1 은 필드를 더하기만 했다.** 기존 1.0 데이터셋은 그대로 유효하며, 검증기는
 > 파일에 적힌 판번호의 규칙으로 검사한다. 나중에 만든 규칙으로 옛 파일을 소급
@@ -36,6 +36,11 @@
 > 1.2가 더한 것: Level 3의 같은 입력 10회 평균을 검증할 수 있도록 실물 전력 Dataset에
 > 평균 전 `trace_repeats`·`exec_time_repeats`와 masked IUT의 실제 `mask_repeats`를
 > 보존한다. 명목 대역폭과 교정 실측값, 공장 션트값과 최대값 검증도 Metadata로 구분한다.
+>
+> 1.3이 바꾼 것: Execution 한 번을 Record 한 행으로 저장하는 `raw-acquisition`과,
+> 완성된 반복 묶음을 전처리·평균한 `derived-analysis`를 분리한다. 1.3 원본에는 평균값이
+> 없고 `repeat_group_id`·`repeat_index`로 같은 입력 10회를 묶는다. 1.2의 3차원 반복 배열은
+> 기존 파일에서만 유지하며 1.3 파일에는 사용하지 않는다.
 
 ---
 
@@ -80,7 +85,9 @@ Zarr 도 요건을 만족하지만 산출물이 디렉터리라 배포·이동�
       ├─ exec_time   (n,)          ← Attribute      [1.1, 선택] §4.2
       ├─ trace_repeats (n, r, ns)  ← 평균 전 원 파형 [1.2 power 필수]
       ├─ exec_time_repeats (n, r)  ← 반복별 트리거 길이 [1.2 power 필수]
-      └─ mask_repeats (n, r, 10)   ← 반복별 실제 마스크 [1.2 masked 선택]
+      ├─ mask_repeats (n, r, 10)   ← 반복별 실제 마스크 [1.2 masked 선택]
+      ├─ repeat_group_id (n,)      ← 같은 입력 Execution 묶음 [1.3]
+      └─ repeat_index (n,)         ← 묶음 안 실행 순번 [1.3 raw]
 ```
 
 **행 정렬 규칙:** 한 Subset 안의 모든 배열은 **행 수 n 이 같고, i 번째 행이 같은 Execution
@@ -294,6 +301,19 @@ ISO/IEC 17825 의 요건을 **판정 가능하게** 만드는 값들이다. 없�
 > `exec_time` 배열(§4.2)만 있고 `exec_time_unit` 이 없으면 그 숫자가 무엇의 개수인지
 > 알 수 없다. 단위 없는 물리량 필드는 금지다(§5.1).
 
+### 3.11 원본과 파생 역할 [1.3 필수]
+
+`dataset_role`은 다음 둘 중 하나다.
+
+| 역할 | 필수 Metadata | 의미 |
+|---|---|---|
+| `raw-acquisition` | `capture_repeats`, `capture_contract_sha256`, `acquisition_status="complete"` | 장비·에뮬레이터가 만든 Execution별 불변 원본 |
+| `derived-analysis` | `source_dataset_sha256`, `source_capture_contract_sha256`, `derivation_contract_sha256`, `aggregation_kind="mean"`, `aggregation_n`, `preprocessing_pipeline` | 원본에서 재생성 가능한 분석 입력 |
+
+원본의 `capture_contract_sha256`은 수집 전에 고정한 resolved spec, 실제 IUT 바이너리와
+수집 설정의 정규화 JSON을 해시한 값이다. 파생 계약은 원본 SHA-256, 전처리 설정과 구현
+버전을 포함한다. 경로나 파일 시각은 계약의 정본이 아니며 hash와 manifest가 정본이다.
+
 ---
 
 ## 4. Subset metadata(서브셋 메타데이터) — 그룹 HDF5 attrs
@@ -350,6 +370,19 @@ Subset **이름은 자유**지만 `role` 은 이 목록에서 고른다. 프로�
 반복 뒤 트리거 밖에서 실제 회수한 10바이트를 `mask_repeats`에 저장한다. 검증기는 대표값의
 평균 일치와 형상을 확인하므로 불완전 평균이나 행 어긋남이 분석으로 넘어갈 수 없다.
 
+### 4.4 실행별 원본과 파생 평균 [1.3]
+
+1.3 원본은 Execution 한 번을 `trace` 한 행으로 저장한다. 같은 key·plaintext·ciphertext의
+`capture_repeats`회는 `repeat_group_id`가 같고 `repeat_index`가 0부터 연속이어야 한다.
+묶음 전체가 성공한 뒤에만 모든 배열에 행을 추가한다. `mask`와 `exec_time`도 Execution별
+한 행이며 서로 다른 마스크는 정상이다.
+
+1.3 파생은 완성된 묶음마다 `trace` 한 행을 저장한다. dtype은 `float64`이고 원본의
+`sample_scale`로 정규화한 각 실행을 평균한다. 원본 묶음의 식별자는 `repeat_group_id`로
+보존한다. `repeat_index`와 평균 실행시간은 저장하지 않는다.
+TA는 파생값이 아니라 원본의 Execution별 `exec_time`을 사용한다.
+1.2의 `trace_repeats`·`exec_time_repeats`·`mask_repeats`는 어느 1.3 역할에도 저장하지 않는다.
+
 > 에뮬레이션의 `exec_time` 은 **명령어 수이지 사이클 수가 아니다.** Unicorn 에는 사이클
 > 모델이 없다(확인: `Uc` 에 사이클 카운터 API 없음). 명령어 수가 **다르면** 데이터 의존
 > 제어흐름이라는 확정 소견이지만, **같아도 constant-time 을 증명하지는 못한다.**
@@ -368,7 +401,7 @@ Subset **이름은 자유**지만 `role` 은 이 목록에서 고른다. 프로�
 
 ### 5.2 `trace` 의 값과 `sample_scale`
 
-`trace` 는 정수형(`int16` 등) 또는 부동소수점(`float32`)을 허용한다.
+`trace` 는 정수형(`int16` 등) 또는 부동소수점(`float32`, `float64`)을 허용한다.
 
 - **정수형이면 `sample_scale` 이 필수다.** 정규화 값 = `trace / sample_scale`.
 - 부동소수점이면 `sample_scale = 1.0` 으로 적는다.
@@ -415,15 +448,16 @@ Subset **이름은 자유**지만 `role` 은 이 목록에서 고른다. 프로�
 5. 1.1: `sample_axis="instruction"` 이면 §3.9 의 에뮬레이션 필드와 루트 `sample_map` 존재
 6. 1.1: `channel_type="power"` 이면 `bandwidth_hz` 존재
 7. 1.2 power: 반복 배열·실측/명목 구분 Metadata와 평균 일치
-8. Subset 마다 §4 의 필수 항목 존재, `role` 이 허용 목록 안
-9. `trace` · `key` · `plaintext` 존재
-10. **행 정렬** — 한 subset 안 모든 배열의 행 수 일치, `n_records` 와도 일치
-11. `sample_dtype` · `samples_per_trace` 가 실제 `trace` 와 일치
-12. 정수형 `trace` 인데 `sample_scale` 이 없으면 위반
+8. 1.3: Dataset 역할별 provenance와 원본 반복 묶음 또는 파생 평균 계약
+9. Subset 마다 §4 의 필수 항목 존재, `role` 이 허용 목록 안
+10. `trace` · `key` · `plaintext` 존재
+11. **행 정렬** — 한 subset 안 모든 배열의 행 수 일치, `n_records` 와도 일치
+12. `sample_dtype` · `samples_per_trace` 가 실제 `trace` 와 일치
+13. 정수형 `trace` 인데 `sample_scale` 이 없으면 위반
 
 위반 목록을 돌려주며, 비어 있으면 준수다. **수집 직후와 분석 시작 시** 호출한다.
 
-> **이전 판 파일에 1.2 규칙을 적용하지 않는다.** 나중에 만든 규칙으로 옛 파일을 소급
+> **이전 판 파일에 1.3 규칙을 적용하지 않는다.** 나중에 만든 규칙으로 옛 파일을 소급
 > 위반 처리하면, "부분 준수" 가 *데이터가 부실하다* 는 뜻인지 *스키마가 나중에 바뀌었다* 는
 > 뜻인지 구분할 수 없게 된다. 판번호는 그 구분을 위해 있다.
 

@@ -833,30 +833,30 @@
  577              		.file 8 "<built-in>"
 DEFINED SYMBOLS
                             *ABS*:00000000 simpleserial-base.c
-     /tmp/cc5PDQOw.s:19     .text.my_init:00000000 $t
-     /tmp/cc5PDQOw.s:25     .text.my_init:00000000 my_init
-     /tmp/cc5PDQOw.s:229    .text.my_init:000000a0 $d
-     /tmp/cc5PDQOw.s:235    .text.my_update:00000000 $t
-     /tmp/cc5PDQOw.s:241    .text.my_update:00000000 my_update
-     /tmp/cc5PDQOw.s:306    .text.my_update:00000044 $d
-     /tmp/cc5PDQOw.s:311    .text.my_final:00000000 $t
-     /tmp/cc5PDQOw.s:317    .text.my_final:00000000 my_final
-     /tmp/cc5PDQOw.s:382    .text.my_final:00000024 $d
-     /tmp/cc5PDQOw.s:390    .text.get_key:00000000 $t
-     /tmp/cc5PDQOw.s:396    .text.get_key:00000000 get_key
-     /tmp/cc5PDQOw.s:414    .text.get_pt:00000000 $t
-     /tmp/cc5PDQOw.s:420    .text.get_pt:00000000 get_pt
-     /tmp/cc5PDQOw.s:453    .text.reset:00000000 $t
-     /tmp/cc5PDQOw.s:459    .text.reset:00000000 reset
-     /tmp/cc5PDQOw.s:472    .text.startup.main:00000000 $t
-     /tmp/cc5PDQOw.s:478    .text.startup.main:00000000 main
-     /tmp/cc5PDQOw.s:536    .text.startup.main:0000003c $d
-     /tmp/cc5PDQOw.s:563    .bss:000002df global_len
-     /tmp/cc5PDQOw.s:567    .bss:000002e0 global_masks
-     /tmp/cc5PDQOw.s:559    .bss:000001ea global_ret
-     /tmp/cc5PDQOw.s:555    .bss:000000f5 global_p
-     /tmp/cc5PDQOw.s:551    .bss:00000000 global_k
-     /tmp/cc5PDQOw.s:552    .bss:00000000 $d
+     /tmp/ccUOaveM.s:19     .text.my_init:00000000 $t
+     /tmp/ccUOaveM.s:25     .text.my_init:00000000 my_init
+     /tmp/ccUOaveM.s:229    .text.my_init:000000a0 $d
+     /tmp/ccUOaveM.s:235    .text.my_update:00000000 $t
+     /tmp/ccUOaveM.s:241    .text.my_update:00000000 my_update
+     /tmp/ccUOaveM.s:306    .text.my_update:00000044 $d
+     /tmp/ccUOaveM.s:311    .text.my_final:00000000 $t
+     /tmp/ccUOaveM.s:317    .text.my_final:00000000 my_final
+     /tmp/ccUOaveM.s:382    .text.my_final:00000024 $d
+     /tmp/ccUOaveM.s:390    .text.get_key:00000000 $t
+     /tmp/ccUOaveM.s:396    .text.get_key:00000000 get_key
+     /tmp/ccUOaveM.s:414    .text.get_pt:00000000 $t
+     /tmp/ccUOaveM.s:420    .text.get_pt:00000000 get_pt
+     /tmp/ccUOaveM.s:453    .text.reset:00000000 $t
+     /tmp/ccUOaveM.s:459    .text.reset:00000000 reset
+     /tmp/ccUOaveM.s:472    .text.startup.main:00000000 $t
+     /tmp/ccUOaveM.s:478    .text.startup.main:00000000 main
+     /tmp/ccUOaveM.s:536    .text.startup.main:0000003c $d
+     /tmp/ccUOaveM.s:563    .bss:000002df global_len
+     /tmp/ccUOaveM.s:567    .bss:000002e0 global_masks
+     /tmp/ccUOaveM.s:559    .bss:000001ea global_ret
+     /tmp/ccUOaveM.s:555    .bss:000000f5 global_p
+     /tmp/ccUOaveM.s:551    .bss:00000000 global_k
+     /tmp/ccUOaveM.s:552    .bss:00000000 $d
 
 UNDEFINED SYMBOLS
 simpleserial_put

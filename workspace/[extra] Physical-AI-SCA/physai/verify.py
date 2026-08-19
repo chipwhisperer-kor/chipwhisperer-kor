@@ -19,31 +19,20 @@
 """
 
 import argparse
-import hashlib
 import json
 import sys
 
-from . import paths, report as report_mod, spec as spec_mod
+from . import artifacts, paths, report as report_mod, spec as spec_mod
 
 import sca_schema as S          # noqa: E402
 
 REQUIRED_DOCS = ("01_experiment_plan.md", "02_analysis_report.md",
-                 "03_evidence_manifest.md", "results.json", "manifest.json")
+                 "03_evidence_manifest.md", "01_experiment_plan.html",
+                 "02_analysis_report.html", "03_evidence_manifest.html",
+                 "results.json", "manifest.json")
 
 
-def _sha256(p):
-    """파일을 1 MiB씩 읽어 소문자 SHA-256 문자열을 반환한다.
-
-    파일을 변경하지 않으며 읽기 실패는 호출자에게 전파된다.
-    """
-    h = hashlib.sha256()
-    with open(p, "rb") as f:
-        for chunk in iter(lambda: f.read(1 << 20), b""):
-            h.update(chunk)
-    return h.hexdigest()
-
-
-def verify(run_id):
+def verify(run_id, study_path=None):
     """실행 ID의 증거 번들을 검증하고 문제·경고·확인 수를 사전으로 반환한다.
 
     파일 존재·크기·SHA-256, 보고서 구성, 명세 연결, Dataset 스키마를 검사한다. 툴체인
@@ -68,7 +57,7 @@ def verify(run_id):
         if not p.is_file():
             problems.append("파일 없음: %s" % f["path"])
             continue
-        actual = _sha256(p)
+        actual = artifacts.sha256_file(p)
         checked += 1
         if actual != f["sha256"]:
             problems.append("해시 불일치: %s\n      기록 %s\n      실제 %s"
@@ -85,7 +74,12 @@ def verify(run_id):
     # 3) spec 계약과 results 대응
     spec_path = paths.EXP / ("%s.yaml" % run_id)
     sp = None
-    if not spec_path.is_file():
+    if study_path:
+        try:
+            sp = spec_mod.load_from_study(study_path, run_id)
+        except Exception as e:
+            problems.append("study/spec 계약 위반: %s" % e)
+    elif not spec_path.is_file():
         problems.append("spec 이 없다: %s" % spec_path)
     else:
         try:
@@ -93,25 +87,36 @@ def verify(run_id):
         except Exception as e:
             problems.append("spec 계약 위반: %s" % e)
 
-    ds = None
+    datasets = {}
     rpath = out_dir / "results.json"
     if rpath.is_file():
         results = json.loads(rpath.read_text(encoding="utf-8"))
         if results.get("spec_id") != run_id:
             problems.append("results.json 의 spec_id(%s) 가 run(%s) 과 다르다"
                             % (results.get("spec_id"), run_id))
-        ds = paths.Path(results["dataset"])
+        for role, key in (("raw-acquisition", "source_dataset"),
+                          ("derived-analysis", "dataset")):
+            if key not in results:
+                problems.append("results.json에 %s 경로(%s)가 없다" % (role, key))
+            else:
+                datasets[role] = paths.Path(results[key])
 
-    # 4) Dataset이 여전히 스키마를 지키는가
-    if ds is None:
+    # 4) 불변 원본과 파생 분석 Dataset이 모두 존재하고 역할별 스키마를 지키는가
+    if not datasets:
         problems.append("results.json이 없어 Dataset을 찾을 수 없다")
-    elif not ds.is_file():
-        problems.append("Dataset이 없다: %s (용량 때문에 커밋하지 않는다 — "
-                        "재현하려면 collect 를 다시 돌린다)" % ds)
-    else:
+    for expected_role, ds in datasets.items():
+        if not ds.is_file():
+            problems.append("%s Dataset이 없다: %s" % (expected_role, ds))
+            continue
         bad = S.validate_dataset(path=ds)
         if bad:
-            problems.append("Dataset 스키마 위반 %d건: %s" % (len(bad), "; ".join(bad[:3])))
+            problems.append("%s Dataset 스키마 위반 %d건: %s"
+                            % (expected_role, len(bad), "; ".join(bad[:3])))
+            continue
+        actual_role = str(S.root_attrs(ds).get("dataset_role", ""))
+        if actual_role != expected_role:
+            problems.append("Dataset 역할 불일치: %s는 %s여야 하나 %s"
+                            % (ds, expected_role, actual_role))
 
     # 5) 툴체인 (경고)
     now = report_mod._toolchain()
@@ -121,7 +126,7 @@ def verify(run_id):
 
     return {"ok": not problems, "run": run_id, "files_checked": checked,
             "problems": problems, "warnings": warnings,
-            "dataset": str(ds) if ds else None}
+            "datasets": {role: str(path) for role, path in datasets.items()}}
 
 
 def main(argv=None):
@@ -132,10 +137,11 @@ def main(argv=None):
     """
     ap = argparse.ArgumentParser(prog="physai.verify")
     ap.add_argument("--run", required=True)
+    ap.add_argument("--study", default=None)
     ap.add_argument("--quiet", action="store_true")
     a = ap.parse_args(argv)
 
-    r = verify(a.run)
+    r = verify(a.run, a.study)
     if not a.quiet:
         print("=" * 66)
         print(" 증거 번들 검증 — %s" % a.run)

@@ -18,15 +18,10 @@ import time
 import h5py
 import numpy as np
 
-from . import paths, spec as spec_mod
+from . import artifacts, paths, spec as spec_mod
 from .collectors import cw_power, emulation
 
 import sca_schema as S          # noqa: E402  (paths 가 workspace/lib 를 넣는다)
-
-# HDF5 스트리밍 버퍼의 레코드 수다. 판정 기준이 아니며, 200개씩만 메모리에 보관해
-# 전체 수집량이 늘어도 버퍼 크기가 커지지 않게 한다.
-BATCH = 200
-
 
 def _rng_for(seed, subset_name):
     """subset 마다 결정적이면서 서로 다른 난수열.
@@ -73,7 +68,7 @@ def _make_inputs(sub, rng, fixed_key, fixed_pt, n):
 #   different-data-random  → key_mode=fixed,  pt_mode=random  (평문이 다르다)
 
 
-def collect_emulation(spec, out_path, verbose=True, resume=False):
+def collect_emulation(spec, out_path=None, verbose=True, resume=False):
     """명세의 Subset을 순서대로 에뮬레이션해 Dataset을 담은 HDF5 파일을 만든다.
 
     첫 실행의 누설 모델 산출물에서 Trace 길이를 확인한다. 기존 파일은 ``resume=True``일
@@ -91,8 +86,26 @@ def collect_emulation(spec, out_path, verbose=True, resume=False):
     fixed_key = rng_fix.randint(0, 256, 16).astype(np.uint8)
     fixed_pt = rng_fix.randint(0, 256, 16).astype(np.uint8)
     has_masks = emulation._has_masks(iut)
+    # 수집 계약은 ELF 자체 해시만 필요하다. metadata()는 첫 trace 실행 뒤 확정되는
+    # leakage_segments도 요구하므로 여기서 호출하면 신규 수집이 시작되기 전에 실패한다.
+    binary_sha = str(tgt.sha256)
+    contract_sha = artifacts.capture_contract(spec, binary_sha)
+    out_path = (artifacts.raw_path(spec["id"], contract_sha) if out_path is None
+                else paths.Path(out_path))
 
-    # 첫 실행으로 트레이스 길이를 확정한다. 상수로 정하지 않는다.
+    if out_path.exists():
+        with h5py.File(out_path, "r") as h5:
+            if str(h5.attrs.get("acquisition_status", "")) == "complete":
+                if str(h5.attrs.get("capture_contract_sha256", "")) != contract_sha:
+                    raise RuntimeError("완료 원본의 수집 계약이 현재 계약과 다르다: %s" % out_path)
+                S.require_schema(out_path)
+                return out_path, contract_sha
+            if not resume:
+                raise FileExistsError("미완성 원본이 있다. 검증 후 이어받으려면 --resume: %s"
+                                      % out_path)
+
+    # 새 수집이나 명시적 resume에서만 첫 실행으로 트레이스 길이를 확정한다. 완성 원본을
+    # 재사용할 때 이 파일럿 실행조차 하지 않아 collect가 실제로 read-only가 되게 한다.
     k0 = bytes(fixed_key)
     p0 = bytes(fixed_pt)
     _, _, tr0, _ = tgt.run(k0, p0, seed, trace=True)
@@ -102,18 +115,17 @@ def collect_emulation(spec, out_path, verbose=True, resume=False):
               % (tgt.n_instr, len(tgt.components), ns))
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    if out_path.exists() and not resume:
-        raise FileExistsError("기존 Dataset을 덮어쓰지 않는다. 이어받으려면 --resume: %s"
-                              % out_path)
     t_start = time.time()
 
     mode = "a" if out_path.exists() else "w"
     with h5py.File(out_path, mode) as h5:
         if mode == "w":
-            _write_root_metadata(h5, spec, tgt, ns)
+            _write_root_metadata(h5, spec, tgt, ns, contract_sha)
             h5.create_dataset(S.F_SAMPLE_MAP, data=tgt.sample_map(), dtype=np.uint32)
         else:
-            for key, expected in (("spec_id", spec["id"]), ("rng_seed", seed)):
+            for key, expected in (("spec_id", spec["id"]), ("rng_seed", seed),
+                                  ("capture_contract_sha256", contract_sha),
+                                  ("dataset_role", "raw-acquisition")):
                 if key not in h5.attrs or h5.attrs[key] != expected:
                     raise RuntimeError("resume 계약 불일치: %s (파일=%r, 명세=%r)"
                                        % (key, h5.attrs.get(key), expected))
@@ -132,76 +144,46 @@ def collect_emulation(spec, out_path, verbose=True, resume=False):
                 rows = {name: d.shape[0] for name, d in g.items()}
                 if len(set(rows.values())) != 1:
                     raise RuntimeError("resume 행 정렬 불일치 /%s: %s" % (sub["name"], rows))
-                have = next(iter(rows.values()), 0)
-                if have > n or not np.array_equal(g[S.F_KEY][:], keys[:have]) or \
-                        not np.array_equal(g[S.F_PLAINTEXT][:], pts[:have]):
+                repeats = int(spec["criteria"]["preprocessing"]["average_n"])
+                have_rows = next(iter(rows.values()), 0)
+                if have_rows % repeats:
+                    raise RuntimeError("resume 파일에 불완전 반복 묶음이 있다: /%s" % sub["name"])
+                have = have_rows // repeats
+                if have > n or not np.array_equal(g[S.F_KEY][::repeats], keys[:have]) or \
+                        not np.array_equal(g[S.F_PLAINTEXT][::repeats], pts[:have]):
                     raise RuntimeError("resume 입력 prefix 또는 목표 수 불일치: /%s"
                                        % sub["name"])
             else:
-                g = h5.create_group(sub["name"])
-                g.attrs["role"] = sub["role"]
-                g.attrs["n_records"] = 0
-                g.attrs["key_mode"] = sub["key_mode"]
-                g.attrs["pt_mode"] = sub["pt_mode"]
-                if "spa_pair_kind" in sub:
-                    g.attrs["spa_pair_kind"] = sub["spa_pair_kind"]
-                if has_masks:
-                    g.attrs["mask_seeds"] = seeds
-                g.create_dataset(S.F_TRACE, shape=(0, ns), dtype=np.int16,
-                                 chunks=(min(BATCH, n), ns), maxshape=(None, ns))
-                g.create_dataset(S.F_KEY, shape=(0, 16), dtype=np.uint8,
-                                 chunks=True, maxshape=(None, 16))
-                g.create_dataset(S.F_PLAINTEXT, shape=(0, 16), dtype=np.uint8,
-                                 chunks=True, maxshape=(None, 16))
-                g.create_dataset(S.F_CIPHERTEXT, shape=(0, 16), dtype=np.uint8,
-                                 chunks=True, maxshape=(None, 16))
-                g.create_dataset(S.F_EXEC_TIME, shape=(0,), dtype=np.uint32,
-                                 chunks=True, maxshape=(None,))
-                if has_masks:
-                    g.create_dataset(S.F_MASK, shape=(0, 10), dtype=np.uint8,
-                                     chunks=True, maxshape=(None, 10))
+                repeats = int(spec["criteria"]["preprocessing"]["average_n"])
+                g = cw_power._new_group(h5, sub, ns, repeats, has_masks)
                 have = 0
 
-            d_t, d_k, d_p = g[S.F_TRACE], g[S.F_KEY], g[S.F_PLAINTEXT]
-            d_o, d_e = g[S.F_CIPHERTEXT], g[S.F_EXEC_TIME]
-            d_m = g[S.F_MASK] if has_masks else None
-
+            repeats = int(spec["criteria"]["preprocessing"]["average_n"])
             t0 = time.time()
-            buf_t = np.empty((BATCH, ns), dtype=np.int16)
-            buf_o = np.empty((BATCH, 16), dtype=np.uint8)
-            buf_e = np.empty(BATCH, dtype=np.uint32)
-            buf_m = np.empty((BATCH, 10), dtype=np.uint8) if has_masks else None
-            fill = 0
-            base = have
             for i in range(have, n):
-                ct, mk, tr, et = tgt.run(bytes(keys[i]), bytes(pts[i]),
-                                         int(seeds[i]), trace=True)
-                buf_t[fill] = tr
-                buf_o[fill] = np.frombuffer(ct, dtype=np.uint8)
-                buf_e[fill] = et
-                if has_masks:
-                    buf_m[fill] = np.frombuffer(mk, dtype=np.uint8)
-                fill += 1
-                if fill == BATCH or i == n - 1:
-                    for dset in (d_t, d_k, d_p, d_o, d_e):
-                        dset.resize(base + fill, axis=0)
-                    if d_m is not None:
-                        d_m.resize(base + fill, axis=0)
-                    d_t[base:base + fill] = buf_t[:fill]
-                    d_k[base:base + fill] = keys[base:base + fill]
-                    d_p[base:base + fill] = pts[base:base + fill]
-                    d_o[base:base + fill] = buf_o[:fill]
-                    d_e[base:base + fill] = buf_e[:fill]
+                trace_rows = np.empty((repeats, ns), dtype=np.int16)
+                time_rows = np.empty(repeats, dtype=np.uint32)
+                mask_rows = np.empty((repeats, 10), dtype=np.uint8) if has_masks else None
+                ciphertext = None
+                for repeat in range(repeats):
+                    repeat_seed = (int(seeds[i]) + repeat * 0x9E3779B1) & 0x7FFFFFFF
+                    ct, mk, tr, et = tgt.run(bytes(keys[i]), bytes(pts[i]),
+                                             repeat_seed, trace=True)
+                    if ciphertext is not None and ct != ciphertext:
+                        raise RuntimeError("같은 입력 반복의 암호문이 달라졌다: /%s[%d]"
+                                           % (sub["name"], i))
+                    ciphertext = ct
+                    trace_rows[repeat] = tr
+                    time_rows[repeat] = et
                     if has_masks:
-                        d_m[base:base + fill] = buf_m[:fill]
-                    base += fill
-                    g.attrs["n_records"] = base
-                    h5.flush()
-                    fill = 0
-                    if verbose:
-                        pct = 100.0 * base / n
-                        print("\r  /%-14s %6d/%d (%5.1f%%)" % (sub["name"], base, n, pct),
-                              end="", flush=True)
+                        mask_rows[repeat] = np.frombuffer(mk, dtype=np.uint8)
+                cw_power._append_record(g, keys[i], pts[i], ciphertext,
+                                        trace_rows, time_rows, mask_rows)
+                h5.flush()
+                if verbose:
+                    base = i + 1
+                    print("\r  /%-14s %6d/%d (%5.1f%%)" %
+                          (sub["name"], base, n, 100.0 * base / n), end="", flush=True)
             g.attrs["seconds"] = time.time() - t0
             if verbose:
                 print("   %.1fs" % g.attrs["seconds"])
@@ -210,11 +192,12 @@ def collect_emulation(spec, out_path, verbose=True, resume=False):
         # 없어 복구할 일이 없으므로 적지 않는다 — 빈 배열을 남기면 "복구 없음" 과
         # "이 채널에는 개념이 없음" 이 구분되지 않는다.
         h5.attrs["acquisition_seconds"] = time.time() - t_start
+        h5.attrs["acquisition_status"] = "complete"
 
-    return out_path
+    return out_path, contract_sha
 
 
-def _write_root_metadata(h5, spec, tgt, ns):
+def _write_root_metadata(h5, spec, tgt, ns, contract_sha256):
     """에뮬레이션 Dataset의 루트 HDF5 attrs를 열린 파일에 기록한다.
 
     입력은 쓰기 가능한 h5py 파일, 검증된 명세, 초기화된 타겟, Trace당 Sample 수다.
@@ -227,6 +210,10 @@ def _write_root_metadata(h5, spec, tgt, ns):
     c = spec["criteria"]
     h5.attrs["schema"] = S.SCHEMA
     h5.attrs["schema_version"] = S.SCHEMA_VERSION
+    h5.attrs["dataset_role"] = "raw-acquisition"
+    h5.attrs["capture_repeats"] = int(c["preprocessing"]["average_n"])
+    h5.attrs["capture_contract_sha256"] = str(contract_sha256)
+    h5.attrs["acquisition_status"] = "collecting"
 
     h5.attrs["target_name"] = "emulated:%s" % tgt.metadata()["instruction_set"]
     h5.attrs["target_device"] = "Unicorn ARM (Cortex-M4 코드, 사이클 모델 없음)"
@@ -263,9 +250,9 @@ def _write_root_metadata(h5, spec, tgt, ns):
 
     h5.attrs["exec_time_unit"] = "instruction"
     h5.attrs["exec_time_epsilon"] = 1.0        # 명령어 1개
-    h5.attrs["preprocessing_average_n"] = int(c["preprocessing"]["average_n"])
-
     h5.attrs["spec_id"] = spec["id"]
+    h5.attrs["assessment_profile"] = spec["assessment_profile"]
+    h5.attrs["campaign_stage"] = spec["campaign_stage"]
     h5.attrs["schema_note"] = (
         "에뮬레이션 채널. trace 값은 측정치가 아니라 leakage_model 의 출력이다. "
         "target_clock_hz=0 은 에뮬레이터에 클럭이 없다는 뜻이며 "
@@ -282,14 +269,27 @@ def main(argv=None):
     """
     ap = argparse.ArgumentParser(prog="physai.collect",
                                  description="spec → SCHEMA.md 검증을 통과하는 Dataset 생성")
-    ap.add_argument("--spec", required=True)
-    ap.add_argument("--out", default=None, help="생략하면 traces/<spec.id>.h5")
+    ap.add_argument("--spec", default=None, help="독립 v2 experiment YAML")
+    ap.add_argument("--study", default=None, help="v2 study YAML")
+    ap.add_argument("--experiment", default=None, help="--study에서 실행할 experiment id")
+    ap.add_argument("--out", default=None, help="생략하면 수집 계약 해시 기반 traces/raw 경로")
     ap.add_argument("--resume", action="store_true",
                     help="기존 파일의 계약·입력 prefix가 일치할 때 다음 완성 레코드부터 재개")
     ap.add_argument("--quiet", action="store_true")
     a = ap.parse_args(argv)
 
-    sp = spec_mod.load(a.spec)
+    if bool(a.spec) == bool(a.study):
+        ap.error("--spec 또는 --study 중 정확히 하나가 필요하다")
+    if a.study and not a.experiment:
+        ap.error("--study에는 --experiment가 필요하다")
+    sp = (spec_mod.load(a.spec) if a.spec else
+          spec_mod.load_from_study(a.study, a.experiment))
+    sealed_dataset = sealed_manifest = None
+    manifest_path = artifacts.capture_manifest_path(sp["id"])
+    if manifest_path.is_file():
+        # 같은 ID의 봉인 원본이 다른 기준으로 재해석되기 전에 중단한다. 이 검사를 계획
+        # 보고서보다 먼저 두어 잘못된 명세가 기존 evidence 파일도 덮어쓰지 못하게 한다.
+        sealed_dataset, sealed_manifest = artifacts.load_capture_manifest(sp["id"], sp)
     if not a.quiet:
         print("\n".join(spec_mod.summary_lines(sp)))
         print("-" * 66)
@@ -298,20 +298,34 @@ def main(argv=None):
     # 구조적으로 불가능하도록 순서를 고정한 것이다 (§8.4 `shall [08.04]`).
     # 지연 import: report 는 matplotlib 을 쓰므로 수집만 할 때 불러올 이유가 없다.
     from . import report as report_mod
-    plan = report_mod.write_plan(sp, paths.run_dir(sp["id"], create=True))
+    run_dir = paths.run_dir(sp["id"], create=True)
+    resolved = run_dir / "resolved_spec.json"
+    resolved.write_text(json.dumps(sp, ensure_ascii=False, indent=2), encoding="utf-8")
+    plan = report_mod.write_plan(sp, run_dir)
     if not a.quiet:
         print("계획 보고서(수집 전): %s" % plan.relative_to(paths.PROJECT))
         print("-" * 66)
 
-    out = paths.TRACES / ("%s.h5" % sp["id"]) if a.out is None else paths.Path(a.out)
-    kind = sp["collector"]["kind"]
-    if kind == "emulation":
-        collect_emulation(sp, out, verbose=not a.quiet, resume=a.resume)
-    else:  # JSON Schema가 지원 종류를 emulation과 cw_power로 한정한다.
-        cw_power.collect(sp, out, verbose=not a.quiet, resume=a.resume)
+    if sealed_dataset is not None:
+        if a.out is not None and paths.Path(a.out).resolve() != sealed_dataset:
+            raise RuntimeError("봉인 manifest의 원본과 --out이 다르다: %s != %s"
+                               % (sealed_dataset, paths.Path(a.out).resolve()))
+        out = sealed_dataset
+        contract_sha = sealed_manifest["capture_contract_sha256"]
+    else:
+        out = None if a.out is None else paths.Path(a.out)
+        kind = sp["collector"]["kind"]
+        if kind == "emulation":
+            out, contract_sha = collect_emulation(sp, out, verbose=not a.quiet, resume=a.resume)
+        else:  # JSON Schema가 지원 종류를 emulation과 cw_power로 한정한다.
+            out, contract_sha = cw_power.collect(sp, out, verbose=not a.quiet, resume=a.resume)
 
     bad = S.validate_dataset(path=out)
+    manifest = manifest_path if sealed_dataset is not None else None
+    if not bad and manifest is None:
+        manifest = artifacts.write_capture_manifest(sp, out, contract_sha)
     result = {"ok": not bad, "spec": sp["id"], "dataset": str(out),
+              "capture_manifest": str(manifest) if manifest else None,
               "schema_violations": bad}
     if not a.quiet:
         print("-" * 66)

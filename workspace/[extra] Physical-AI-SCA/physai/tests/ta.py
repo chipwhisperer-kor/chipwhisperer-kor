@@ -138,11 +138,13 @@ def run(dataset_path, spec):
     unit = str(attrs.get("exec_time_unit", ""))
     eps = float(attrs.get("exec_time_epsilon", 1.0))
     lvl = int(spec["criteria"]["security_level"])
-    need = {3: 1000, 4: 10000}[lvl]
+    need = int(spec["profile_requirements"]["ta_raw_per_block"])
 
     subs = [s for s in spec["subsets"] if s["role"] == "timing"]
     if not subs:
         return {"verdict": "not-applicable",
+                "procedure_status": "incomplete", "statistical_power": "not-applicable",
+                "early_finding": "not-applicable", "preassessment_verdict": "not-applicable",
                 "reason": "role=timing 인 subset 이 없다",
                 "requirement": {"met": False,
                                 "note": "A.%d.4 는 각 1,000/10,000 회 수집을 shall 로 요구한다" % (2 if lvl == 3 else 3)}}
@@ -166,18 +168,27 @@ def run(dataset_path, spec):
             stages.append({"stage": label, "verdict": "not-applicable",
                            "reason": "해당 규약의 subset 이 없다"})
             continue
-        try:
-            g = S.load_group(dataset_path, sub["name"],
-                             fields=[S.F_EXEC_TIME_REPEATS, split_field])
-            repeats = int(g[S.F_EXEC_TIME_REPEATS].shape[1])
-            exec_time = g[S.F_EXEC_TIME_REPEATS].reshape(-1)
-            split_values = np.repeat(g[split_field][:, 0], repeats)
-        except KeyError:
+        if str(attrs.get("dataset_role", "")) == "raw-acquisition":
             g = S.load_group(dataset_path, sub["name"],
                              fields=[S.F_EXEC_TIME, split_field])
-            repeats = 1
+            repeats = int(attrs["capture_repeats"])
             exec_time = g[S.F_EXEC_TIME]
             split_values = g[split_field][:, 0]
+            logical_records = int(exec_time.shape[0] // repeats)
+        else:
+            try:
+                g = S.load_group(dataset_path, sub["name"],
+                                 fields=[S.F_EXEC_TIME_REPEATS, split_field])
+                repeats = int(g[S.F_EXEC_TIME_REPEATS].shape[1])
+                exec_time = g[S.F_EXEC_TIME_REPEATS].reshape(-1)
+                split_values = np.repeat(g[split_field][:, 0], repeats)
+            except KeyError:
+                g = S.load_group(dataset_path, sub["name"],
+                                 fields=[S.F_EXEC_TIME, split_field])
+                repeats = 1
+                exec_time = g[S.F_EXEC_TIME]
+                split_values = g[split_field][:, 0]
+            logical_records = int(g[split_field].shape[0])
         # 트레이스 수는 **목표치가 아니라 실보유량**으로 센다. spec 의 n 을 믿으면 수집이
         # 중간에 끊긴 데이터셋에서 요건 충족을 거짓으로 보고하게 된다.
         have = int(exec_time.shape[0])
@@ -185,7 +196,7 @@ def run(dataset_path, spec):
             shortfall.append("%s: %d장 (요구 %d장)" % (sub["name"], have, need))
         r = _stage(exec_time, split_values, eps, alpha, label)
         r["subset"] = sub["name"]
-        r["logical_records"] = int(g[split_field].shape[0])
+        r["logical_records"] = logical_records
         r["repeats_per_record"] = repeats
         stages.append(r)
         if r["verdict"] == "fail":
@@ -205,6 +216,11 @@ def run(dataset_path, spec):
     cycle_accurate = unit != "instruction"
     out = {
         "verdict": overall,
+        "procedure_status": "complete",
+        "statistical_power": "sufficient" if not shortfall else "underpowered",
+        "early_finding": "detected" if overall == "fail" else "not-detected-at-N",
+        "preassessment_verdict": overall,
+        "claim_scope": "실행시간의 CSP·평문 의존성과 분산 차이",
         "stages": stages,
         "instrument": unit or "미기록",
         "epsilon": eps,

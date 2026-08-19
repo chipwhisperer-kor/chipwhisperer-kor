@@ -1,0 +1,12 @@
+schema_version: 2
+id: "demo_0_1_l3_cw_lab"
+title: "Physical-AI-SCA 기본 L3 CW Lab 파일럿"
+assessment_profile: "iso-17825-l3"
+campaign_stage: "cw-lab-pilot"
+algorithm: "aes-128-ecb"
+experiments:
+  - {spec: "exp/demo_l3lab_emul_tinyaes.yaml", role: "positive-control"}
+  - {spec: "exp/demo_l3lab_emul_masked.yaml", role: "supporting-channel", compare_with: "demo_l3lab_emul_tinyaes"}
+  - {spec: "exp/demo_l3lab_hw_tinyaes.yaml", role: "positive-control", compare_with: "demo_l3lab_emul_tinyaes"}
+  - {spec: "exp/demo_l3lab_hw_masked.yaml", role: "iut", compare_with: "demo_l3lab_hw_tinyaes"}
+publication: {grok_assist: true, grok_audit: true}

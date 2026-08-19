@@ -82,12 +82,14 @@ def run(dataset_path, spec, key_schedule_window=None):
     필드·Subset 누락은 스키마 로더 예외 또는 `not-applicable` 결과로 드러난다.
     """
     lvl = int(spec["criteria"]["security_level"])
-    need_traces = {3: 11, 4: 21}[lvl]
-    need_points = {3: 100, 4: 1000}[lvl]
+    need_traces = int(spec["profile_requirements"]["spa_required_traces"])
+    need_points = int(spec["profile_requirements"]["spa_points_per_csp_bit"])
 
     subs = [s for s in spec["subsets"] if s["role"] == "simple-analysis"]
     if not subs:
         return {"verdict": "not-applicable",
+                "procedure_status": "incomplete", "statistical_power": "not-applicable",
+                "early_finding": "not-applicable", "preassessment_verdict": "inconclusive",
                 "reason": "role=simple-analysis 인 subset 이 없다",
                 "requirement": {"met": False,
                                 "note": "A.%d.2는 Trace %d장을 요구한다" % (2 if lvl == 3 else 3, need_traces)}}
@@ -110,8 +112,10 @@ def run(dataset_path, spec, key_schedule_window=None):
             groups[kind]["key_schedule"] = _pair_distance(tr[:, cols])
 
     same = groups.get("same-data")
-    # 같은 입력에서의 차이 = 관측 잡음의 상한. 에뮬레이션은 결정적이라 0 이어야 한다.
+    # 같은 입력에서의 차이 = 관측 잡음의 상한. 결정적 에뮬레이션만 0을 기대한다.
     noise = same["full"]["max_abs_diff"] if same else 0.0
+    emulated = "emulated-power" in spec["scope"]["channels"]
+    masked = spec["iut"]["countermeasure"] != "none"
 
     # 판정 근거는 **키가 다른 쌍**뿐이다 (§8.3.1 — key derivation).
     # 평문이 다른 쌍은 참고로만 싣는다.
@@ -165,12 +169,17 @@ def run(dataset_path, spec, key_schedule_window=None):
 
     return {
         "verdict": verdict,
+        "procedure_status": "complete",
+        "statistical_power": "sufficient" if enough else "underpowered",
+        "early_finding": ("detected" if key_leak else "not-detected-at-N"),
+        "preassessment_verdict": "inconclusive",
+        "claim_scope": "자동 통계 절차만 완료; 사람의 SPA 육안 검토는 포함하지 않음",
         "statistical_verdict": stat,
         "verdict_scope": ("이 도구는 SPA 의 최종 판정을 내지 않는다. A.2.2 는 육안 검사와 "
-                          "통계 검정을 **둘 다** 통과하라고 요구하는데 육안은 사람의 행위이고, "
-                          "잡음 바닥이 0인 결정적 채널에서는 '키가 다르면 트레이스도 다르다'가 "
-                          "거의 항상 참이라 그것만으로 fail 을 내면 판별력이 없다. "
-                          "관측값과 `statistical_verdict` 를 근거로 사람이 판정한다."),
+                          "통계 검정을 **둘 다** 통과하라고 요구하는데 육안은 사람의 행위다. "
+                          "키가 다른 파형의 차이만으로 비밀 의존성과 실제 공격 가능성을 "
+                          "확정할 수 없으므로, 관측 잡음 바닥과 `statistical_verdict` 및 "
+                          "증거 그림을 함께 보고 사람이 판정한다."),
         "statistical_verdict_meaning": {
             "key-dependent-structure-observed":
                 "키가 다른 단일 트레이스들이 잡음 바닥을 넘어 구별된다 — §8.3.1이 지목한 "
@@ -183,12 +192,7 @@ def run(dataset_path, spec, key_schedule_window=None):
         "clause": "ISO/IEC 17825 §7.3.5·§8.3.1, Annex A.%d.2" % (2 if lvl == 3 else 3),
         "target": "key derivation (key schedule) — §8.3.1 이 지목한 대칭키 SPA 표적",
         "noise_floor": noise,
-        "noise_floor_note": ("같은 입력 쌍의 최대 절대차 = 판정의 기준선. "
-                             "**대책이 없는 구현**이면 에뮬레이션은 결정적이므로 0 이어야 하고, "
-                             "0 이 아니면 데이터가 아니라 관측 절차를 의심한다. "
-                             "**마스킹 구현**이면 같은 입력이어도 마스크가 매번 새로 뽑혀 0 이 "
-                             "아니며, 그 변동이 곧 대책이 만들어 낸 잡음 바닥이다 — 키 의존 "
-                             "차이가 이 값을 넘어야 SPA 누설로 센다."),
+        "noise_floor_note": _noise_floor_note(emulated, masked),
         "findings": findings,
         "judged_on": ("키가 다른 트레이스 쌍(different-data-fixed)만 판정에 넣는다. "
                       "평문이 다르면 트레이스도 다른 것은 모든 구현에서 당연하므로 "
@@ -196,7 +200,7 @@ def run(dataset_path, spec, key_schedule_window=None):
         "key_dependent_single_trace": bool(key_leak),
         "key_schedule_leak": bool(ks_leak),
         "visual_inspection": {
-            "status": "미결 — 사람 확인 필요",
+            "status": "pending",
             "required_by": "ISO/IEC 17825 A.%d.2 — 육안과 통계 **둘 다** 통과해야 한다"
                            % (2 if lvl == 3 else 3),
             "artifact": "spa_traces.svg (증거 번들)",
@@ -209,3 +213,17 @@ def run(dataset_path, spec, key_schedule_window=None):
         },
         "_groups": groups,          # 그림용
     }
+
+
+def _noise_floor_note(emulated, masked):
+    """수집 채널과 대책에 맞는 같은-입력 잡음 바닥의 의미를 반환한다."""
+    prefix = "같은 입력 쌍의 최대 절대차 = 판정의 경험적 기준선. "
+    if not emulated:
+        return (prefix + "실물 전력 채널에서는 계측 잡음·동기 오차가 포함되고, 마스킹 구현이면 "
+                "마스크 재난수화 변동도 포함된다. 키 의존 차이는 이 기준선과 증거 그림을 "
+                "함께 검토하며, 이 값만으로 SPA 최종 판정을 내리지 않는다.")
+    if masked:
+        return (prefix + "결정적 에뮬레이션이라도 마스킹 구현은 같은 입력에서 마스크를 새로 "
+                "뽑으므로 0이 아닐 수 있다. 이 변동을 기준으로 삼되 최종 판정은 사람이 한다.")
+    return (prefix + "대책 없는 결정적 에뮬레이션은 같은 입력에서 0을 기대한다. 0이 아니면 "
+            "수집 재현성과 입력 계약을 점검하며, 이 값만으로 SPA 최종 판정을 내리지 않는다.")

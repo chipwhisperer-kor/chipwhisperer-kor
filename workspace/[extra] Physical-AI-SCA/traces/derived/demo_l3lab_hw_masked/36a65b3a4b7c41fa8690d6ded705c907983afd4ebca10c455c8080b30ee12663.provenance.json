@@ -1,0 +1,58 @@
+{
+  "profile": "iso-17825-l3",
+  "source": "/workspace/[extra] Physical-AI-SCA/traces/raw/demo_l3lab_hw_masked/c782f22f7e63b2dcb518d244000b6c1694881689a11c5cb3942c562d55020d09.h5",
+  "source_sha256": "e4a367fd23e23a00fea61a13671415e0ef54f15d6bfbbba84388d51fa54b3bd8",
+  "derived": "/workspace/[extra] Physical-AI-SCA/traces/derived/demo_l3lab_hw_masked/36a65b3a4b7c41fa8690d6ded705c907983afd4ebca10c455c8080b30ee12663.h5",
+  "derived_sha256": "c3456b7d2391f8897a64c4b0f4b299878e6995c2879ecf7e2456747edd851034",
+  "derivation_contract_sha256": "36a65b3a4b7c41fa8690d6ded705c907983afd4ebca10c455c8080b30ee12663",
+  "contract": {
+    "pipeline_version": 1,
+    "source_dataset_sha256": "e4a367fd23e23a00fea61a13671415e0ef54f15d6bfbbba84388d51fa54b3bd8",
+    "assessment_profile": "iso-17825-l3",
+    "preprocessing": {
+      "average_n": 10,
+      "alignment": "trigger-checked",
+      "filter": null
+    },
+    "aggregation_kind": "mean",
+    "aggregation_n": 10,
+    "trace_dtype": "float64"
+  },
+  "pipeline": "mean-10",
+  "metrics": {
+    "attack": {
+      "records": 128,
+      "repeats": 10
+    },
+    "spa_diffkey": {
+      "records": 4,
+      "repeats": 10
+    },
+    "spa_diffpt": {
+      "records": 4,
+      "repeats": 10
+    },
+    "spa_same": {
+      "records": 4,
+      "repeats": 10
+    },
+    "ta_fk_rp": {
+      "records": 32,
+      "repeats": 10
+    },
+    "ta_rk_fp": {
+      "records": 32,
+      "repeats": 10
+    },
+    "tvla_fk": {
+      "records": 64,
+      "repeats": 10
+    },
+    "tvla_rk": {
+      "records": 64,
+      "repeats": 10
+    }
+  },
+  "alignment_mapping_sha256": null,
+  "evidence_npz": null
+}

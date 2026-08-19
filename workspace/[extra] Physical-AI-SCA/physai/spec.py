@@ -1,12 +1,11 @@
-"""실험 명세(spec) 로드·검증, 그리고 명세에서 유도되는 값 계산.
+"""v2 실험·study 계약 로드와 프로파일 유도값 계산.
 
-spec 은 **AI 와 도구 사이의 유일한 접점**이다. AI 가 실험을 설계해 YAML 로 쓰고,
-collect·analyze 가 그것만 읽는다. 사람이 손으로 써도 똑같이 동작한다.
-
-여기서 계산하는 유도값(필요 트레이스 수 N, 보정 임계)은 spec 에 적지 않는다 —
-파라미터의 **결과**이지 판단이 아니기 때문이다. 적어 두면 파라미터와 어긋날 수 있다.
+YAML은 수집 전에 고정하는 원시 계약이고 ``profiles.py``는 수치 기준의 유일한 정의다.
+``load()``는 두 정보를 결합한 실행용 사전을 반환한다. v1을 묵시적으로 보정하지 않는
+이유는 어떤 프로파일·단계를 의도했는지 추측하면 기존 결과의 의미가 바뀌기 때문이다.
 """
 
+from copy import deepcopy
 import json
 from pathlib import Path
 
@@ -14,158 +13,191 @@ import yaml
 from jsonschema import Draft202012Validator
 from scipy.stats import norm
 
-from . import paths
+from . import paths, profiles
+from .algorithms import get as get_algorithm
 
 SCHEMA_PATH = paths.CONTRACTS / "experiment_spec.schema.json"
+STUDY_SCHEMA_PATH = paths.CONTRACTS / "study.schema.json"
 
 
 class SpecError(ValueError):
-    """spec 이 계약을 어겼다. 메시지에 위반 목록을 담는다."""
+    """명세 또는 study 계약 위반 전체를 사람이 고칠 수 있는 메시지로 담는다."""
 
 
-def load(spec_path):
-    """spec YAML 을 읽고 계약(JSON Schema)에 맞는지 검사한다.
+def _validate(document, schema_path, label):
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    errors = sorted(Draft202012Validator(schema).iter_errors(document),
+                    key=lambda e: list(e.absolute_path))
+    if errors:
+        lines = ["%s: %s" % ("/".join(str(x) for x in e.absolute_path) or "(root)",
+                             e.message) for e in errors]
+        raise SpecError("%s 계약 위반 %d건:\n  - %s"
+                        % (label, len(lines), "\n  - ".join(lines)))
 
-    출력: dict
-    실패 조건: 파일이 없으면 FileNotFoundError, 계약 위반이면 SpecError(전체 목록).
 
-    위반을 하나씩 던지지 않고 모아서 던지는 이유는 검증기와 같다 — 첫 번째만 고치면
-    다음 것이 또 나온다.
+def load(spec_path, defaults=None):
+    """v2 experiment YAML을 검증하고 프로파일이 적용된 실행용 명세를 반환한다.
+
+    ``defaults``는 study가 소유한 assessment_profile/campaign_stage/algorithm 세 참조만
+    제공한다. experiment가 같은 값을 복제하면 오류를 내지는 않지만 study와 다르면 즉시
+    거부한다. 파일 누락, YAML 형식, 계약 또는 교차 필드 위반은 예외로 전파된다.
     """
     p = Path(spec_path)
     if not p.is_file():
         raise FileNotFoundError("spec 이 없다: %s" % p)
-    spec = yaml.safe_load(p.read_text(encoding="utf-8"))
+    raw = yaml.safe_load(p.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        raise SpecError("spec 최상위는 객체여야 한다: %s" % p)
+    if raw.get("schema_version") != 2:
+        raise SpecError("v1 명세는 지원하지 않는다: %s. schema_version: 2로 명시적으로 마이그레이션한다."
+                        % p.name)
+    raw = deepcopy(raw)
+    for key in ("assessment_profile", "campaign_stage", "algorithm"):
+        if defaults and key in defaults:
+            if key in raw and raw[key] != defaults[key]:
+                raise SpecError("study.%s=%r와 %s의 %s=%r가 다르다"
+                                % (key, defaults[key], p.name, key, raw[key]))
+            raw[key] = defaults[key]
+    _validate(raw, SCHEMA_PATH, p.name)
+    get_algorithm(raw["algorithm"])
+    _check_cross_field(raw, p.name)
+    resolved = profiles.resolve(raw)
+    resolved["_spec_path"] = str(p.resolve())
+    return resolved
 
-    schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
-    errors = sorted(Draft202012Validator(schema).iter_errors(spec),
-                    key=lambda e: list(e.absolute_path))
-    if errors:
-        lines = ["%s: %s" % ("/".join(str(x) for x in e.absolute_path) or "(root)", e.message)
-                 for e in errors]
-        raise SpecError("spec 계약 위반 %d건 (%s):\n  - %s"
-                        % (len(lines), p.name, "\n  - ".join(lines)))
 
-    _check_cross_field(spec, p.name)
-    return spec
+def load_study(study_path):
+    """study YAML을 검증하고 참조 experiment 경로를 프로젝트 절대경로로 해석한다."""
+    p = Path(study_path)
+    if not p.is_file():
+        raise FileNotFoundError("study 가 없다: %s" % p)
+    study = yaml.safe_load(p.read_text(encoding="utf-8"))
+    if not isinstance(study, dict) or study.get("schema_version") != 2:
+        raise SpecError("study는 schema_version: 2 객체여야 한다: %s" % p)
+    _validate(study, STUDY_SCHEMA_PATH, p.name)
+    get_algorithm(study["algorithm"])
+    out = deepcopy(study)
+    for item in out["experiments"]:
+        candidate = paths.PROJECT / item["spec"]
+        if not candidate.is_file():
+            raise SpecError("study experiment 파일이 없다: %s" % item["spec"])
+        item["spec_path"] = candidate
+    return out
 
 
-def _check_cross_field(spec, name):
-    """JSON Schema 로 표현할 수 없는 규칙 — 필드끼리의 정합성."""
+def study_experiments(study_path):
+    """study 순서를 보존해 ``(experiment metadata, resolved spec)`` 목록을 반환한다."""
+    study = load_study(study_path)
+    defaults = {k: study[k] for k in ("assessment_profile", "campaign_stage", "algorithm")}
+    found, out = set(), []
+    for item in study["experiments"]:
+        sp = load(item["spec_path"], defaults=defaults)
+        sp["_study_path"] = str(Path(study_path).resolve())
+        if sp["id"] in found:
+            raise SpecError("study 안의 experiment id가 중복된다: %s" % sp["id"])
+        found.add(sp["id"])
+        out.append((item, sp))
+    for item, sp in out:
+        other = item.get("compare_with")
+        if other and other not in found:
+            raise SpecError("%s compare_with 대상이 study에 없다: %s" % (sp["id"], other))
+    return study, out
+
+
+def load_from_study(study_path, experiment_id):
+    """study에서 ID가 일치하는 단일 실행용 experiment를 반환한다."""
+    _, experiments = study_experiments(study_path)
+    for _, sp in experiments:
+        if sp["id"] == experiment_id:
+            return sp
+    raise SpecError("study에 experiment가 없다: %s" % experiment_id)
+
+
+def _check_cross_field(raw, name):
     bad = []
-    c = spec["criteria"]
-    if c["security_level"] != spec["scope"]["target_level"]:
-        bad.append("criteria.security_level(%s) 과 scope.target_level(%s) 이 다르다"
-                   % (c["security_level"], spec["scope"]["target_level"]))
-
-    # Annex A.2.3 / A.3.3 이 정한 표준 effect size. 다른 값을 쓰는 것 자체는 막지 않되,
-    # 표준값과 다르면 대조표에서 근거를 대야 하므로 여기서 경고 대신 오류로 잡는다.
-    expected_d = {3: 0.04, 4: 0.01}[c["security_level"]]
-    if abs(c["effect_size_d"] - expected_d) > 1e-12:
-        bad.append("effect_size_d=%s 인데 Level %d 의 표준값은 %s 다 "
-                   "(ISO/IEC 17825 A.%d.3). 의도한 값이면 rationale 에 근거를 적고 이 검사를 지운다."
-                   % (c["effect_size_d"], c["security_level"], expected_d,
-                      2 if c["security_level"] == 3 else 3))
-
-    if spec["collector"]["kind"] == "emulation":
-        if not spec["collector"].get("components"):
-            bad.append("collector.kind=emulation 이면 components 가 필요하다")
-        if not spec["collector"].get("window"):
-            bad.append("collector.kind=emulation 이면 window 가 필요하다")
-        if "emulated-power" not in spec["scope"]["channels"]:
-            bad.append("collector.kind=emulation 인데 scope.channels 에 emulated-power 가 없다")
-
-    names = [s["name"] for s in spec["subsets"]]
+    if raw["collector"]["kind"] == "emulation":
+        if not raw["collector"].get("components") or not raw["collector"].get("window"):
+            bad.append("collector.kind=emulation이면 components와 window가 필요하다")
+        if "emulated-power" not in raw["scope"]["channels"]:
+            bad.append("emulation 수집기인데 scope.channels에 emulated-power가 없다")
+    names = [s["name"] for s in raw["subsets"]]
     if len(set(names)) != len(names):
         bad.append("subset 이름이 중복된다: %s" % names)
-
-    # 필수 시험(ta·spa·dpa)에 필요한 subset 이 실제로 있는가.
-    roles = {s["role"] for s in spec["subsets"]}
-    need = {"ta": {"timing"},
-            "spa": {"simple-analysis"},
-            "dpa": {"leakage-detection-fixed", "leakage-detection-random"},
-            "soundness": {"profiling"},
-            "cpa": {"attack"}}
-    for a in spec["analyses"]:
-        missing = need.get(a, set()) - roles
+    by_name = {s["name"]: s for s in raw["subsets"]}
+    need_roles = {"ta": {"timing"}, "spa": {"simple-analysis"},
+                  "tvla": {"leakage-detection-fixed", "leakage-detection-random"},
+                  "dpa": {"attack"}, "soundness": {"profiling"}, "cpa": {"attack"}}
+    roles = {s["role"] for s in raw["subsets"]}
+    for analysis in raw["analyses"]:
+        missing = need_roles.get(analysis, set()) - roles
         if missing:
-            bad.append("analyses 에 '%s' 가 있는데 role %s 인 subset 이 없다"
-                       % (a, sorted(missing)))
-
+            bad.append("analysis %s에 필요한 role이 없다: %s" % (analysis, sorted(missing)))
+    ai = raw["analysis_inputs"]
+    for analysis, keys in (("tvla", ("fixed", "random")), ("dpa", ("subset",)),
+                           ("cpa", ("subset",))):
+        if analysis not in raw["analyses"]:
+            continue
+        for key in keys:
+            subset = ai[analysis][key]
+            if subset not in by_name:
+                bad.append("analysis_inputs.%s.%s가 없는 subset을 가리킨다: %s"
+                           % (analysis, key, subset))
+    algo = get_algorithm(raw["algorithm"])
+    if ai["dpa"]["target"] not in algo.DPA_TARGETS:
+        bad.append("알고리즘이 지원하지 않는 DPA target: %s" % ai["dpa"]["target"])
+    if "cpa" in raw["analyses"] and not algo.CPA_SUPPORTED:
+        bad.append("algorithm %s은 CPA 모델을 제공하지 않는다" % raw["algorithm"])
+    if "soundness" in raw["analyses"] and not algo.SOUNDNESS_SUPPORTED:
+        bad.append("algorithm %s은 soundness 모델을 제공하지 않는다" % raw["algorithm"])
     if bad:
         raise SpecError("spec 정합성 위반 %d건 (%s):\n  - %s"
                         % (len(bad), name, "\n  - ".join(bad)))
 
 
-# ─────────────────────────────────────────────────────────────
-# spec 에서 유도되는 값
-# ─────────────────────────────────────────────────────────────
 def required_n(criteria):
-    """ISO/IEC 17825 Formula (1) — DPA 에 필요한 총 트레이스 수.
-
-        N = 4 (Z_{α/2} + Z_β)² / d²
-
-    두 subset 을 합친 수다(N = N_A + N_B). 트레이스 수는 판단이 아니라 α·β·d 의 **결과**이므로
-    spec 에 적지 않고 여기서 계산해 계획 보고서에 근거와 함께 싣는다.
-    """
+    """ISO/IEC 17825 Formula (1)의 두 집단 합계 N을 계산한다."""
     a, b, d = criteria["alpha"], criteria["beta"], criteria["effect_size_d"]
-    z_a = norm.ppf(1.0 - a / 2.0)
-    z_b = norm.ppf(1.0 - b)
-    n = 4.0 * (z_a + z_b) ** 2 / (d ** 2)
-    return {"n_required": int(round(n)), "z_alpha_half": float(z_a), "z_beta": float(z_b),
+    za, zb = norm.ppf(1.0 - a / 2.0), norm.ppf(1.0 - b)
+    n = 4.0 * (za + zb) ** 2 / d ** 2
+    return {"n_required": int(round(n)), "z_alpha_half": float(za), "z_beta": float(zb),
             "formula": "N = 4 (Z_{alpha/2} + Z_beta)^2 / d^2",
             "source": "ISO/IEC 17825:2024 Formula (1)"}
 
 
 def corrected_threshold(criteria, n_tests):
-    """다중비교 보정 후의 t 임계.
-
-    §8.4 `shall [08.03]` 이 보정을 요구한다. Sample이 수만 개인 Trace에서 보정 없이
-    |t| > 4.5 를 쓰면 귀무가설이 참이어도 수십 개가 우연히 넘는다.
-
-    Bonferroni: per-test 유의수준 α/m 에 해당하는 정규분포 양측 임계를 쓴다.
-    (자유도가 큰 t 분포는 정규분포에 수렴하므로 정규 근사로 충분하다. 트레이스가
-     수천 개 이상인 이 시험의 조건에서 그렇다.)
-    """
+    """사전 지정 하한과 Bonferroni 보정 임계 중 더 엄격한 값을 반환한다."""
     t0 = float(criteria["t_threshold"])
     kind = criteria["multiplicity_correction"]
     if kind == "none" or n_tests <= 1:
         return {"threshold": t0, "correction": kind, "n_tests": int(n_tests),
                 "alpha_per_test": float(criteria["alpha"])}
     alpha_per = float(criteria["alpha"]) / float(n_tests)
-    t_corr = float(norm.ppf(1.0 - alpha_per / 2.0))
-    return {"threshold": max(t_corr, t0), "correction": "bonferroni",
+    corrected = float(norm.ppf(1.0 - alpha_per / 2.0))
+    return {"threshold": max(corrected, t0), "correction": "bonferroni",
             "n_tests": int(n_tests), "alpha_per_test": alpha_per,
-            "threshold_uncorrected": t0,
-            "note": "보정 임계와 spec 의 t_threshold 중 큰 값을 쓴다 — 둘 다 하한이다."}
+            "threshold_uncorrected": t0}
 
 
 def summary_lines(spec):
-    """검증된 명세를 수집 시작 전에 보여 줄 한국어 줄 목록으로 변환한다.
-
-    판정 기준·유도된 Trace 수·주장하지 않는 범위를 포함한다. 출력이나 파일 쓰기는 하지
-    않으며, 필수 필드가 없으면 `KeyError`가 발생한다.
-    """
-    c = spec["criteria"]
-    n = required_n(c)
+    """수집 전에 프로파일·단계·유도 수량과 주장 제한을 사람이 검토할 줄로 만든다."""
+    c, need = spec["criteria"], required_n(spec["criteria"])
     out = [
         "spec         : %s — %s" % (spec["id"], spec["title"]),
+        "프로파일     : %s / %s" % (spec["assessment_profile"], spec["campaign_stage"]),
+        "알고리즘     : %s" % spec["algorithm"],
         "IUT          : %s (대책: %s)" % (spec["iut"]["name"], spec["iut"]["countermeasure"]),
-        "수집기       : %s" % spec["collector"]["kind"],
-        "채널         : %s" % ", ".join(spec["scope"]["channels"]),
-        "판정 기준    : Level %d, d=%s, α=%s, β=%s, %s 보정, |t|>%s"
+        "판정 기준    : Level %d, d=%s, α=%s, β=%s, %s, |t|>%s"
         % (c["security_level"], c["effect_size_d"], c["alpha"], c["beta"],
            c["multiplicity_correction"], c["t_threshold"]),
-        "Formula (1)  : N = %d 장 필요 (Z_α/2=%.4f, Z_β=%.4f)"
-        % (n["n_required"], n["z_alpha_half"], n["z_beta"]),
+        "Formula (1)  : N = %d 논리 트레이스" % need["n_required"],
         "전처리       : 평균 %d회, 정렬 %s"
         % (c["preprocessing"]["average_n"], c["preprocessing"]["alignment"]),
         "분석         : %s" % ", ".join(spec["analyses"]),
         "주장하지 않음:",
     ]
-    out += ["  - %s" % s for s in spec["scope"]["not_claimed"]]
-    out.append("Subset       :")
+    out += ["  - %s" % x for x in spec["scope"]["not_claimed"]]
+    out.append("Subset:")
     for s in spec["subsets"]:
-        out.append("  /%-14s [%-24s] %7d 장  키=%s 평문=%s"
+        out.append("  /%-14s [%-24s] %7d장 키=%s 평문=%s"
                    % (s["name"], s["role"], s["n"], s["key_mode"], s["pt_mode"]))
     return out

@@ -1,9 +1,8 @@
-"""ChipWhisperer Lite + Husky 실물 전력 수집기.
+"""ChipWhisperer Lite + Husky 실물 전력 원본 수집기.
 
-논리 레코드 하나는 같은 키·평문을 ``average_n``회 모두 성공적으로 캡처한 뒤에만 HDF5에
-추가한다. 대표 ``trace``와 ``exec_time``은 원 반복 배열의 반올림 평균이며, 원 파형·트리거
-길이·masked IUT의 실제 회수 마스크는 별도 배열에 보존한다. 따라서 평균 근거와 행 정렬을
-Dataset 하나만으로 검증할 수 있다.
+Execution 한 번을 HDF5 한 행으로 보존한다. 같은 입력 10회는 메모리에서 완성한 뒤
+``repeat_group_id``·``repeat_index``가 있는 10행으로 함께 추가한다. 평균은 수집기가 만들지
+않고 파생 분석 Dataset 생성기가 계산한다.
 
 복구는 자연 발생한 정상 캡처 실패에만 실행한다. 타깃 reset, 장비 reconnect와 설정 복원,
 Husky SAM 펌웨어 재기록을 차례로 각각 최대 3회 시도하며 인위적인 실패를 만들지 않는다.
@@ -13,7 +12,6 @@ Husky SAM 펌웨어 재기록을 차례로 각각 최대 3회 시도하며 인�
 from __future__ import annotations
 
 import datetime
-import hashlib
 import json
 import platform as platform_mod
 import sys
@@ -23,7 +21,7 @@ from pathlib import Path
 import h5py
 import numpy as np
 
-from .. import paths
+from .. import artifacts, paths
 
 if str(paths.SCALIB) not in sys.path:
     sys.path.insert(0, str(paths.SCALIB))
@@ -36,15 +34,6 @@ STATUS = "구현됨 — 실제 완료 여부는 실행 Dataset·manifest·verify
 SS_VER = "SS_VER_2_1"
 CRYPTO_TARGET = "NONE"
 MAX_RECOVERY_TRIES = 3
-
-
-def _sha256(path):
-    """파일을 1 MiB씩 읽어 SHA-256 문자열을 반환하며 파일을 변경하지 않는다."""
-    digest = hashlib.sha256()
-    with open(path, "rb") as stream:
-        for chunk in iter(lambda: stream.read(1 << 20), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _device_inventory(cw):
@@ -230,13 +219,19 @@ def _expected_inputs(spec):
     return fixed_key, fixed_pt, expected
 
 
-def _write_root(h5, spec, bench, elf_path, trigger_counts):
+def _write_root(h5, spec, bench, elf_path, trigger_counts, contract_sha256):
     """실행 시점의 실제 장비 설정과 명세의 명목 프로브 근거를 분리해 기록한다."""
     coll = spec["collector"]
     husky = bench.husky
     h5.attrs["schema"] = S.SCHEMA
     h5.attrs["schema_version"] = S.SCHEMA_VERSION
+    h5.attrs["dataset_role"] = "raw-acquisition"
+    h5.attrs["capture_repeats"] = int(spec["criteria"]["preprocessing"]["average_n"])
+    h5.attrs["capture_contract_sha256"] = str(contract_sha256)
+    h5.attrs["acquisition_status"] = "collecting"
     h5.attrs["spec_id"] = spec["id"]
+    h5.attrs["assessment_profile"] = spec["assessment_profile"]
+    h5.attrs["campaign_stage"] = spec["campaign_stage"]
     h5.attrs["target_name"] = coll["platform"]
     h5.attrs["target_device"] = "STM32F303RCT7 on CW308T-STM32F3"
     h5.attrs["target_clock_hz"] = float(bench.clk_hz)
@@ -254,14 +249,13 @@ def _write_root(h5, spec, bench, elf_path, trigger_counts):
     h5.attrs["sample_scale"] = 32768.0
     h5.attrs["trigger_source"] = "userio_d0"
     h5.attrs["trigger_semantics"] = coll["window"]["semantics"]
-    h5.attrs["alignment"] = spec["criteria"]["preprocessing"]["alignment"]
+    h5.attrs["alignment"] = "none"
     h5.attrs["acquisition_start"] = datetime.datetime.now().isoformat(timespec="seconds")
     h5.attrs["tool_chain"] = "chipwhisperer %s; python %s; numpy %s" % (
         bench.cw.__version__, platform_mod.python_version(), np.__version__)
     h5.attrs["rng_seed"] = int(spec["seed"])
     h5.attrs["exec_time_unit"] = "adc_sample"
     h5.attrs["exec_time_epsilon"] = float(coll["adc_mul"])
-    h5.attrs["preprocessing_average_n"] = int(spec["criteria"]["preprocessing"]["average_n"])
     h5.attrs["platform"] = coll["platform"]
     h5.attrs["adc_mul"] = int(coll["adc_mul"])
     h5.attrs["bandwidth_hz"] = float(coll["bandwidth_hz"])
@@ -270,7 +264,7 @@ def _write_root(h5, spec, bench, elf_path, trigger_counts):
     h5.attrs["shunt_ohm"] = float(coll["shunt_ohm"])
     h5.attrs["shunt_selection_note"] = coll["shunt_selection_note"]
     h5.attrs["shunt_max_verified"] = bool(coll["shunt_max_verified"])
-    h5.attrs["firmware_sha256"] = _sha256(elf_path)
+    h5.attrs["firmware_sha256"] = artifacts.sha256_file(elf_path)
     h5.attrs["firmware_path"] = str(elf_path.relative_to(paths.WORKSPACE))
     h5.attrs["trigger_measurements"] = np.asarray(trigger_counts, dtype=np.uint32)
     h5.attrs["device_inventory_redacted"] = json.dumps(bench.inventory, sort_keys=True)
@@ -281,12 +275,15 @@ def _write_root(h5, spec, bench, elf_path, trigger_counts):
     h5.attrs["recoveries"] = np.asarray([], dtype="S24")
 
 
-def _check_resume(h5, spec, expected):
-    """기존 파일이 같은 명세·seed·입력 순서·평균 횟수인지 읽기만 해 확인한다."""
+def _check_resume(h5, spec, expected, contract_sha256):
+    """미완성 원본이 같은 계약·입력 순서의 완성 반복 묶음까지만 가졌는지 확인한다."""
+    repeats = int(spec["criteria"]["preprocessing"]["average_n"])
     checks = {
         "spec_id": spec["id"],
         "rng_seed": int(spec["seed"]),
-        "preprocessing_average_n": int(spec["criteria"]["preprocessing"]["average_n"]),
+        "capture_repeats": repeats,
+        "capture_contract_sha256": str(contract_sha256),
+        "dataset_role": "raw-acquisition",
     }
     for key, value in checks.items():
         if key not in h5.attrs or h5.attrs[key] != value:
@@ -299,21 +296,26 @@ def _check_resume(h5, spec, expected):
         rows = {name: d.shape[0] for name, d in g.items()}
         if len(set(rows.values())) != 1:
             raise RuntimeError("resume 행 정렬 불일치 /%s: %s" % (sub["name"], rows))
-        have = next(iter(rows.values()), 0)
+        have_rows = next(iter(rows.values()), 0)
+        if have_rows % repeats:
+            raise RuntimeError("resume 파일에 불완전 반복 묶음이 있다 /%s: %d행"
+                               % (sub["name"], have_rows))
+        have = have_rows // repeats
         if have > int(sub["n"]):
             raise RuntimeError("resume 파일이 명세 목표보다 많다 /%s: %d > %d"
                                % (sub["name"], have, sub["n"]))
         keys, pts = expected[sub["name"]]
-        if have and (not np.array_equal(g[S.F_KEY][:], keys[:have]) or
-                     not np.array_equal(g[S.F_PLAINTEXT][:], pts[:have])):
+        if have and (not np.array_equal(g[S.F_KEY][::repeats], keys[:have]) or
+                     not np.array_equal(g[S.F_PLAINTEXT][::repeats], pts[:have])):
             raise RuntimeError("resume 입력 prefix 불일치: /%s" % sub["name"])
 
 
 def _new_group(h5, sub, ns, repeats, with_masks):
-    """한 Subset의 resizable 배열을 모두 빈 상태로 만들고 그룹을 반환한다."""
+    """Execution 한 행 구조의 resizable 원본 Subset을 만든다."""
     g = h5.create_group(sub["name"])
     g.attrs["role"] = sub["role"]
     g.attrs["n_records"] = 0
+    g.attrs["n_repeat_groups"] = 0
     g.attrs["key_mode"] = sub["key_mode"]
     g.attrs["pt_mode"] = sub["pt_mode"]
     if "spa_pair_kind" in sub:
@@ -323,61 +325,72 @@ def _new_group(h5, sub, ns, repeats, with_masks):
     g.create_dataset(S.F_CIPHERTEXT, (0, 16), maxshape=(None, 16), dtype=np.uint8, chunks=True)
     g.create_dataset(S.F_TRACE, (0, ns), maxshape=(None, ns), dtype=np.int16,
                      chunks=(1, ns))
-    g.create_dataset(S.F_TRACE_REPEATS, (0, repeats, ns), maxshape=(None, repeats, ns),
-                     dtype=np.int16, chunks=(1, repeats, ns))
     g.create_dataset(S.F_EXEC_TIME, (0,), maxshape=(None,), dtype=np.uint32, chunks=True)
-    g.create_dataset(S.F_EXEC_TIME_REPEATS, (0, repeats), maxshape=(None, repeats),
-                     dtype=np.uint32, chunks=True)
+    g.create_dataset(S.F_REPEAT_GROUP_ID, (0,), maxshape=(None,), dtype=np.uint64, chunks=True)
+    g.create_dataset(S.F_REPEAT_INDEX, (0,), maxshape=(None,), dtype=np.uint16, chunks=True)
     if with_masks:
-        g.create_dataset(S.F_MASK_REPEATS, (0, repeats, 10), maxshape=(None, repeats, 10),
-                         dtype=np.uint8, chunks=True)
+        g.create_dataset(S.F_MASK, (0, 10), maxshape=(None, 10), dtype=np.uint8, chunks=True)
     return g
 
 
 def _append_record(g, key, plaintext, ciphertext, traces, times, masks=None):
-    """완성된 반복 묶음을 같은 행에 추가하고 쓰기 실패 시 모든 배열 크기를 되돌린다."""
-    trace = np.rint(traces.astype(np.float64).mean(axis=0)).astype(np.int16)
-    exec_time = np.uint32(np.rint(times.astype(np.float64).mean()))
+    """완성된 반복 묶음을 Execution별 행으로 추가하고 실패 시 전 배열을 되돌린다."""
+    repeats = int(traces.shape[0])
+    group_id = int(g.attrs.get("n_repeat_groups", 0))
     payload = {
-        S.F_KEY: np.asarray(key, dtype=np.uint8),
-        S.F_PLAINTEXT: np.asarray(plaintext, dtype=np.uint8),
-        S.F_CIPHERTEXT: np.frombuffer(ciphertext, dtype=np.uint8),
-        S.F_TRACE: trace,
-        S.F_TRACE_REPEATS: traces,
-        S.F_EXEC_TIME: exec_time,
-        S.F_EXEC_TIME_REPEATS: times,
+        S.F_KEY: np.repeat(np.asarray(key, dtype=np.uint8)[None, :], repeats, axis=0),
+        S.F_PLAINTEXT: np.repeat(np.asarray(plaintext, dtype=np.uint8)[None, :], repeats, axis=0),
+        S.F_CIPHERTEXT: np.repeat(np.frombuffer(ciphertext, dtype=np.uint8)[None, :], repeats, axis=0),
+        S.F_TRACE: np.asarray(traces, dtype=np.int16),
+        S.F_EXEC_TIME: np.asarray(times, dtype=np.uint32),
+        S.F_REPEAT_GROUP_ID: np.full(repeats, group_id, dtype=np.uint64),
+        S.F_REPEAT_INDEX: np.arange(repeats, dtype=np.uint16),
     }
     if masks is not None:
-        payload[S.F_MASK_REPEATS] = masks
+        payload[S.F_MASK] = np.asarray(masks, dtype=np.uint8)
     before = {name: d.shape[0] for name, d in g.items()}
     try:
         for name, value in payload.items():
             dset = g[name]
-            dset.resize(before[name] + 1, axis=0)
-            dset[-1] = value
+            dset.resize(before[name] + repeats, axis=0)
+            dset[-repeats:] = value
     except Exception:
         for name, size in before.items():
             g[name].resize(size, axis=0)
         raise
     g.attrs["n_records"] = int(g[S.F_TRACE].shape[0])
+    g.attrs["n_repeat_groups"] = group_id + 1
 
 
-def collect(spec, out_path, verbose=True, resume=False):
+def collect(spec, out_path=None, verbose=True, resume=False):
     """실물 펌웨어 빌드·플래시·설정 후 명세의 모든 논리 레코드를 수집한다.
 
     기존 파일은 ``resume=True``일 때만 열며 계약과 입력 prefix가 맞지 않으면 장비 수집 전에
     중단한다. 성공하면 완성 경로를 반환하고 장비는 항상 닫는다. 캡처·복구·골든 AES·마스크
     회수·파일 오류는 예외로 전파되며 불완전한 논리 레코드는 저장하지 않는다.
     """
-    out_path = Path(out_path)
     fixed_key, fixed_pt, expected = _expected_inputs(spec)
-    if out_path.exists() and not resume:
-        raise FileExistsError("기존 Dataset을 덮어쓰지 않는다. 이어받으려면 --resume: %s" % out_path)
+    firmware_hex, firmware_elf = _build_firmware(spec)
+    # ChipWhisperer make의 기본 target은 매번 전체 링크를 수행한다. ELF에는 플래시되지 않는
+    # 링크·디버그 메타데이터가 있어 같은 기계어인데도 파일 해시가 바뀌지만, 실제 장치에 쓰는
+    # Intel HEX는 동일하다. 수집 계약은 실행 의미를 가진 플래시 이미지 해시로 고정하고,
+    # HDF5 firmware_sha256에는 Schema 1.3 정의대로 그 실행 때의 ELF 원본 해시를 별도 기록한다.
+    firmware_image_sha = artifacts.sha256_file(firmware_hex)
+    contract_sha = artifacts.capture_contract(spec, firmware_image_sha)
+    out_path = (artifacts.raw_path(spec["id"], contract_sha) if out_path is None
+                else Path(out_path))
     if out_path.exists():
         with h5py.File(out_path, "r") as h5:
-            _check_resume(h5, spec, expected)
+            if str(h5.attrs.get("acquisition_status", "")) == "complete":
+                if str(h5.attrs.get("capture_contract_sha256", "")) != contract_sha:
+                    raise RuntimeError("완료 원본의 수집 계약이 현재 계약과 다르다: %s" % out_path)
+                S.require_schema(out_path)
+                return out_path, contract_sha
+            if not resume:
+                raise FileExistsError("미완성 원본이 있다. 검증 후 이어받으려면 --resume: %s"
+                                      % out_path)
+            _check_resume(h5, spec, expected, contract_sha)
 
-    firmware_hex, firmware_elf = _build_firmware(spec)
     existing_ns = None
     if out_path.exists():
         with h5py.File(out_path, "r") as h5:
@@ -396,15 +409,17 @@ def collect(spec, out_path, verbose=True, resume=False):
 
         out_path.parent.mkdir(parents=True, exist_ok=True)
         mode = "a" if out_path.exists() else "w"
+        acquisition_started = time.time()
         with h5py.File(out_path, mode) as h5:
+            previous_seconds = float(h5.attrs.get("acquisition_seconds", 0.0))
             if mode == "w":
-                _write_root(h5, spec, bench, firmware_elf, trigger_counts)
+                _write_root(h5, spec, bench, firmware_elf, trigger_counts, contract_sha)
             repeats = int(spec["criteria"]["preprocessing"]["average_n"])
             for sub in spec["subsets"]:
                 keys, pts = expected[sub["name"]]
                 g = (h5[sub["name"]] if sub["name"] in h5 else
                      _new_group(h5, sub, bench.ns, repeats, bench.with_masks))
-                have = int(g[S.F_TRACE].shape[0])
+                have = int(g[S.F_TRACE].shape[0]) // repeats
                 for row in range(have, int(sub["n"])):
                     trace_rows = np.empty((repeats, bench.ns), dtype=np.int16)
                     time_rows = np.empty(repeats, dtype=np.uint32)
@@ -434,7 +449,10 @@ def collect(spec, out_path, verbose=True, resume=False):
                         for x in h5.attrs.get("recoveries", [])]
             h5.attrs["recoveries"] = np.asarray(
                 previous + bench.recoveries, dtype="S24")
+            h5.attrs["acquisition_seconds"] = previous_seconds + \
+                (time.time() - acquisition_started)
             h5.attrs["acquisition_end"] = datetime.datetime.now().isoformat(timespec="seconds")
-        return out_path
+            h5.attrs["acquisition_status"] = "complete"
+        return out_path, contract_sha
     finally:
         bench.close()

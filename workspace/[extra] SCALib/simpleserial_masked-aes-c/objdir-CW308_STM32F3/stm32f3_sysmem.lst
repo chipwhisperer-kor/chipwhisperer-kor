@@ -189,11 +189,11 @@
  105              		.file 2 "/usr/include/newlib/sys/errno.h"
 DEFINED SYMBOLS
                             *ABS*:00000000 stm32f3_sysmem.c
-     /tmp/cciSokYP.s:19     .text._sbrk:00000000 $t
-     /tmp/cciSokYP.s:25     .text._sbrk:00000000 _sbrk
-     /tmp/cciSokYP.s:91     .text._sbrk:0000002c $d
-     /tmp/cciSokYP.s:97     .bss:00000000 $d
-     /tmp/cciSokYP.s:101    .bss:00000000 heap_end.0
+     /tmp/ccNqar2A.s:19     .text._sbrk:00000000 $t
+     /tmp/ccNqar2A.s:25     .text._sbrk:00000000 _sbrk
+     /tmp/ccNqar2A.s:91     .text._sbrk:0000002c $d
+     /tmp/ccNqar2A.s:97     .bss:00000000 $d
+     /tmp/ccNqar2A.s:101    .bss:00000000 heap_end.0
 
 UNDEFINED SYMBOLS
 __errno

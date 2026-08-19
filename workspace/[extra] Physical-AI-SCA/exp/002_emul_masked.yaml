@@ -1,4 +1,8 @@
+schema_version: 2
 id: "002_emul_masked"
+assessment_profile: "iso-17825-l3"
+campaign_stage: "cw-lab-pilot"
+algorithm: "aes-128-ecb"
 title: "에뮬레이션 — 1차 마스킹 AES 구현의 soundness 검증"
 rationale: >
   이 프로젝트의 본 실험이다. 논문이 증명하는 것은 "올바르게 마스킹된 구현에서는 모든
@@ -14,10 +18,8 @@ scope:
   standard: "ISO/IEC 17825:2024"
   assessment_type: "pre-assessment"
   clauses_applied: ["7", "8"]
-  security_function: "AES-128-ECB"
   csp_classes: ["cryptographic key"]
   channels: ["emulated-power"]
-  target_level: 3
   not_claimed:
     - "ISO/IEC 19790 적합성 — 모듈 경계·CSP 정의가 이 환경 밖이다"
     - "독립 시험소 평가 — 벤더와 시험자가 동일하다(자기시험)"
@@ -46,24 +48,17 @@ collector:
       것은 정상이며, 관심사는 CipherMasked 구간이다.
 
 subsets:
-  - {name: ta_rk_fp,   role: timing,                    n: 1000, key_mode: random, pt_mode: fixed}
-  - {name: ta_fk_rp,   role: timing,                    n: 1000, key_mode: fixed,  pt_mode: random}
-  - {name: spa_same,   role: simple-analysis,           n: 6,    key_mode: fixed,  pt_mode: fixed,  spa_pair_kind: same-data}
-  - {name: spa_diffkey, role: simple-analysis,          n: 6,    key_mode: random, pt_mode: fixed,  spa_pair_kind: different-data-fixed}
-  - {name: spa_diffpt,  role: simple-analysis,          n: 6,    key_mode: fixed,  pt_mode: random, spa_pair_kind: different-data-random}
-  - {name: tvla_fk,    role: leakage-detection-fixed,   n: 2000, key_mode: fixed,  pt_mode: fixed}
-  - {name: tvla_rk,    role: leakage-detection-random,  n: 2000, key_mode: fixed,  pt_mode: random}
-  - {name: profiling,  role: profiling,                 n: 4000, key_mode: random, pt_mode: random}
-  - {name: attack,     role: attack,                    n: 2000, key_mode: fixed,  pt_mode: random}
+  - {name: ta_rk_fp,   role: timing, key_mode: random, pt_mode: fixed}
+  - {name: ta_fk_rp,   role: timing, key_mode: fixed,  pt_mode: random}
+  - {name: spa_same,   role: simple-analysis,    key_mode: fixed,  pt_mode: fixed,  spa_pair_kind: same-data}
+  - {name: spa_diffkey, role: simple-analysis,    key_mode: random, pt_mode: fixed,  spa_pair_kind: different-data-fixed}
+  - {name: spa_diffpt,  role: simple-analysis,    key_mode: fixed,  pt_mode: random, spa_pair_kind: different-data-random}
+  - {name: tvla_fk,    role: leakage-detection-fixed, key_mode: fixed,  pt_mode: fixed}
+  - {name: tvla_rk,    role: leakage-detection-random, key_mode: fixed,  pt_mode: random}
+  - {name: profiling,  role: profiling, key_mode: random, pt_mode: random}
+  - {name: attack,     role: attack, key_mode: fixed,  pt_mode: random}
 
-criteria:
-  security_level: 3
-  effect_size_d: 0.04
-  alpha: 1.0e-5
-  beta: 0.05
-  multiplicity_correction: "bonferroni"
-  t_threshold: 4.5
-  max_acquisition_hours: 6
+criteria_context:
   sensitive_leakage_time:
     from: "0"
     to: "end"
@@ -75,9 +70,6 @@ criteria:
       1라운드는 분할정복 키 복구의 표준 표적). 다만 이 IUT 는 KeyExpansion 이 비보호이므로
       **구간 앞부분의 검출은 결함이 아니라 문서화된 보호 범위 밖**이다. 보고서는 두 구간을
       나누어 보고한다.
-  preprocessing:
-    average_n: 1
-    alignment: "none"
   vendor_info:
     algorithms: "AES-128 ECB (masked-aes-c, CENSUS/masked-aes-c MELITY PoC 기반)"
     design: >
@@ -92,5 +84,9 @@ criteria:
       편향되면 1차 누설이 그대로 남는다. 또한 KeyExpansion 구간은 설계상 보호되지 않으므로
       키 스케줄 중간값을 겨냥한 공격에는 대책이 없다.
 
-analyses: ["ta", "spa", "dpa", "soundness", "cpa"]
+analyses: ["ta", "spa", "tvla", "dpa", "soundness", "cpa"]
+analysis_inputs:
+  tvla: {fixed: "tvla_fk", random: "tvla_rk"}
+  dpa: {subset: "attack", target: "round1-sbox-byte0-bit0"}
+  cpa: {subset: "attack"}
 seed: 1234

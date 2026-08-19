@@ -1,281 +1,252 @@
-# [extra] Physical-AI-SCA — 피지컬 AI 기반 부채널 취약점 **사전 진단** 환경
+# Physical-AI-SCA — ISO L3/L4 부채널 사전진단과 CW Lab 파일럿
 
-AI 가 사람 개입 최소로 **실험 설계 → 수집 → 분석 → 보고**를 수행하고, 정형화된 세 문서를
-산출하는 환경이다. 준용 표준은 ISO/IEC 17825:2024 이며, **적합성 평가가 아니라 사전
-진단(pre-assessment)** 이다 — 그 이유는 §2 에 있다.
+이 프로젝트는 실험 계획, 에뮬레이션/ChipWhisperer 수집, 통계 분석, 증거 검증과 보고를
+하나의 재현 가능한 흐름으로 묶는다. ISO/IEC 17825:2024의 방법론을 준용하지만
+ISO/IEC 19790 모듈 경계, 승인 기관과 독립 시험소가 없으므로 **적합성 평가가 아니라
+pre-assessment**다.
 
----
+## 처음 실행하는 사람
 
-## 1. 무엇을 왜 만들었나
+ChipWhisperer Docker의 code-server에서
+`demo/0.1.Demo_without_TraceWhisperer.ipynb`를 열고 **Run All**을 누른다. 기본 study는
+`demo/study.yaml`이며 다음 네 실험을 순서대로 수행한다.
 
-에뮬레이션과 실물 전력 수집은 산출 형식이 달라 하나의 분석기로 비교할 수 없었고,
-실험 설계·판정 기준·보고서는 AI가 이어받을 수 있는 계약으로 고정되어 있지 않았다.
-이 프로젝트는 두 관측을 **하나의 스키마와 하나의 판정 규칙** 위에 놓는다.
-
-### 설계를 지배하는 명제 — Security is only as strong as the weakest link
-
-고리는 층마다 다르고, 층마다 그것을 볼 수 있는 도구가 다르다.
-
-| 고리 | 깨지는 방식 | 도구 | 이 프로젝트 |
-|---|---|---|---|
-| 이론 (마스킹 수식) | 증명의 가정이 실제와 안 맞음 | 논문·형식 검증 | **범위 밖** |
-| 구현 (소스 → 기계어) | 전이 누설, share 재사용, 컴파일러가 만든 스필 | **에뮬레이션** | 데모 출력만 Git 추적, 생성 증거 번들은 Git 제외 |
-| 물리 (실제 칩) | 글리치·커플링·파이프라인 | **실물 전력 수집** | `0.1.Demo_without_TraceWhisperer.ipynb`에서 두 IUT 실행·검증 |
-
-**에뮬레이션에서 깨끗해도 실물에서 샐 수 있다** — HW/HD 모델은 물리 효과를 담지 않는다.
-**실물에서는 잡음에 묻혀 안 보이는 구조적 누설을 에뮬레이션에서 분리해 볼 수 있다.**
-둘은 대체재가 아니라 **상보재**이고, 어느 하나가 깨끗하다는 사실만으로 안전을 주장할 수 없다.
-
-### 에뮬레이션이 검사하는 것
-
-논문이 증명하는 명제는 이렇다 — **올바르게 마스킹된 구현에서는 모든 연산의 HW·HD 가
-비마스킹 알고리즘의 민감값과 통계적으로 독립이다.**
-
-코딩 과정의 휴먼 에러는 그 고리를 되살린다. 같은 레지스터에 두 share 를 연달아 쓰면
-
-```
-HD = HW(share1 ^ share2) = HW(민감값)
-```
-
-이 되어 **수식은 그대로인데 구현만 새는** 상태가 된다. 이 결함은 실측으로 찾기 어렵다 —
-잡음에 묻히고, 명령어 단위로 짚기 어렵다. 에뮬레이션은 물리 측정 Noise를 모델링하지 않고
-**Trace의 각 Sample(샘플)을 명령어 하나에 대응**시킨다. 선택한 누설 모델과 라벨에서 통계적
-종속성이 검출되면 `sample_map`으로 후보 명령어를 역추적할 수 있다. 이는 물리적 누설 위치를
-확정하는 것이 아니라 실측으로 교차 확인할 구현 후보를 만드는 절차다.
-
----
-
-## 2. 이 환경의 위치 — 왜 "적합성 평가" 가 아닌가
-
-ISO/IEC 17825 §1 Scope 가 못박는다. 이 표준은 **ISO/IEC 19790:2012 적합성 판정용**이고,
-**ISO/IEC 24759:2017 과 함께** 쓰이며, **"암호모듈의 정의된 경계"** 에서 시험한다.
-우리가 가진 것은 그 삼각 구조의 한 다리뿐이다.
-
-| 구조적으로 불가능한 것 | 왜 |
-|---|---|
-| 적합성 판정 | 모듈 경계·CSP 정의·보안수준 배정이 ISO/IEC 19790 의 일이다. IUT 는 모듈이 아니라 라이브러리다 |
-| 독립 시험소 평가 | `shall [07.04]` 는 벤더가 시험소에 정보를 주는 구도다. 여기서는 **벤더 = 시험자 = AI** 다 |
-| 기준 설정 | Annex A.1·C·G·H 에 "can supersede this annex in its entirety" 가 붙어 있다 — 승인 기관이 정한다 |
-| 육안 검사 | A.2.2 는 육안과 통계를 **둘 다** 요구한다. 육안은 사람의 행위다 |
-
-그래서 목표는 **"표준의 방법론을 준용해, 실제 시험소가 그대로 이어받을 수 있는 형태로
-증거를 내되, 못 지킨 것을 전부 드러내는 것"** 이다.
-
-`scope.not_claimed` 를 spec 의 **필수 필드**로 만든 이유가 그것이다 —
-**무엇을 주장하지 않는지 적지 않으면 나머지가 전부 주장으로 읽힌다.**
-
----
-
-## 3. 4층 구조 — AI 는 무엇을 하고 도구는 무엇을 하나
-
-| 층 | 내용 | LLM 관여 |
+| 채널 | 비마스킹 양성 대조 | 마스킹 IUT |
 |---|---|---|
-| 1. 결정적 CLI | `collect` · `analyze` · `report` · `verify` · `conformance` | **없음** |
-| 2. 계약 파일 | `exp/<id>.yaml` (AI 가 쓴다) · `results.json` (AI 가 읽는다) · `manifest.json` | — |
-| 3. 에이전트 지침 | `AGENTS.md` · `PROMPT.md` | — |
-| 4. LLM 클라이언트 | `physai/llm.py` — 함수 하나 | 서술 초안만 |
+| Unicorn 명령어 HW/HD | tiny-AES-c | masked-aes-c |
+| CW308T-STM32F3 전력 | tiny-AES-c | masked-aes-c |
 
-**수치·판정·해시·요건 대조표는 전부 도구가 만든다.** LLM 이 관여하는 곳은 보고서의 서술
-초안 하나뿐이고, 환경변수가 없으면 그 칸이 빈 채로 나머지가 다 채워진 문서가 나온다 —
-**LLM 이 없어도 산출물은 나온다.**
+기본값은 `iso-17825-l3 + cw-lab-pilot`이다. 실물 단계에는 연결된 ChipWhisperer Husky와
+CW308T-STM32F3가 필요하다. Grok CLI는 컨테이너가 아니라 **호스트**에 설치하고 로그인한다.
+Run All은 사전 자문과 출판 감사 셀에서 요청 파일을 쓴 뒤 기다린다. 각 셀은 호스트의
+`chipwhisperer-kor` 저장소 루트에서 실행할 정확한 Python 한 줄을 출력한다. 표시된 one-shot
+스크립트는 현재 요청 하나를 검증하고 Grok headless를 포그라운드에서 한 번 호출한 뒤 응답
+JSON을 쓰고 즉시 종료한다. 감시기·데몬·백그라운드 Grok은 없다. 정상 Run All은 같은 한 줄을
+사전 자문과 출판 감사에 각각 한 번 요구하고, 파이프라인 실패 진단이 발생하면 한 번 더 요구한다.
 
-에이전트 루프·툴콜 파싱·재시도는 만들지 않는다. 그것은 grok 헤드리스·Claude Code 같은
-하네스가 하는 일이다. 온라인↔오프라인 전환 비용은 환경변수 세 개다(`physai/llm.py`).
+## 프로파일과 캠페인 단계
 
----
+보안 레벨과 캠페인 단계는 서로 다른 축이다.
 
-## 4. 실행
+| 값 | 의미 |
+|---|---|
+| `iso-17825-l3` | Annex A.2 수량·효과크기·시간·전처리 |
+| `iso-17825-l4` | Annex A.3 수량과 L4 필터·정적/동적 정렬 |
+| `smoke` | 계약·코드·배관의 최소 확인 |
+| `cw-lab-pilot` | 본시험 전에 같은 절차를 저표본으로 예행 |
+| `full` | 프로파일의 수집량과 Formula (1)을 목표로 수행 |
 
-모든 실행은 **컨테이너 안**이다. 호스트에는 `unicorn`·`lief`·`scalib` 가 없다.
+CW Lab은 “노이즈 없는 제3의 레벨”이나 간이 판정이 아니다. ChipWhisperer 전용 보드의
+통제된 환경에서 시간이 긴 L3/L4 본시험 전에 수행하는 파일럿이다. 절차, 증거, 한계와 결론
+규율은 본시험과 같지만 통계 검정력은 별도로 `underpowered`라고 기록한다.
+
+프로파일 수치의 정본은 `physai/profiles.py` 하나다. 원시 YAML에는 보안 수준, effect size,
+α·β, 시간 제한, 반복 수와 subset 수량을 복제하지 않는다.
+
+| 기준 | L3 | L4 |
+|---|---:|---:|
+| 효과크기 d | 0.04 | 0.01 |
+| 수집 시간 상한 | 6 h | 24 h |
+| TA 원시 실행/블록 | 1,000 | 10,000 |
+| SPA 최소 트레이스 | 11 | 21 |
+| CSP bit당 SPA 샘플 | 100 | 1,000 |
+| 같은 입력 원본 실행/파생 평균 | 10회/1장 | 10회/1장 |
+
+공통 통계 정책은 α=1e-5, β=0.05, Bonferroni 보정과 보정 전 |t| 하한 4.5다. Formula (1)의
+N은 이 값에서 계산하며 별도 설정으로 적지 않는다.
+
+CW Lab 기본 물리 실험은 TA 32+32, SPA 4+4+4, TVLA 64+64, DPA/CPA 128로 논리
+트레이스 332개를 만들고 각각 10회 실행해 원시 캡처 3,320개를 보존한다.
+
+## v2 계약
+
+`contracts/experiment_spec.schema.json`은 실험별 사실을, `contracts/study.schema.json`은
+여러 실험의 순서·대조 관계·출판 정책을 검증한다. v1은 묵시적으로 읽지 않는다. 어떤
+프로파일과 단계였는지 추정하면 과거 결과의 의미가 바뀌기 때문이다.
+
+study가 소유하는 값:
+
+- `assessment_profile`, `campaign_stage`, `algorithm`
+- 실행할 experiment와 양성 대조/비교 관계
+- Grok 자문·출판 감사 정책
+
+experiment가 소유하는 값:
+
+- IUT와 countermeasure
+- 수집기·실제 장비 설정·관측 구간
+- subset의 입력 방식과 분석 입력 매핑
+- 민감 경계·벤더 정보·`scope.not_claimed`
+
+판정 기준을 바꾸면 새 study와 experiment ID를 만든다. 기존 Dataset을 덮어쓰거나 새 기준으로
+재해석하지 않는다. 수집 전에 `resolved_spec.json`과 `01_experiment_plan.{md,html}`을 써서
+계약을 동결한다.
+
+실물 수집 계약은 장치에 실제로 플래시하는 Intel HEX의 SHA-256을 사용한다. 기본 firmware
+make는 같은 기계어에도 ELF의 링크·디버그 바이트를 바꾸므로 ELF 전체 해시를 계약에 쓰면
+Run All마다 거짓 신규 계약이 생긴다. HDF5 `firmware_sha256`은 Schema 1.3의 provenance
+정의대로 해당 실행에서 생성된 ELF 원본 해시를 별도로 기록한다.
+
+한 experiment ID에 `capture_manifest.json`이 봉인된 뒤에는 resolved spec과 원본 SHA가
+일치할 때만 그 원본을 읽기 전용으로 재사용하며 빌드·플래시·장비 연결을 다시 하지 않는다.
+IUT 소스·컴파일 설정·펌웨어 이미지를 바꿀 때는 새 experiment ID를 만든다. 같은 ID를
+새 구현에 재사용하면 과거 증거가 다른 구현의 결과처럼 읽히므로 허용하지 않는다.
+
+## 분석의 의미
+
+ISO 필수 순서는 TA → SPA → DPA다. 앞 시험이 fail이어도 뒤 시험은 계속 수행한다. 단,
+TA 내부에서 CSP 의존성 1단계가 fail이면 표준 절차에 따라 평문 의존성 2단계로 가지 않는다.
+
+| 분석 | 역할 | 집단/모델 |
+|---|---|---|
+| TA | ISO 필수 판정 | 실행시간 평균과 분산의 CSP·평문 의존성 |
+| SPA | ISO 필수, 사람 검토 필요 | key schedule 구조와 잡음 바닥, 최종 `pending` |
+| TVLA | 독립 누설 평가 | fixed-vs-random Welch t-test |
+| DPA | ISO 필수 판정 | 사전 지정 민감값으로 동일 수집 집합을 분할한 Welch t-test |
+| CPA | 참고/양성 대조 | 공격자 관점 AES HW(S-box) 상관, ISO 판정에 미포함 |
+| soundness | 에뮬레이션 연구자 관점 | 실제 기계어 HW/HD와 알려진 민감값의 종속성 |
+
+과거 코드의 `dpa.py`는 fixed-vs-random을 비교했으므로 실제로는 TVLA였다. v2에서는 이를
+`tvla.py`로 분리했다. AES DPA 기본 표적은 수집 전에 고정한 첫 라운드
+`SBOX(plaintext[0] xor key[0])`의 bit 0이다.
+
+각 시험은 하나의 단어에 서로 다른 의미를 섞지 않는다.
+
+- `procedure_status`: 자동 절차가 complete/incomplete/error인가
+- `statistical_power`: sufficient/underpowered/not-applicable인가
+- `early_finding`: detected/not-detected-at-N/not-applicable인가
+- `preassessment_verdict`: pass/fail/inconclusive/not-applicable인가
+- `human_review.spa`: 자동화하지 않으므로 항상 pending
+
+TA 또는 DPA 누설이 관측되면 저표본이어도 fail이다. 누설 미검출은 요구 수량과 양성 대조가
+모두 충족되어야 pass가 될 수 있다. TVLA 검출은 중요한 독립 소견이지만 ISO 종합 판정을
+직접 바꾸지 않는다. SPA의 사람 검토가 구조화 입력으로 돌아오지 않으므로 자동 종합 결과는
+다른 필수시험의 fail이 없는 한 inconclusive다.
+
+## 원본 수집 HDF5와 파생 분석 HDF5
+
+Schema 1.3은 수집과 분석의 책임을 분리한다.
+
+| 구분 | 저장 단위 | 변경 정책 | 소비자 |
+|---|---|---|---|
+| `raw-acquisition` | Execution 1회 = 1행 | 완료 후 불변 | TA의 실행별 `exec_time`, 파생 생성기 |
+| `derived-analysis` | 같은 입력 10회 = float64 평균 1행 | 계약이 바뀌면 새로 생성 | SPA·TVLA·DPA·CPA·soundness |
+
+원본의 같은 key/plaintext/ciphertext 실행은 `repeat_group_id`로 묶고 `repeat_index=0..9`로
+구분한다. `trace`, `exec_time`, masked IUT의 `mask`를 매 실행 별도로 보존하며 수집기에는
+평균값이 없다. 10회 전체가 성공한 뒤에만 10행을 함께 추가하므로 부분 묶음은 정상 원본이
+될 수 없다.
+
+파생 파일은 원본 SHA-256, 전처리 설정과 파이프라인 판번호에서 정한 content-addressed
+경로에 생성한다. 이 계약과 저장된 파생 SHA-256이 모두 같을 때만 캐시를 재사용한다. 평균은
+원본 `sample_scale`로 정규화한 float64라 분수 정보를 보존한다. 원본은 처음 한 번 수집하고,
+같은 봉인 원본을 분석할 때 다시 수집하지 않는다.
+
+## Level 4 전처리
+
+L3는 정규화 후 직접 평균한다. L4는 원본 HDF5를 수정하지 않고 각 Execution을 먼저
+전처리한 뒤 평균하며 다음 고정 순서를 적용한다.
+
+1. 실제 target clock의 0.5–1.5배, 4차 Butterworth SOS zero-phase band-pass
+2. 기준 파형과 normalized cross-correlation 전역 정렬(최대 2 target cycles)
+3. 8개 등간격 anchor normalized cross-correlation 국소 정렬(최대 1 cycle)
+4. anchor shift 선형 보간과 공통 유효 구간 crop
+5. 정렬된 동일 입력 10회 평균
+
+기준은 `spa_same` 첫 논리 레코드의 첫 반복이다. anchor 상관 최솟값 0.8, 교정 PSD의 대역
+내 peak prominence 6 dB를 요구한다. Nyquist·prominence·이동·상관 기준을 어기면 중단하고
+inconclusive 근거로 남긴다. 결과를 본 뒤 대역이나 정렬값을 자동 조정하지 않는다.
+
+원본/파생 SHA-256, 필터 응답, PSD, 이동량, 상관계수, mapping 해시와 전후 파형은 파생
+HDF5 옆의 `.provenance.json`, run의 NPZ와 보고서 그림에 남는다.
+
+## Grok headless와 출판
+
+프로젝트는 전역 Grok 설정을 수정하거나 인증정보를 컨테이너에 공유하지 않는다. 노트북은
+프로파일에서 해석된 수량·통계·전처리는 `runs/<study>_preflight.json`에 결정적으로 기록한다.
+노트북은 이 파일과 원본 명세를 `runs/grok_request.json`에 프로젝트 상대경로·크기·SHA-256으로
+기록하고 현재 셀에서 응답을 기다린다. 사용자가 호스트에서 표시된 Python 한 줄을 실행할 때만 Grok이 시작되며 완료 후 즉시
+종료한다. 모델·추론 강도·task 문장·출력 스키마·다음 제한의 정본은 모두
+`physai/grok_once.py` 하나다.
+
+```text
+--single --no-memory --no-subagents --disable-web-search --no-plan
+--tools Shell(cat:*) --permission-mode dontAsk
+```
+
+자문은 `grok-4.6/high`, 필수 출판 감사는 `grok-4.6/xhigh`다. 자문은 계획 검토·실패 설명·
+결과 설명만 하며 파일 수정, 판정 변경과 명령 재실행 권한이 없다. 데모 Run All에서는 사전
+자문 실패나 Grok 부재가 수집을 막고, 출판 감사 실패·부재는 publication 완료를 막는다.
+
+감사 JSON은 모든 입력의 프로젝트 상대경로·바이트·SHA-256을 기록한다. 통합 보고서 생성 시 현재
+파일과 다시 비교해 stale 감사를 거부한다. Grok이 쓴 finding에는 파일/필드 근거와 한계를
+함께 요구하며 수치·판정·해시의 정본은 항상 결정적 JSON이다.
+
+## 보고서와 CLI
+
+각 run은 다음 산출물을 만든다.
+
+- `01_experiment_plan.{md,html}` — 수집 전 계약과 계획
+- `02_analysis_report.{md,html}` — 수치, 판정 축, SPA/TVLA/DPA/CPA와 전처리 증거
+- `03_evidence_manifest.{md,html}` + `manifest.json` — 재현 명령과 파일 해시
+- `results.json` — 기계 판독 정본
+
+통합 보고서는 `demo/0.1.Demo_without_TraceWhisperer_Report.{md,html}`이다. HTML은 외부 CDN
+없이 CSS와 그림을 내장하고 화면·인쇄에 모두 맞춘다.
 
 ```bash
-docker exec -it chipwhisperer-kor bash
-cd "/workspace/[extra] Physical-AI-SCA"
+cd '/workspace/[extra] Physical-AI-SCA'
 
-# 0) 에뮬레이션용 ELF 빌드 — 소스는 workspace/iut/ 의 것을 그대로 컴파일한다
-make -C emul_harness IUT=tiny-AES-c
-make -C emul_harness IUT=masked-aes-c
+# study의 experiment 하나를 명시적으로 수행
+python3 -m physai.collect --study demo/study.yaml --experiment demo_l3lab_emul_tinyaes
+python3 -m physai.analyze --study demo/study.yaml --experiment demo_l3lab_emul_tinyaes
+python3 -m physai.report --run demo_l3lab_emul_tinyaes --study demo/study.yaml
+python3 -m physai.verify --run demo_l3lab_emul_tinyaes --study demo/study.yaml
 
-# 0-1) 자가검사 — 수집 전에 반드시 통과해야 한다
-python3 -m physai.collectors.emulation --selftest --n 10
+# 통합 요약
+python3 -m physai.demo --study demo/study.yaml
 
-# 1) 수집 (실험 계획 보고서를 **수집 전에** 먼저 만든다)
-python3 -m physai.collect --spec exp/001_emul_tinyaes.yaml
-python3 -m physai.collect --spec exp/002_emul_masked.yaml
-
-# 2) 분석 — TA → SPA → DPA 순서로 수행한다
-python3 -m physai.analyze --spec exp/001_emul_tinyaes.yaml
-python3 -m physai.analyze --spec exp/002_emul_masked.yaml
-
-# 3) 보고서 3종 + 증거 번들
-python3 -m physai.report --run 001_emul_tinyaes
-
-# 4) 증거 검증 — 해시·스키마·툴체인 대조
-python3 -m physai.verify --run 001_emul_tinyaes
-
-# 기존 Dataset에 요건 대조표만 생성
-python3 -m physai.conformance --dataset "/workspace/[extra] SCALib/traces/scalib_dataset_tiny-AES-c.h5" --level 3
+# 아래 명령은 요청을 쓴 뒤 기다리면서 호스트에서 실행할 Python 한 줄을 표시한다.
+python3 -m physai.demo --study demo/study.yaml --grok
+python3 -m physai.demo --study demo/study.yaml --report
 ```
 
-각 CLI 는 마지막 줄에 JSON 요약을 내고 종료 코드로 성패를 알린다.
+## 새 알고리즘 추가
 
----
+`physai/algorithms` 계약에 다음을 구현하고 registry에 등록한다.
 
-## 5. 산출물 세 가지
+1. 고유 ID와 key/input/output byte 폭
+2. 입력을 바꾸지 않는 골든 연산
+3. 이름이 고정된 DPA target 목록과 `(plaintext,key) → 0/1 label` 분할
+4. 지원한다면 CPA 예측 행렬과 soundness 가능 여부
 
-| 문서 | 생성 시점 | 담는 것 |
-|---|---|---|
-| `01_experiment_plan.md` | **수집 전** | 적용 범위 선언(`not_claimed` 포함) · 요건 대조표 · 판정 기준 · 필요 트레이스 수 산정 근거 · 벤더 정보 |
-| `02_analysis_report.md` | 분석 후 | 필수 시험 3종 결과 · **결함 후보의 명령어 주소** · 갱신된 대조표 · 본 고리와 보지 않은 고리 |
-| `03_evidence_manifest.md` + `manifest.json` | 마지막 | 모든 파일의 sha256 · 생성 명령 · 툴체인 · 재현 절차 |
+그 뒤 experiment의 `algorithm`, subset 폭을 사용하는 수집기와 펌웨어 통신을 함께 구현한다.
+현재 에뮬레이션 하네스와 ChipWhisperer SimpleSerial 수집기는 AES 16바이트 구현이다. 폭만
+명세에서 바꿔 놓고 동작한다고 주장하지 않는다. 골든 연산, 분할 균형, 알려진 누설 합성
+데이터와 양성 대조를 먼저 테스트한다.
 
-**계획 보고서를 수집 전에 만드는 것이 핵심이다.** 결과를 본 뒤 판정 기준을 고르는 사후
-정당화를 구조로 막는다. ISO/IEC 17825 §8.4 `shall [08.04]` 도 통계 시험 전에 effect
-size·α·β 를 지정하라고 요구한다.
+## 새 수집 도구 추가
 
----
+오실로스코프 드라이버는 이번 구현에 포함하지 않는다. 새 수집기는 공용 HDF5 Schema 1.3을
+통과하는 파일을 생성해야 하며 최소한 다음을 실제 값으로 기록한다.
 
-## 6. 판정 기준
+- 채널 종류, probe와 trigger 의미
+- target clock, sample rate, resolution, gain과 실제 파형 길이
+- 대역폭 값의 출처와 nominal/calibrated 구분
+- 동일 입력의 Execution별 원파형·실행시간, `repeat_group_id`와 `repeat_index`
+- key/plaintext/ciphertext의 행 정렬과 골든 결과
+- 수집 시간, 툴체인, seed, 자연 발생 복구 이력
 
-**"취약/안전" 은 키 복구가 아니라 누설 관측으로 판정한다** (§7.2 — "test passes unless
-leakage is observed"). 키가 복구되지 않아도 누설이 임계를 넘으면 fail 이다.
+원본 수집기는 평균을 저장하지 않는다. 분석기가 동일한 Schema 1.3 파생 계약으로 float64
+평균을 만든다. 모르는 대역폭·션트·교정값은 추정하지 말고 미기록으로 둔다.
 
-### 필수 시험은 3종이다
+## 해석 한계
 
-§7.3.2 `shall [07.03]` 와 §8.1 `shall [08.01]` 이 **TA·SPA·DPA 셋 모두**를 요구한다.
+- 에뮬레이션은 물리 글리치·커플링·파이프라인 효과를 포함하지 않는다.
+- Unicorn 실행시간은 명령어 수이며 Cortex-M4 cycle-accurate 시간이 아니다.
+- EM 채널과 독립 시험소 판정은 제공하지 않는다.
+- CPA 실패/성공은 ISO 판정이 아니라 배관과 공격 참고다.
+- 고차 DPA는 현재 범위 밖이다. TA의 분산 검정은 별개로 수행한다.
+- `미기록`, `미준수`, `검정력 부족`, `검출 없음`을 서로 바꾸어 쓰지 않는다.
 
-| 시험 | 대칭키에서의 표적 | Level 3 요건 |
-|---|---|---|
-| **TA** | 실행시간이 CSP·평문에 의존하는가 (= constant-time) | A.2.4 — 각 1,000회, **Annex A 유일의 `shall collect`** |
-| **SPA** | key derivation (§8.3.1) | A.2.2 — 11 트레이스, 육안 + 통계 **둘 다**. 도구는 통계만 하므로 **판정을 내지 않는다**(§9) |
-| **DPA** | Welch t-test 로 두 집단 비교 (§8.4) | A.2.3 — Formula (1) |
-
-- **TA 는 캐시 유무와 무관하게 수행한다.** §8.2 의 캐시 면제는 Reference [50] 의 캐시
-  공격 프레임워크에만 걸린다. §7.3.4 의 절차에는 캐시라는 단어가 나오지 않는다.
-- **TA 는 평균뿐 아니라 분산도 검정한다** (2차 타이밍 누설, `shall`).
-- **고차 제외는 DPA 에만 해당한다** (Fig.1 NOTE 3). 타이밍의 2차는 의무다.
-- **CPA 는 판정에 쓰지 않는다.** 표준상 필수 시험이 아니며, 여기서는 배관(입력 주입·정렬·
-  라벨링)이 옳은지 확인하는 **양성 대조**로만 쓴다.
-
-### 순서와 예외
-
-§7.3.2 는 TA → SPA → DPA 순서를 정한다("should"). 그러나 **앞이 fail 이어도 뒤를 계속
-수행한다** — §8.1 이 셋을 **모두** 평가하라고 `shall` 로 요구하기 때문이다. shall 이 should
-를 이긴다. 유일한 예외는 TA 내부의 2단계로, §7.3.4 가 1단계 실패 시 2단계로 가지 않는다고
-명시한다.
-
-### 대조군이 판정의 신뢰를 만든다
-
-| 대조군 | 기대 | 어긋나면 |
-|---|---|---|
-| `tiny-AES-c` (비마스킹) | 민감 구간에서 검출 | 검출기·라벨·Trace 수·구간 설정을 점검하고 원인 확인 전 판정 중단 |
-| masked 의 `KeyExpansion` 구간 | 검출됨 (문서화된 보호 범위 밖) | 구간 경계 산정 오류 |
-| masked 의 `CipherMasked` 구간 | 검출 없음 | 결함 후보 — 찾으려던 것 |
-
-**"masked 에서 아무것도 안 나왔다" 는 결과는, 같은 검출기가 tiny-AES 에서 반응한다는
-증거가 있어야만 의미가 있다.** `exp/001` 이 그 증거를 만드는 실험이다.
-
----
-
-## 7. 누설 벡터 (에뮬레이션 채널)
-
-명령어마다 네 성분을 뽑아 **성분별로 연접**한다. 길이 = 4 × L (L = 구간 명령어 수).
-
-```
-trace = [ hw_reg | hd_reg | hw_mem | hd_mem ]
-```
-
-| 성분 | 정의 | 잡는 것 |
-|---|---|---|
-| `hw_reg` | 그 명령어가 쓴 레지스터의 실행 후 값의 HW 합 | 값 자체의 누설 |
-| `hd_reg` | **HW(R_before ^ R_after)** — 같은 레지스터의 앞뒤 | 레지스터 전이 누설 |
-| `hw_mem` | 메모리 쓰기 값의 HW 합 | 메모리 값 누설 |
-| `hd_mem` | **HW(old ^ new)** — 같은 주소의 앞뒤 | 메모리 전이 누설 |
-
-**HD 는 같은 저장소의 한 명령어 앞뒤 값끼리만 계산한다.** `HD(R2_before, R5_after)` 같은
-서로 다른 레지스터 쌍은 실제 하드웨어에서 전이 누설이 생기는 방식이 아니고, 조합이
-폭발해 오탐만 만든다.
-
-메모리 성분을 넣는 이유: tiny-AES 계열은 state 를 메모리 배열에 두고 **in-place 로
-갱신**한다. 전이 결함은 레지스터보다 이 state 버퍼에서 더 자주 난다.
-
-**PC 는 뺀다.** 제어흐름이 데이터 독립이면 PC 는 상수라 신호가 없고, 데이터 의존이면 그것은
-타이밍 분석이 잡을 일이며 이 벡터에 섞으면 정렬이 무너진다.
-
----
-
-## 8. 왜 실측과 같은 소스를 컴파일하나
-
-`emul_harness/Makefile` 은 `../../iut/<IUT>/aes.c` 를 직접 컴파일한다. 실물 펌웨어
-(`[extra] SCALib/simpleserial_<IUT>/`)도 **같은 파일**을 컴파일한다. 컴파일 플래그도
-펌웨어에서 그대로 옮겼다 — 특히 **`-Os`** 다.
-
-> 최적화 수준이 전이 누설을 **만들기도 하고 없애기도 한다.** 같은 C 소스라도 `-Os` 와
-> `-O2` 는 레지스터 할당과 명령어 선택이 달라 서로 다른 구현이 된다. 플래그가 다르면
-> "에뮬레이션에서 찾은 결함이 실측 타겟에도 있다" 고 말할 근거가 사라진다.
-
-통합 데모는 같은 seed와 입력을 사용해 두 채널의 Dataset을 교차 검증한다. 다만 에뮬레이션의
-명령어 수와 실측의 ADC Sample은 단위가 다르므로 길이가 비슷하다는 이유로 구간 대응이나
-원인을 확정하지 않는다.
-
----
-
-## 9. 알려진 한계 — 감추지 않는다
-
-| 한계 | 영향 |
-|---|---|
-| **Unicorn 에 사이클 모델이 없다** | 에뮬 TA 는 명령어 수 기준이다. 수가 **다르면** 데이터 의존 제어흐름의 확정 소견이지만, **같아도** constant-time 을 증명하지 못한다 |
-| **채널별 전처리 차이** | Level 3 실물 데모는 같은 입력을 10회 평균한다. 결정적 에뮬레이션 명세는 평균 1회이므로 대조표가 채널별 상태를 그대로 보고한다 |
-| **SPA 판정 불가** | 육안 검사가 사람의 행위이고, 잡음 바닥이 0인 결정적 채널에서는 "키가 다르면 트레이스도 다르다"가 거의 항상 참이라 그것만으로 fail을 내면 판별력이 없다. **언제나 `inconclusive`**를 내고 관측값(`statistical_verdict`)으로 사람이 판정한다 |
-| **STM32F303 캐시 유무 미확인** | §8.2 면제의 전제인데 저장소 안에 근거 문서가 없다. 대조표에 `미기록` 으로 나온다 |
-| **EM 채널 없음** | 근접 자기장 프로브 미보유. Annex E 는 오히려 EM 을 선호한다고 적는다 |
-| **Git 추적 파일만으로 DPA 판정 불가** | 결과·Dataset은 Git에서 제외된다. 로컬 번들이 있어도 `verify`를 통과해야 현재 근거로 쓸 수 있다. 제공된 데모 명세의 수집량은 Formula (1)의 N보다 작으므로 그 규모의 DPA는 `inconclusive`다. |
-
----
-
-장기 방향은 구현 방법을 고정하지 않고 [`FutureWorks.md`](FutureWorks.md)에만 짧게 기록한다.
-
-## 10. 디렉터리
-
-```
-physai/
-  paths.py         저장소 경로 해결 (workspace/lib 를 sys.path 에 넣는다)
-  spec.py          실험 명세 로드·검증, Formula (1)·보정 임계 계산
-  collect.py       CLI: spec → HDF5 생성/resume → SCHEMA 1.2 검증(위반 시 실패)
-  collectors/
-    emulation.py   ★ 에뮬레이션 수집기 (데모 출력 추적, 생성 증거 번들은 Git 제외)
-    cw_power.py    실물 전력 10회 반복·평균·resume·단계별 자연 복구
-  demo.py          네 Dataset 교차 검증·Grok 구조화 감사 경계
-  analyze.py       CLI: TA→SPA→DPA 순서 수행 → results.json
-  tests/{ta,spa,dpa}.py   필수 시험 3종
-  soundness.py     구현 층 1차 누설 검출 + 명령어 지목
-  conformance.py   ISO/IEC 17825 요건 대조표
-  report.py        보고서 3종 + 증거 번들
-  verify.py        증거 번들 검증
-  llm.py           OpenAI 호환 클라이언트 (함수 하나)
-emul_harness/      에뮬레이션용 ELF 빌드 (workspace/iut/ 소스를 직접 컴파일)
-FutureWorks.md     구현 선택을 고정하지 않는 장기 방향
-contracts/         experiment_spec.schema.json
-exp/               실험 명세 (AI 가 작성)
-runs/              실행 산출물 (gitignore)
-traces/            Dataset (gitignore — GB 단위)
-```
-
-공용 정의는 이 프로젝트 밖에 있다.
-
-| 위치 | 내용 |
-|---|---|
-| `workspace/lib/sca_schema.py` | 스키마 상수·검증기·경로 기반 로더 |
-| `workspace/lib/aes_ref.py` | SBOX·HW·`intermediates()` 민감값 참조 계산 |
-| `workspace/iut/` | IUT(테스트 대상 구현) 암호 라이브러리 (펌웨어와 공유) |
-
----
-
-## 11. 인용 규약
-
-ISO/IEC 17825:2024 원문은 저작권 보호 문서이며 **이 저장소에 포함되지 않는다.**
-이 프로젝트의 문서·보고서는 **조항 번호와 요구의 취지만 자기 말로** 적고 원문을 옮기지 않는다.
-
-출처: ISO/IEC 17825:2024, Second edition, 2024-01,
-*Information technology — Security techniques — Testing methods for the mitigation of
-non-invasive attack classes against cryptographic modules*.
+표준 출처는 ISO/IEC 17825:2024, Second edition, 2024-01이며 커밋 문서는 조항 번호와
+요구 취지만 자체 문장으로 설명한다.

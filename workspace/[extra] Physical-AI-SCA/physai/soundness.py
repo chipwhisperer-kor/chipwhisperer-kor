@@ -164,6 +164,11 @@ def run(dataset_path, spec, subset="profiling", labels=DEFAULT_LABELS,
 
     return {
         "verdict": verdict,
+        "procedure_status": "complete" if not n_incon else "incomplete",
+        "statistical_power": "not-applicable",
+        "early_finding": "detected" if n_fail else "not-detected-at-N",
+        "preassessment_verdict": "not-applicable",
+        "claim_scope": "에뮬레이션 연구자 관점의 구현 HW/HD 1차 종속성",
         "perspective": "연구자 — 키를 알고 검정한다. 공격 가능성이 아니라 설계 명제의 성립 여부를 잰다.",
         "proposition": ("올바르게 마스킹된 구현에서는 모든 연산의 HW·HD 가 비마스킹 "
                         "알고리즘의 민감값과 통계적으로 독립이다."),
