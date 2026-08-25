@@ -171,6 +171,8 @@ flowchart LR
 
 > Husky 기반 하드웨어 트레이스 캡처·분석
 
+> 위 세 입문 노트북은 필요한 펌웨어 빌드·프로그래밍·연결 코드를 각각 포함합니다. 각 노트북은 자기 설정 셀의 `HUSKY_SERIAL_NUMBER`로 지정된 Husky Plus만 열며, 연결 실패 시 다른 장비로 전환하지 않습니다.
+
 **③ Release the Husky — 와이어태핑**
 
 | 노트북 | 주제 | 대상 |
@@ -184,8 +186,8 @@ flowchart LR
 
 | 경로 | 설명 |
 |------|------|
-| `Setup_Generic.ipynb` | scope·target 연결 및 기본 설정 |
-| `My_Setup.ipynb` | 타겟 보드 바이너리 빌드 환경 초기화 |
+| `Setup_Generic.ipynb` | 공용 연결·기본 설정이 필요한 다른 노트북용 자료 |
+| `My_Setup.ipynb` | 공용 펌웨어 빌드·프로그래밍이 필요한 다른 노트북용 자료 |
 | `hal/`, `crypto/`, `simpleserial/` | 펌웨어 컴파일용 HAL·암호 라이브러리 |
 
 **[extra] PRE-SCA — 연구 프로젝트**
@@ -539,12 +541,13 @@ ss -tlnp | grep 8080       # 포트 점유 여부 확인
 
 **노트북에서 `scope` 연결 오류**
 
-- `workspace/base/Setup_Generic.ipynb`의 연결 셀을 먼저 실행합니다.
-- USB가 일시적으로 끊긴 경우 노트북 안내대로 scope를 재연결합니다.
+- SCA·FA·TraceWhisperer 입문 노트북은 맨 위의 자기완결 설정 셀부터 순서대로 실행합니다.
+- `HUSKY_SERIAL_NUMBER`가 해당 강의용 장비인지 확인합니다. 지정 장비 연결에 실패해도 다른 장비로 자동 전환하지 않습니다.
+- USB가 일시적으로 끊긴 경우 기존 커널의 연결을 해제하거나 커널을 다시 시작한 뒤 설정 셀을 재실행합니다.
 
 ```python
 import chipwhisperer as cw
-scope = cw.scope()
+scope = cw.scope(sn=HUSKY_SERIAL_NUMBER)
 ```
 
 </details>

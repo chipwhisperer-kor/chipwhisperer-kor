@@ -48,11 +48,9 @@ make PLATFORM=CW308_STM32F3 CRYPTO_TARGET=NONE SS_VER=SS_VER_2_1
 
 ## 노트북 연결 구조
 
-튜토리얼 노트북은 직접 하드웨어에 연결하지 않는다. 흐름은 다음과 같다.
+`1. SCA and FA/1.0.SCA_main.ipynb`, `2.0.FA_main.ipynb`, `2. TraceWhisperer/1.0.TraceWhisperer_main.ipynb`는 각각 자기완결적이다. 각 노트북은 내부 셀에서 필요한 패키지를 임포트하고 펌웨어를 clean·build한 뒤, 노트북 전용 `HUSKY_SERIAL_NUMBER`를 `cw.scope(sn=...)`에 전달해 지정 장비만 연결한다. 시리얼 없는 연결이나 다른 장비로의 fallback은 강의 장비 역할을 뒤바꿀 수 있으므로 두지 않는다.
 
-`<튜토리얼>.ipynb`에서 `PLATFORM` 설정 → `%run '../base/My_Setup.ipynb'` → 그 안에서 `%%bash`로 펌웨어 빌드, `%run '../base/Setup_Generic.ipynb'`(순수 `cw.scope()` / `cw.target()`), `cw.program_target(...)` 수행 후 공용 헬퍼 정의.
-
-`base/My_Setup.ipynb`가 정의하고 튜토리얼이 의존하는 헬퍼: `my_fsr_cmd(target, cmd, scmd, data, payload_only)`, `my_setting_num_samples(...)`(측정된 `trig_count`로부터 `scope.adc.samples`를 유도), `my_get_trace(target, scope)`, `cwUFO_reboot_flush()`. 공용 헬퍼는 노트북마다 복사하지 말고 여기에 추가한다(AGENTS.md 1-2). 예외는 `3. Release the Husky`로, 장비 **2대**(Lite = 프로그래밍·통신, Husky = 수동 관측)를 다루기 때문에 `My_Setup.ipynb` 대신 `My_script.ipynb`에서 자체 연결을 수행한다.
+SCA·FA는 독립 A–Z 실행을 위해 `reset_target`, `my_fsr_cmd`, `my_setting_num_samples`, `my_get_trace`와 SimpleSerial 2.1 빌드·프로그래밍을 각각 포함한다. TraceWhisperer는 자체 SimpleSerial 1.1 빌드·프로그래밍·trace 설정을 사용한다. `base/My_Setup.ipynb`와 `base/Setup_Generic.ipynb`는 다른 사용처를 위해 유지하지만 이 세 입문 노트북은 실행하지 않는다. `3. Release the Husky`는 장비 **2대**(Lite = 프로그래밍·통신, Husky = 수동 관측)를 다루므로 계속 `My_script.ipynb`에서 자체 연결을 수행한다.
 
 ### 커스텀 SimpleSerial 2.1 프로토콜
 
