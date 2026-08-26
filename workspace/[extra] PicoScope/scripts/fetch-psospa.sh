@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Download the Pico libpsospa Debian package and extract it into .vendor/.
+# Does not require sudo. Official GUI (PicoScope 7) still needs a system install.
+set -euo pipefail
+REPO="$(cd "$(dirname "$0")/.." && pwd)"
+DEST="$REPO/.vendor/picoscope"
+BASE="https://labs.picotech.com/picoscope7/debian"
+DEB="libpsospa_1.1.7-0r5994_amd64.deb"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+
+mkdir -p "$TMP" "$DEST"
+curl -fsSL -o "$TMP/$DEB" "$BASE/pool/main/libp/libpsospa/$DEB"
+dpkg-deb -x "$TMP/$DEB" "$TMP/root"
+rm -rf "$DEST/lib" "$DEST/include"
+mkdir -p "$DEST/lib" "$DEST/include"
+cp -a "$TMP/root/opt/picoscope/lib/libpsospa.so"* "$DEST/lib/"
+cp -a "$TMP/root/opt/picoscope/include/libpsospa" "$DEST/include/"
+echo "Installed $DEST/lib/libpsospa.so"
+ls -lh "$DEST/lib"

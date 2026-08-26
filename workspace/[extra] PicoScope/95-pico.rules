@@ -1,0 +1,3 @@
+# Pico Technology USB instruments (PicoScope, PicoLog, …)
+# Official postinst from libpsospa / libps3000a writes this as MODE=0666.
+ATTRS{idVendor}=="0ce9", MODE="0666"
