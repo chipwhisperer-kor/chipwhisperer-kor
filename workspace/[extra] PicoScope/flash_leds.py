@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Sweep the 3418E front-panel LEDs so the physical unit can be identified."""
+"""Identify an attached 3418E by sweeping its front-panel LEDs.
+
+The command needs a loadable ``libpsospa``, USB write access, and an available
+scope. It changes the A, B, C, D, AUX, and AWG LED states, prints completion,
+and creates no files. Driver and device errors propagate, while the opened
+scope is always closed and the LEDs are left off after a successful sweep.
+"""
 
 from __future__ import annotations
 
@@ -12,6 +18,7 @@ LEDS = ["A", "B", "C", "D", "AUX", "AWG"]
 
 
 def main() -> int:
+    """Run two LED sweeps and return zero when the final off state is applied."""
     scope = psdk.psospa()
     scope.open_unit()
     try:

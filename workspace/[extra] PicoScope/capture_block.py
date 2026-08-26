@@ -1,8 +1,13 @@
 #!/usr/bin/env python3
-"""One-shot block capture on channel A, with the AWG running.
+"""Capture channel A once while the PicoScope AWG is running.
 
-Connect AWG → Channel A with a BNC cable to see a 10 kHz sine.
-Without that loopback the capture is still valid: open-input noise.
+The command needs an attached scope, a loadable ``libpsospa``, and USB write
+access. It configures the AWG, channel A, and an auto-trigger; then it overwrites
+``captures/chA_block.csv`` and ``captures/chA_block.png``. Driver and device
+errors propagate to the caller, while the opened scope is always closed.
+
+An AWG-to-channel-A BNC loopback shows the generated sine wave. With no
+loopback, the same capture path records open-input noise.
 """
 
 from __future__ import annotations
@@ -26,6 +31,7 @@ OUT_DIR = Path(__file__).resolve().parent / "captures"
 
 
 def main() -> int:
+    """Run the configured capture and return zero after both output files exist."""
     scope = psdk.psospa()
     scope.open_unit()
     try:

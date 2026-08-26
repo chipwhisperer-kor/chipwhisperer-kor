@@ -1,4 +1,11 @@
-"""Locate libpsospa and apply pypicosdk.override_directory before opening a scope."""
+"""Select the native ``libpsospa`` used by all PicoScope entry points.
+
+Importing this module prefers the ignored, project-local driver downloaded by
+``scripts/fetch-psospa.sh`` and otherwise accepts the system PicoSDK location.
+Selecting the local copy changes pypicosdk's process-wide lookup directory. If
+neither library exists, import fails with ``FileNotFoundError`` before a USB
+device is opened.
+"""
 
 from __future__ import annotations
 
@@ -12,6 +19,7 @@ SYSTEM_LIB = Path("/opt/picoscope/lib/libpsospa.so")
 
 
 def configure_sdk() -> Path:
+    """Return the selected library path and configure pypicosdk when local."""
     if VENDOR_LIB.exists():
         psdk.override_directory(str(VENDOR_LIB.parent.parent))
         return VENDOR_LIB

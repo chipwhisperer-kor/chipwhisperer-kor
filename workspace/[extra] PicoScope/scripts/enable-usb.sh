@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # Temporarily chmod Pico USB device nodes to 0666 without host sudo.
-# Uses a local privileged container that bind-mounts /dev/bus/usb.
+# Input: attached Pico USB devices and optional PICO_USB_DOCKER_IMAGE.
+# Output: changed node modes and a status line for each device; no files.
+# Failure: no matching device, inaccessible sysfs/devfs, or unavailable Docker.
+# Side effect: when the caller cannot already write the node, a disposable local
+# privileged container bind-mounts /dev/bus/usb and changes the host node mode.
 set -euo pipefail
 
 python3 - <<PY

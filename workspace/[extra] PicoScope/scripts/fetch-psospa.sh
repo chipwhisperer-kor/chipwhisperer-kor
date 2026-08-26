@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
-# Download the Pico libpsospa Debian package and extract it into .vendor/.
-# Does not require sudo. Official GUI (PicoScope 7) still needs a system install.
+# Download the x86-64 Pico libpsospa Debian package and extract it into .vendor/.
+# Input: network access plus curl and dpkg-deb; no command-line arguments.
+# Output: the native library and headers under .vendor/picoscope.
+# Failure: download, package extraction, or expected package layout errors.
+# Side effect: replaces only the ignored .vendor/picoscope/lib and include trees;
+# it does not install the PicoScope GUI or modify the host package database.
 set -euo pipefail
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 DEST="$REPO/.vendor/picoscope"

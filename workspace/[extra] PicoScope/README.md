@@ -1,73 +1,70 @@
 # PicoScope 3418E
 
-이 디렉터리는 워크스테이션에 연결된 Pico Technology **PicoScope 3418E**만 다룬다.
-시리얼 `10561/0034`, 드라이버 API는 3000E용 **`psospa`**.
+이 서브프로젝트는 Pico Technology **PicoScope 3418E**를 `psospa` API로 열어
+식별하고, 전면 LED와 채널 A 블록 캡처를 독립적으로 점검한다. 장비별 시리얼,
+교정일, 펌웨어와 드라이버 버전은 저장소에 고정하지 않고 `identify_scope.py`가
+연결된 장치에서 읽는다.
 
-| 항목 | 값 |
-|------|-----|
-| 모델 | PicoScope 3418E (아날로그 4채널, MSO 아님) |
-| USB | SuperSpeed 5 Gb/s, `0ce9:1020` |
-| 대역폭 | 500 MHz (8-bit) |
-| 최대 샘플 | 5 GS/s (1채널 8-bit) / 2.5 GS/s (10-bit) |
-| 메모리 | 2 GS (8-bit) / 1 GS (10-bit) |
-| 분해능 | 8-bit 또는 10-bit FlexRes |
-| AWG | 전면 BNC, 200 MS/s 14-bit |
-| 트리거 보조 | 전면 AUX I/O |
-| 교정 | 19 Jun 2024 |
+## 편입 범위
 
-전면: 채널 A–D, AUX, AWG. 각 BNC에 RGB LED가 있다.
+현재 단계는 외부에서 가져온 PicoScope 도구를 이 저장소 안에서 재현 가능하게
+실행하는 데까지만 포함한다. `workspace/3. Release the Husky`의 파일은 변경하지
+않으며 두 프로젝트의 캡처 흐름도 아직 연결하지 않는다. 추후 융합은 이 디렉터리에
+새 Jupyter 노트북을 추가하여 수행한다.
 
-## 확인된 상태
+## 실행 환경 준비
 
-드라이버로 장치를 열었고, 전면 LED를 쓸 수 있고, 채널 A 블록 캡처가 끝난다.
-열린 입력에서 8-bit ±2 V 범위의 LSB(약 15.6 mV) 계단이 보이면 ADC 경로가 살아있는 것이다.
-
-PicoScope 7 GUI **7.2.24.9932** 와 `libpsospa` 1.1.7, USB udev 규칙이 이 호스트에 설치되어 있다.
-
-## 사용
+저장소의 기본 Docker 컨테이너 또는 Python 3.10 이상과 해당 Python의 `venv`·`pip`
+모듈이 있는 Linux x86-64 환경에서 이 디렉터리로 이동한 뒤 아래 명령을 한 번
+실행한다. Debian/Ubuntu 호스트에서 `ensurepip` 오류가 나면 `python3-venv` 패키지가
+필요하다. 가상환경과 내려받은 드라이버는 재생성 가능한 로컬 상태이므로 Git에서
+제외된다.
 
 ```bash
-source .venv/bin/activate          # 최초 1회: uv venv .venv && uv pip install -r requirements.txt
-./scripts/enable-usb.sh            # 재연결 직후 USB 쓰기 권한
-python identify_scope.py           # 모델·시리얼·펌웨어
-python flash_leds.py               # 전면 LED가 A→AWG 순으로 깜빡이면 이 상자
-python capture_block.py            # 채널 A 블록 캡처 → captures/chA_block.png
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+./scripts/fetch-psospa.sh
 ```
 
-USB udev 규칙 `/etc/udev/rules.d/95-pico.rules` 가 이미 설치되어 있어, 재연결 후에도 권한이 유지되어야 한다.
-그래도 장치가 안 열리면 `./scripts/enable-usb.sh`.
+`fetch-psospa.sh`는 Pico가 배포하는 amd64 Debian 패키지에서 `libpsospa`만
+`.vendor/`로 추출하므로 `curl`과 `dpkg-deb`가 필요하다. 설치 중 네트워크 오류,
+패키지 형식 변경 또는 x86-64가 아닌 환경에서는 실패한다. 시스템에 PicoSDK가
+설치되어 있으면 내려받기를 생략할 수 있다. 실행 코드는 프로젝트 로컬 드라이버를
+우선 사용하고, 없으면 시스템 드라이버를 사용하며, 둘 다 없으면 실행 전에 실패한다.
 
-시스템 드라이버는 `/opt/picoscope/lib/libpsospa.so` 이다. Python 스크립트는 `.vendor` 가 있으면 그쪽을 먼저 쓴다.
+## USB 권한
 
-## 첫 측정
-
-1. **LED** — `flash_leds.py` 동안 본체의 A, B, C, D, AUX, AWG LED가 차례로 켜지는지 본다.
-2. **열린 채널** — 프로브 없이 `capture_block.py`. 수 mV–수십 mV의 양자화 잡음이면 정상.
-3. **AWG 루프백** — 짧은 BNC 케이블로 **AWG → 채널 A**. 다시 `capture_block.py`.
-   10 kHz, 1 Vpk-pk 정현파가 보여야 한다. AWG 출력은 50 Ω.
-4. **프로브** — 채널 A에 패시브 프로브를 꽂고 1×/10× 스위치를 프로브와
-   소프트웨어 감쇠가 같게 맞춘다. 3418E 입력은 1 MΩ 또는 50 Ω.
-
-캡처 스크립트는 AWG를 켜 둔 채 채널 A를 10 MS/s, 10 k샘플로 한 번 뜬다.
-트리거가 없으면 100 ms 후 강제 캡처한다.
-
-## PicoScope 7 (대화형 GUI)
-
-설치된 버전은 **7.2.24.9932** 이다. 앱 목록의 “PicoScope 7” 또는:
+호스트에서 다음 udev 규칙을 한 번 설치한 뒤 규칙을 다시 읽고 장치를 재연결한다.
+이 작업은 호스트 시스템을 변경하며 관리자 권한이 필요하다.
 
 ```bash
-picoscope
+sudo install -m 0644 95-pico.rules /etc/udev/rules.d/95-pico.rules
+sudo udevadm control --reload-rules
 ```
 
-apt 저장소는 `/etc/apt/sources.list.d/picoscope7.list` 이다.
-Ubuntu 26.04는 Pico 공식 지원 목록(22.04/24.04) 밖이지만, 이 호스트에서는
-패키지가 설치되고 GUI 프로세스가 기동했다. GTK 경고가 나와도 창이 뜨면 무시한다.
+장치를 재연결할 수 없거나 규칙을 아직 설치하지 못했다면 호스트에서
+`./scripts/enable-usb.sh`를 실행할 수 있다. 이 스크립트는 Pico USB 노드만 찾아
+일시적으로 모든 사용자에게 쓰기 권한을 주며, 권한이 없을 때는 로컬 Docker를
+특권 모드로 실행한다. 장치가 없거나 Docker를 사용할 수 없으면 0이 아닌 코드로
+종료한다.
 
-시작 후에도 장치가 안 보이면 USB를 뽑았다가 꽂고, 후면 USB-C 전원을 연결한 뒤
-`./scripts/enable-usb.sh` 를 실행한다.
+## 점검 순서
 
-## 전원
+```bash
+.venv/bin/python identify_scope.py
+.venv/bin/python flash_leds.py
+.venv/bin/python capture_block.py
+```
 
-3418E는 USB-C 3 A 또는 동봉 PS017(후면 USB-C 전원)을 권장한다.
-지금은 USB 3.0 허브 두 단을 거쳐 SuperSpeed로 열려 있고
-`powerErrorLikely=0`이다. 캡처가 끊기거나 장치가 사라지면 후면 전원을 연결한다.
+1. `identify_scope.py`는 연결된 장치의 모델, 시리얼, USB, 교정, 펌웨어와 드라이버
+   정보를 출력한다. 열 수 있는 장치가 없거나 권한·드라이버 문제가 있으면 실패한다.
+2. `flash_leds.py`는 A, B, C, D, AUX, AWG LED를 차례로 점멸한 뒤 모두 끈다.
+   장치를 눈으로 식별하기 위한 절차이며 측정 데이터는 만들지 않는다.
+3. `capture_block.py`는 AWG를 활성화하고 채널 A를 한 번 캡처하여
+   `captures/chA_block.csv`와 `captures/chA_block.png`를 덮어쓴다. 열린 입력도
+   캡처할 수 있지만, 파형 경로까지 확인하려면 짧은 BNC 케이블로 AWG와 채널 A를
+   연결한다.
+
+세 명령은 모두 장치를 열고 설정한 뒤 정상·예외 종료 시 닫는다. 캡처 결과는 장비와
+배선에 종속되고 다시 만들 수 있으므로 Git에서 제외한다. 장치가 실행 중 사라지거나
+캡처가 불안정하면 USB 연결과 별도 전원 상태를 확인한다.

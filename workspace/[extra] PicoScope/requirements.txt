@@ -1,3 +1,6 @@
+# 세 하드웨어 점검 명령이 사용하는 메서드·열거형 계약을 고정한다. 버전 변경 시 실제
+# 3418E에서 identify, LED 점멸, 블록 캡처를 모두 확인해야 한다.
 pypicosdk==1.7.5
+# capture_block.py가 직접 import하는 실행 의존성이다.
 matplotlib
 numpy

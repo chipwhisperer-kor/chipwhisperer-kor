@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Print identity of the attached PicoScope 3000E (psospa)."""
+"""Print live identity data from an attached PicoScope 3000E.
+
+The command needs a loadable ``libpsospa`` and USB write access. It opens and
+closes one scope, writes identity and power-status fields to stdout, and creates
+no files. Enumeration failures produce a diagnostic on stderr and exit status
+1; later driver or device errors propagate after the opened scope is closed.
+"""
 
 from __future__ import annotations
 
@@ -21,6 +27,7 @@ INFO = (
 
 
 def main() -> int:
+    """Inspect one scope and return zero, or one when enumeration fails."""
     scope = psdk.psospa()
     try:
         enumerated = scope.get_enumerated_units()
