@@ -15,11 +15,12 @@ IUT는 비침습 방식으로 시험하는 구현이며, Dataset Metadata의 `iu
 
 **같은 소스를 컴파일해야 서로 다른 관측을 나란히 놓을 수 있기 때문이다.**
 
-이 저장소는 한 구현을 **두 가지 방식**으로 관측한다.
+이 저장소는 한 구현을 **세 가지 방식**으로 관측한다.
 
 | 관측 | 무엇을 보나 | 쓰는 곳 |
 |---|---|---|
 | 실물 전력 트레이스 | 실제 칩에서 물리적으로 새는가 | `[extra] SCALib/simpleserial_{tiny-AES-c,masked-aes-c}/` |
+| 사전 에뮬레이션 | ARM 명령어별 레지스터 변화와 오류주입 결과 | `[extra] PRE-SCA/source/target-firmware/` |
 | 에뮬레이션 | 이론이 끊어 놓은 누설 고리를 구현이 되살렸는가 | `[extra] Physical-AI-SCA/emul_harness/` |
 
 둘이 서로 다른 빌드의 서로 다른 소스를 보면, "에뮬레이션에서 찾은 결함이 실측 타겟에도
@@ -35,9 +36,10 @@ IUT는 비침습 방식으로 시험하는 구현이며, Dataset Metadata의 `iu
 |---|---|
 | `[extra] SCALib/simpleserial_tiny-AES-c/makefile` | `VPATH += ../../iut/tiny-AES-c` |
 | `[extra] SCALib/simpleserial_masked-aes-c/makefile` | `VPATH += ../../iut/masked-aes-c` (`-DMASKED=1`) |
+| `[extra] PRE-SCA/source/target-firmware/Makefile` | `../../../iut/tiny-AES-c/aes.c` 직접 컴파일 (`-O2`) |
 | `[extra] Physical-AI-SCA/emul_harness/Makefile` | `../../iut/<lib>/aes.c` 직접 컴파일 |
 
-**경로를 옮기면 위 세 곳을 함께 고치고 `clean` 재빌드한다.** 빌드 산출물
+**경로를 옮기면 위 네 곳을 함께 고치고 `clean` 재빌드한다.** 빌드 산출물
 (`objdir-*/*.lst`, `.elf`)에 소스 경로가 문자열로 박히기 때문에, 재빌드하지 않으면
 낡은 경로를 가진 바이너리가 남는다.
 

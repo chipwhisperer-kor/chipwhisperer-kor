@@ -182,6 +182,8 @@ flowchart LR
 
 > Lite(통신·프로그래밍) + Husky(수동 관측) 역할 분리 실험
 
+> 두 와이어태핑 노트북도 필요한 헬퍼와 빌드·프로그래밍 절차를 직접 포함합니다. 각 노트북은 `HUSKY_SERIAL_NUMBER`와 `LITE_SERIAL_NUMBER`로 배선된 두 장비만 열며, 연결 실패 시 다른 장비로 전환하지 않습니다.
+
 **base/ — 공통 자료**
 
 | 경로 | 설명 |
@@ -196,7 +198,9 @@ flowchart LR
 |--------|------|
 | `PRE-SCA.ipynb` | Unicorn 기반 ARM 펌웨어 명령어 단위 트레이싱 및 오류주입 실험 (tiny-AES 대상) |
 
-> 공식 학습 경로와 별도이며, 결과 CSV는 `nb_output/`에 저장됩니다. **실하드웨어 없이 실행 가능합니다.**
+> 공식 학습 경로와 별도이며, 결과 CSV는 `nb_output/`에 저장됩니다. 분석 대상 `source/tiny-aes`는
+> `source/target-firmware/`에서 만들며, AES 구현은 공용 정본 `workspace/iut/tiny-AES-c`를 직접
+> 컴파일합니다. **실하드웨어 없이 실행 가능합니다.**
 
 </details>
 

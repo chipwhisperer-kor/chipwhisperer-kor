@@ -6,6 +6,6 @@
 nb_output/*/
 nb_output/disassembly.txt
 
-# `source/tiny-aes_소스코드/Makefile` 이 만드는 실행 파일. 분석 대상 ELF 는
-# `source/tiny-aes` 한 벌만 추적하고, 빌드 디렉터리 안의 사본은 재빌드로 얻는다.
-source/tiny-aes_소스코드/tiny-aes
+# `source/target-firmware/Makefile` 의 중간 산출물. 최종 분석 대상 ELF 는
+# `source/tiny-aes` 한 벌만 추적하고, 오브젝트 파일은 재빌드로 얻는다.
+source/target-firmware/*.o

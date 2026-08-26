@@ -469,7 +469,7 @@ TA는 파생값이 아니라 원본의 Execution별 `exec_time`을 사용한다.
 |---|---|---|---|
 | `workspace/[extra] SCALib/traces/scalib_dataset_tiny-AES-c.h5` | 1.0 | `*.h5` 제외 — clone에 포함되지 않음 | 수집 노트북 완료 후 검증기 통과 |
 | `workspace/[extra] SCALib/traces/scalib_dataset_masked-aes-c.h5` | 1.0 | `*.h5` 제외 — clone에 포함되지 않음 | `mask` 포함, 수집 노트북 완료 후 검증기 통과 |
-| `workspace/traces/20260427_143337_SCA_DB.h5` | 1.0 | 파일 있음, 기존 문서 기준 부분 준수 | §7.1의 미기록 Metadata 유지 |
+| `workspace/traces/20260825_220525_SCA_DB.h5` | 1.0 | 파일 있음 | 1.0 규칙으로 검증기 통과 |
 | `workspace/[extra] Physical-AI-SCA/traces/*.h5` | 1.1 | `*.h5` 제외 — clone에 포함되지 않음 | 에뮬레이션이면 `sample_map`·`exec_time` 포함 후 검증기 통과 |
 
 생성 대상 경로가 있다는 사실과 특정 작업 디렉터리에 파일이 존재한다는 사실은 다르다.
@@ -481,16 +481,6 @@ TA는 파생값이 아니라 원본의 Execution별 `exec_time`을 사용한다.
 > Dataset이고 1.0을 완전히 지킨다. 다만 ISO/IEC 17825 요건을 판정하려면 1.1이 요구하는
 > 값(`bandwidth_hz`·`exec_time`·`shunt_ohm` 등)이 필요하므로, **요건 대조표에서는
 > "미기록 → 판정 불가"** 로 보고된다. 스키마 준수와 시험 요건 충족은 다른 축이다.
-
-### 7.1 튜토리얼 Dataset이 부분 준수인 이유
-
-`workspace/traces/20260427_143337_SCA_DB.h5` 는 스키마를 세우기 전에 다른 사람이 받은
-파일이다. 레이아웃과 필드명은 맞췄지만 **당시 기록되지 않은 측정 메타데이터는 복원할 수
-없다** — 게인, 프로브 구성, 분해능 등. §5.3 대로 **추정해서 채우지 않고 비워 두었다.**
-
-튜토리얼 수집 코드는 1.0 스키마 필드를 기록하도록 작성되어 있다. 다만 스코프와 측정 조건에
-맞는 Metadata를 수집 전에 확인해야 하며, 새 Dataset의 준수 여부는 생성 직후 검증기 결과로
-판정한다.
 
 ---
 
