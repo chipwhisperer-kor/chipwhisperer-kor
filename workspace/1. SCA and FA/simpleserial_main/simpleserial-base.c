@@ -89,7 +89,7 @@ uint8_t my_init(uint8_t cmd, uint8_t scmd, uint8_t len, uint8_t *buf)
 	return 0x00;
 
 }
-/* 0x82 'c' 명령: 트리거가 HIGH인 동안에만 XOR 연산을 수행한다. 따라서 수집된
+/* 0x82 'c' 명령: 트리거가 HIGH인 동안에만 XOR 연산을 수행한다. 그래서 수집된
  * Trace(트레이스)는 UART 응답을 포함하지 않는다. 연산 뒤에는 완료 바이트 0x82를 보낸다. */
 uint8_t my_update(uint8_t cmd, uint8_t scmd, uint8_t len, uint8_t *buf)
 {

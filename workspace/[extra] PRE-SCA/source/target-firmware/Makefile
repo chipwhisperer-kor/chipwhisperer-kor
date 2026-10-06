@@ -1,6 +1,6 @@
 CC := arm-none-eabi-gcc
 
-# AES 구현은 저장소 공용 IUT가 정본이다. 이 디렉터리에 사본을 두지 않고 정본을 직접
+# AES 구현은 저장소 공용 IUT를 기준으로 삼는다. 이 디렉터리에 사본을 두지 않고 그 소스를 직접
 # 컴파일해야 PRE-SCA가 다른 실험과 같은 구현을 분석한다.
 IUT_DIR := ../../../iut/tiny-AES-c
 TARGET := ../tiny-aes

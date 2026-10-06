@@ -4,7 +4,7 @@
 정의는 여기 한 곳, 노트북은 타겟 상수·내러티브·호출만 담당한다.
 
 마스크 회수: capture_one(..., with_masks=True) 일 때 0x83 'm' 으로 10바이트를 읽는다.
-호출은 반드시 `trigger_low` 이후(암호화 명령이 끝난 뒤)이므로 Trace에 UART가 섞이지 않는다.
+호출은 언제나 `trigger_low` 이후(암호화 명령이 끝난 뒤)이므로 Trace에 UART가 섞이지 않는다.
 
 장시간 수집은 중간에 깨진다. 그래서 캡처는 항상 Bench.capture() 로 하며, 실패하면
 단순 재시도 3회 → 장비 재연결과 설정 복원 2회 → Husky 펌웨어 재기록 1회 순으로
@@ -56,7 +56,7 @@ from scalib_common import (
 # (scalib_common 이 workspace/lib 를 sys.path 에 넣어 주므로 여기서는 그냥 import 한다)
 from aes_ref import aes_ecb_encrypt
 
-# 노트북이 재export 할 수 있도록 재노출
+# 노트북이 다시 import 할 수 있도록 같은 이름으로 제공한다
 __all__ = [
     "my_fsr_cmd",
     "aes_ecb_encrypt",
@@ -164,7 +164,7 @@ def mask_seed_for(group_name, round_idx):
 
     재현 가능해야 하므로 난수가 아니고, 재접속·재플래시마다 달라져야 하므로
     라운드 번호를, 그룹끼리 겹치지 않도록 그룹 이름을 섞는다.
-    값 자체에 암호학적 의미는 없다 — 목적은 "같은 수열의 재생 방지" 뿐이다.
+    값 자체에 암호학적 의미는 없다. 목적은 같은 수열의 재생을 막는 것뿐이다.
     """
     h = 0
     for ch in group_name:
@@ -175,7 +175,7 @@ def mask_seed_for(group_name, round_idx):
 def _seed_masks(target, group_dset, group_name):
     """with_masks 수집 직전에 새 마스크 시드를 심고 그룹 attrs 에 남긴다.
 
-    라운드 번호는 프로세스 변수가 아니라 **그룹 attrs 에 이미 쌓인 시드 개수**에서
+    라운드 번호는 프로세스 변수가 아니라 그룹 attrs 에 이미 쌓인 시드 개수에서
     센다. 이어받기 스크립트를 껐다 켜도 번호가 되감기지 않아야 하기 때문이다
     (프로세스 카운터로 하면 재실행 때마다 1번 시드로 돌아가 결함이 그대로 재현된다).
     """
@@ -191,7 +191,7 @@ def _seed_masks(target, group_dset, group_name):
 def set_mask_seed(target, seed):
     """Masked 펌웨어의 rand() 시드를 지정한다 (0x81 's', 4바이트 LE).
 
-    **연결·재플래시 직후 반드시 호출한다.** 타겟은 스스로 엔트로피를 만들지 못해
+    연결·재플래시 직후에 호출해야 한다. 타겟은 스스로 엔트로피를 만들지 못해
     부팅 시드가 매번 같다. 이 호출을 빠뜨리면 재시작할 때마다 같은 마스크 수열이
     처음부터 재생되고, 그렇게 모은 Trace는 마스크가 중복되어 분석에 쓸 수 없다.
 
@@ -226,7 +226,7 @@ def open_scope(sn, name, tries=4, pause=3.0):
         except Exception as e:
             last = e
             if attempt < tries:
-                print("  [재시도 %d/%d] %s — %s" % (attempt, tries, name, str(e)[:60]))
+                print("  [재시도 %d/%d] %s: %s" % (attempt, tries, name, str(e)[:60]))
                 time.sleep(pause)
     raise RuntimeError("%s 연결 실패 (%d회 시도): %s" % (name, tries, last))
 
@@ -234,8 +234,8 @@ def open_scope(sn, name, tries=4, pause=3.0):
 def connect_all_devices(required=("ChipWhisperer_Lite", "ChipWhisperer_Husky"), tries=4):
     """USB ChipWhisperer를 탐색해 `{정규화한 이름: scope}` 사전으로 반환한다.
 
-    장치 목록은 최대 `tries`회 확인하며 Lite와 Husky가 기본 필수 장치다. 장치가 없거나
-    필수 이름을 모두 열지 못하면 배선·컨테이너 확인 항목을 담은 `RuntimeError`가 발생한다.
+    장치 목록은 최대 `tries`회 확인하며 기본으로 Lite와 Husky를 요구한다. 장치가 없거나
+    필수 이름을 모두 열지 못하면 USB 연결·컨테이너 확인 항목을 담은 `RuntimeError`가 발생한다.
     성공한 scope의 USB 연결은 호출자가 나중에 닫아야 한다.
     """
     device_list = []
@@ -344,7 +344,7 @@ def setup_husky(husky_scope, adc_mul, gain_db):
           " clkgen_freq =", husky_scope.clock.clkgen_freq)
 
     if not husky_scope.clock.adc_locked or not husky_scope.clock.clkgen_locked:
-        raise RuntimeError("Husky PLL/ADC lock 실패 — AUX 클럭 배선과 진폭을 확인한다.")
+        raise RuntimeError("Husky PLL/ADC lock 실패. AUX 클럭 케이블 연결과 진폭을 확인한다.")
 
     husky_scope.trigger.triggers = "userio_d0"
     husky_scope.trigger.module = "basic"
@@ -367,9 +367,9 @@ def measure_trig_count(target, scope, key16, plain16):
     scope.arm()
     ct = target_aes_encrypt(target, key16, plain16)
     if scope.capture():
-        raise RuntimeError("capture 타임아웃 — TRIG(D0) 배선·펌웨어 트리거를 확인한다.")
+        raise RuntimeError("capture 타임아웃. TRIG(D0) 핀 연결과 펌웨어 트리거를 확인한다.")
     if ct != aes_ecb_encrypt(key16, plain16):
-        raise RuntimeError("골든 불일치 — 측정 전에 통신 상태를 확인한다.")
+        raise RuntimeError("골든 불일치. 측정 전에 통신 상태를 확인한다.")
     return int(scope.adc.trig_count)
 
 
@@ -382,7 +382,7 @@ def apply_trig_count(husky_scope, trig_counts, adc_mul):
     """
     print("trig_count 회차:", list(trig_counts))
     if len(set(trig_counts)) != 1:
-        print("[주의] trig_count 가 일정하지 않다. 트리거 배선·클럭 안정성을 확인한다.")
+        print("[주의] trig_count 가 일정하지 않다. 트리거 핀 연결과 클럭 안정성을 확인한다.")
     trig_count = max(trig_counts)
     try:
         husky_scope.adc.samples = trig_count
@@ -419,7 +419,7 @@ def capture_one(target, scope, key16, plain16, check_golden=True, with_masks=Fal
     scope.arm()
     ct = target_aes_encrypt(target, key16, plain16)
     if scope.capture():
-        raise RuntimeError("capture 타임아웃 — TRIG(D0) 배선·펌웨어 트리거를 확인한다.")
+        raise RuntimeError("capture 타임아웃. TRIG(D0) 핀 연결과 펌웨어 트리거를 확인한다.")
     if check_golden and ct != aes_ecb_encrypt(key16, plain16):
         raise RuntimeError("암호문 골든 불일치")
     wave = np.asarray(scope.get_last_trace(), dtype=np.float64)
@@ -430,7 +430,7 @@ def capture_one(target, scope, key16, plain16, check_golden=True, with_masks=Fal
 
 
 def capture_retry(target, scope, k, p, with_masks=False, tries=3, pause=2.0):
-    """복구 사다리의 **1단계** — 단순 재시도. 골든 불일치는 재시도하지 않는다.
+    """단계별 복구의 1단계인 단순 재시도. 골든 불일치는 재시도하지 않는다.
 
     LIBUSB_ERROR_IO 등 USB 단절은 잠깐 쉰 뒤 재시도한다 (이 실험대에서 장시간
     캡처 중 관측된 실패 모드). 연속 tries 회 실패하면 마지막 예외를 올린다.
@@ -439,8 +439,8 @@ def capture_retry(target, scope, k, p, with_masks=False, tries=3, pause=2.0):
     재연결·펌웨어 재기록으로 넘어가야 하는데, 그 판단은 Bench 가 한다.
 
     Masked 주의: 재시도는 타겟에서 암호화를 한 번 더 돌리므로 rand() 가 그만큼
-    전진한다. 즉 시드를 알아도 "n번째 트레이스의 마스크" 를 호스트에서 계산할 수는
-    없다 — 마스크의 정본은 언제나 0x83 'm'으로 회수해 HDF5 `mask` 배열에 저장한 값이다.
+    전진한다. 그래서 시드를 알아도 "n번째 트레이스의 마스크" 를 호스트에서 계산할 수는
+    없다. 마스크 값의 기준은 언제나 0x83 'm'으로 회수해 HDF5 `mask` 배열에 저장한 값이다.
 
     성공하면 `capture_one()`과 같은 튜플을 반환한다. 골든·마스크 불일치는 즉시 다시
     발생시키고, 다른 통신 오류만 증가하는 대기시간으로 `tries`회 재시도한다. 전부 실패하면
@@ -464,11 +464,11 @@ def capture_retry(target, scope, k, p, with_masks=False, tries=3, pause=2.0):
 def write_root_metadata(h5, bench, cipher_attr, fixed_key, fixed_pt):
     """루트 Metadata 를 SCHEMA.md §3 대로 기록한다.
 
-    이 함수가 스키마와 실측 장비를 잇는 **유일한 지점**이다. 필드가 늘거나 이름이
+    이 함수가 스키마와 실측 장비를 잇는 유일한 지점이다. 필드가 늘거나 이름이
     바뀌면 여기만 고친다.
 
     모르는 값은 적지 않는다(SCHEMA.md §5.3). 예를 들어 대역폭은 Husky 설정에서
-    바로 읽을 수 없으므로 기록하지 않는다 — 추정치를 넣으면 다음 사람이 그것을
+    바로 읽을 수 없으므로 기록하지 않는다. 추정치를 넣으면 뒤에 읽는 사람이 그것을
     측정값으로 오해한다.
 
     쓰기 가능한 h5py 파일과 초기화된 Bench를 받아 루트 HDF5 attrs를 변경한다. 반환값은
@@ -505,7 +505,7 @@ def write_root_metadata(h5, bench, cipher_attr, fixed_key, fixed_pt):
 
     h5.attrs["trigger_source"] = "userio_d0"
     h5.attrs["trigger_semantics"] = (
-        "MY_AES_ECB 전체 — AES_init_ctx(KeyExpansion) + AES_ECB_encrypt")
+        "MY_AES_ECB 전체. AES_init_ctx(KeyExpansion) + AES_ECB_encrypt")
     h5.attrs["trigger_samples"] = int(bench.trig_count)
 
     # 트리거로 동기화만 하고 후처리 정렬은 하지 않았다 (ISO/IEC 17825 A.2.6).
@@ -516,7 +516,7 @@ def write_root_metadata(h5, bench, cipher_attr, fixed_key, fixed_pt):
         cw.__version__, sys.version.split()[0], np.__version__)
     h5.attrs["rng_seed"] = SEED
 
-    # 이 저장소 고유 — 교육용 채점 기준이다 (SCHEMA.md §8).
+    # 이 저장소 고유 필드. 교육용 채점 기준이다 (SCHEMA.md §8).
     h5.attrs["fixed_key"] = fixed_key
     h5.attrs["fixed_pt"] = fixed_pt
 
@@ -527,7 +527,7 @@ def collect_group(h5, name, n_traces, key_mode, pt_mode, fixed_key, fixed_pt, se
 
     키·평문 모드와 결정적 `seed`를 적용하고, Masked 수집이면 마스크와 시드 이력을 함께
     기록한다. 같은 이름의 그룹이 이미 있으면 h5py 오류가 발생한다. 캡처 사고는 Bench의
-    복구 사다리를 거치며 복구 불가·파일 I/O 오류는 호출자에게 전파된다. HDF5와 장비
+    단계별 복구를 거치며 복구 불가·파일 I/O 오류는 호출자에게 전파된다. HDF5와 장비
     상태를 변경하고 반환값은 없다.
     """
     ns, with_masks = bench.ns, bench.with_masks
@@ -581,7 +581,7 @@ def collect_group(h5, name, n_traces, key_mode, pt_mode, fixed_key, fixed_pt, se
         buf_o.append(list(ct)); buf_t.append(to_adc_code(wave))
         if len(buf_t) >= batch:
             flush()
-            # 배치마다 디스크에 반영 — USB 사고 시 손실 구간을 줄인다
+            # 배치마다 디스크에 반영해 USB 사고 시 손실 구간을 줄인다
             h5.flush()
     flush()
     h5.flush()
@@ -642,7 +642,7 @@ def resume_group(h5, name, bench, fixed_key, fixed_pt, batch=BATCH):
     g = h5[name]
     have = g[F_TRACE].shape[0]
     if have >= target_n:
-        print("  /%-10s %6d 장 — 이미 충족" % (name, have))
+        print("  /%-10s %6d 장 (이미 충족)" % (name, have))
         return
 
     print("  /%-10s %6d → %d 장, %d 장 추가" % (name, have, target_n, target_n - have))
@@ -697,7 +697,7 @@ def resume_group(h5, name, bench, fixed_key, fixed_pt, batch=BATCH):
     flush()
     # collect_group 과 같은 attrs 를 남긴다. 예전에는 n_traces·seconds 만 써서
     # resume 로 만든 그룹은 key_mode/pt_mode 가 비었고, dataset_summary 가 '키=? 평문=?'
-    # 를 찍었다. 값의 정본은 위에서 이미 꺼내 쓴 GROUP_MODES[name] 이다.
+    # 를 찍었다. 값의 기준은 위에서 이미 꺼내 쓴 GROUP_MODES[name] 이다.
     g.attrs["role"] = SUBSET_ROLE_MAP[name]
     g.attrs["key_mode"] = key_mode
     g.attrs["pt_mode"] = pt_mode
@@ -709,8 +709,8 @@ def resume_group(h5, name, bench, fixed_key, fixed_pt, batch=BATCH):
 def _report_schema(out_path):
     """수집 직후 스키마 준수를 확인한다 (SCHEMA.md §6).
 
-    여기서 걸러야 규약 위반이 분석 단계까지 흘러가지 않는다. 수집은 이미 끝났으므로
-    예외로 죽이지 않고 보고만 한다 — Dataset 자체는 살아 있기 때문이다. 파일은 읽기
+    여기서 걸러야 스키마 위반이 분석 단계까지 흘러가지 않는다. 수집은 이미 끝났으므로
+    예외로 죽이지 않고 보고만 한다. Dataset 자체는 살아 있기 때문이다. 파일은 읽기
     전용이며 결과를 stdout에 출력하고 반환값은 없다.
     """
     bad = validate_dataset(path=out_path)
@@ -725,8 +725,8 @@ def _report_schema(out_path):
 def _record_recoveries(h5, bench):
     """수집 중 몇 번, 무엇으로 살아났는지 파일에 남긴다.
 
-    자동 복구는 조용히 지나가기 쉬운데, 나중에 데이터 품질을 의심할 때 이 기록이
-    첫 단서가 된다. 복구가 잦았다면 배선·USB 를 손봐야 한다는 뜻이다.
+    자동 복구는 눈에 띄지 않고 지나가기 쉬운데, 나중에 데이터 품질을 의심할 때 이 기록이
+    첫 단서가 된다. 복구가 잦았다면 케이블 연결과 USB 를 점검해야 한다는 뜻이다.
 
     기존 `recoveries` HDF5 attr 뒤에 이번 Bench의 이력을 추가한다. 복구가 없으면 빈 이력을
     유지하며 파일 쓰기 실패는 호출자에게 전파된다.
@@ -795,17 +795,17 @@ def _samba_port(timeout=25.0):
 def reflash_husky_firmware(serial_number):
     """Husky 의 SAM 펌웨어를 소거하고 다시 기록한다.
 
-    **왜 필요한가:** Husky 펌웨어가 손상되면 버전은 정상값(1.5.0)으로 보고하면서
+    이 함수가 필요한 이유는 다음과 같다. Husky 펌웨어가 손상되면 버전은 정상값(1.5.0)으로 보고하면서
     FPGA 레지스터 읽기만 어긋난다(모든 FPGA_READ 응답 앞에 0xff 한 바이트가 더 붙어
     cw.scope() 가 `Unknown hwInfoVer: Default/Unknown` 으로 실패). 이 상태는
     USB 전원 차단·허브 재열거·물리적 재삽입 어느 것으로도 낫지 않고, 재기록만 듣는다.
 
-    실패해도 벽돌이 되지 않는다 — SAM 의 하드웨어 부트로더는 지울 수 없어서, 소거 뒤
+    실패해도 복구 불능 상태가 되지는 않는다. SAM 의 하드웨어 부트로더는 지울 수 없어서, 소거 뒤
     재기록이 실패하면 장치는 SAM-BA(03eb:6124) 로 계속 USB 에 보이고 재시도할 수 있다.
 
     실패 조건: 장치 검색·부트로더 진입·포트 탐색·프로그래밍 실패면 예외가 발생한다.
     지정한 Husky의 기존 애플리케이션 펌웨어를 소거하고 다시 쓰는 파괴적 장비 작업이며,
-    성공 시 반환값은 없다. 호출자는 복구 사다리의 마지막 단계에서만 사용해야 한다.
+    성공 시 반환값은 없다. 호출자는 단계별 복구의 마지막 단계에서만 사용해야 한다.
     """
     from chipwhisperer.hardware.naeusb.naeusb import NAEUSB
 
@@ -836,13 +836,9 @@ class Bench:
     노트북이 연결·플래시·측정 설정을 마친 뒤 그 상태를 넘겨 받는다. 복구란 그 설정을
     그대로 다시 만드는 일이므로, 여기 넘기지 않은 값은 복구할 수 없다.
 
-    복구 사다리 (위에서부터, 성공하면 멈춘다)
-
-    | 단계 | 내용 | 최대 |
-    |------|------|:----:|
-    | 1 | 단순 재시도 | 3회 |
-    | 2 | 재연결 + 측정 설정 복원 | 2회 |
-    | 3 | Husky 펌웨어 재기록 | 1회 |
+    복구는 세 단계를 순서대로 거치며, 어느 단계든 성공하면 멈춘다. 1단계는 단순
+    재시도로 최대 3회, 2단계는 재연결과 측정 설정 복원으로 최대 2회, 3단계는 Husky
+    펌웨어 재기록으로 최대 1회 시도한다.
 
     전부 실패하면 예외를 올려 수집을 멈춘다. 이미 저장된 그룹은 유효하므로
     노트북의 이어받기로 재개하면 된다.
@@ -913,7 +909,7 @@ class Bench:
         self.scopes = connect_all_devices()
         # Lite 를 먼저 세운다. HS2 클럭이 타겟으로 나가야 타겟이 돌고, 그 클럭이 AUX 로
         # 들어와야 Husky 의 PLL 이 lock 된다. 이 한 줄이 없으면 setup_husky 가
-        # "PLL/ADC lock 실패" 로 죽는다 — 배선 문제로 오해하기 쉽다.
+        # "PLL/ADC lock 실패" 로 죽는다. 케이블 연결 문제로 오해하기 쉽다.
         self.lite.default_setup()
         self.target = cw.target(self.lite, cw.targets.SimpleSerial2)
 
@@ -929,12 +925,12 @@ class Bench:
         self.husky.adc.samples = self.ns
 
         # 여기서 통신을 직접 확인한다. 반쯤 살아난 상태로 돌아가면 이후 수천 장이
-        # 조용히 망가지므로, 안 되면 예외를 올려 사다리의 다음 단계로 넘긴다.
+        # 표시 없이 망가지므로, 안 되면 예외를 올려 복구의 다음 단계로 넘긴다.
         probe_k = bytearray(range(AES_BLOCK))
         probe_p = bytearray(range(AES_BLOCK, 2 * AES_BLOCK))
         if target_aes_encrypt(self.target, probe_k, probe_p) != \
                 aes_ecb_encrypt(probe_k, probe_p):
-            raise RuntimeError("복구 후 골든 불일치 — 타겟 통신이 정상이 아니다.")
+            raise RuntimeError("복구 후 골든 불일치. 타겟 통신이 정상이 아니다.")
 
         # 타겟을 리셋했으므로 rand() 수열이 처음부터 재생된다. 새 시드를 심어야
         # 앞 구간과 같은 마스크가 반복되지 않는다 (mask_seeds attr 에 누적 기록).
@@ -951,7 +947,7 @@ class Bench:
 
         반환은 `capture_one()`과 같으며 Masked이면 `(Trace, 암호문, 마스크)`다. 단순 재시도,
         재연결·설정 복원, Husky 펌웨어 재기록을 순서대로 수행한다. 마지막 단계는 장비
-        펌웨어를 소거·재기록한다. 사다리를 다 내려가도 실패하면 마지막 원인을 담은
+        펌웨어를 소거·재기록한다. 모든 단계가 실패하면 마지막 원인을 담은
         `RuntimeError`가 발생한다.
         """
         try:
@@ -960,7 +956,7 @@ class Bench:
             last = e
 
         for i in range(self.RETRY_RECONNECT):
-            print("\n  [복구 2단계] 재연결 %d/%d — 직전 오류: %s"
+            print("\n  [복구 2단계] 재연결 %d/%d (직전 오류: %s)"
                   % (i + 1, self.RETRY_RECONNECT, last))
             try:
                 self._reopen()
@@ -972,7 +968,7 @@ class Bench:
                 last = e
 
         for i in range(self.RETRY_REFLASH):
-            print("\n  [복구 3단계] Husky 펌웨어 재기록 %d/%d — 직전 오류: %s"
+            print("\n  [복구 3단계] Husky 펌웨어 재기록 %d/%d (직전 오류: %s)"
                   % (i + 1, self.RETRY_REFLASH, last))
             try:
                 reflash_husky_firmware(self.husky_sn)
@@ -985,7 +981,7 @@ class Bench:
                 last = e
 
         raise RuntimeError(
-            "복구 실패 — 수집을 중단한다.\n"
+            "복구 실패. 수집을 중단한다.\n"
             "  마지막 오류: %s\n"
             "  이미 저장된 그룹은 유효하다. 노트북의 이어받기 셀로 재개한다." % last)
 

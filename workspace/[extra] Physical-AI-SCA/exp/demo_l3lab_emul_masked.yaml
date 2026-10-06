@@ -1,6 +1,6 @@
 schema_version: 2
 id: "demo_l3lab_emul_masked"
-title: "통합 데모 에뮬레이션 — masked-aes-c soundness"
+title: "통합 데모 에뮬레이션: masked-aes-c soundness"
 rationale: >
   실제 masked-aes-c 기계어의 명령어별 HW·HD 종속성을 검사하고 sample_map으로 결함 후보를
   주소에 연결한다. 실물 전력 실험 demo_l3lab_hw_masked와 입력은 공유하지만, 물리 파형에 명령어 주소를
@@ -12,14 +12,14 @@ scope:
   csp_classes: ["cryptographic key"]
   channels: ["emulated-power"]
   not_claimed:
-    - "ISO/IEC 19790 적합성 — 모듈 경계·CSP 정의가 환경 밖이다"
-    - "독립 시험소 평가 — 벤더와 시험자가 동일하다"
-    - "물리 측정 — 누설 모델 출력이며 글리치·커플링을 포함하지 않는다"
-    - "고차 DPA 저항성 — 1차 부울 마스킹의 2차 분석은 범위 밖이다"
-    - "EM 및 cw_debugtrace 관측 — 이 실험의 채널이 아니다"
-    - "cycle-accurate 타이밍 — Unicorn에는 사이클 모델이 없다"
-    - "SPA 육안 판정 — 사람의 검토가 필요하다"
-    - "KeyExpansion 보호 — 이 구현은 CipherMasked만 보호한다"
+    - "ISO/IEC 19790 적합성은 주장하지 않는다. 모듈 경계와 CSP 정의가 환경 밖에 있다."
+    - "독립 시험소 평가는 주장하지 않는다. 벤더와 시험자가 같다."
+    - "물리 측정은 주장하지 않는다. 누설 모델 출력이며 글리치·커플링을 포함하지 않는다."
+    - "고차 DPA 저항성은 주장하지 않는다. 1차 부울 마스킹의 2차 분석은 범위 밖이다."
+    - "EM과 cw_debugtrace 관측은 주장하지 않는다. 이 실험의 채널이 아니다."
+    - "cycle-accurate 타이밍은 주장하지 않는다. Unicorn에는 사이클 모델이 없다."
+    - "SPA 육안 판정은 주장하지 않는다. 사람의 검토가 필요하다."
+    - "KeyExpansion 보호는 주장하지 않는다. 이 구현은 CipherMasked만 보호한다."
 iut:
   name: "masked-aes-c"
   countermeasure: "1st-order Boolean masking (CipherMasked only; KeyExpansion unprotected)"

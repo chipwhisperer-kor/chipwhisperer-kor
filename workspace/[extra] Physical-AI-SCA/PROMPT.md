@@ -1,7 +1,7 @@
-# PROMPT.md — v2 실행 사이클 계약
+# PROMPT.md: v2 실행 사이클 계약
 
 이 문서는 자동화 에이전트가 한 study를 끝까지 수행할 때 지킬 순서와 실패 조건이다.
-보안 판단 원칙은 `AGENTS.md`, 프로파일·분석·확장 설명은 `README.md`에 자기완결적으로 있다.
+보안 판단 원칙은 `AGENTS.md`에, 프로파일·분석·확장 설명은 `README.md`에 있다.
 
 ## 한 사이클
 
@@ -42,14 +42,14 @@ python3 -m physai.demo --study demo/study.yaml --report
 
 ## 분석과 판정
 
-| 항목 | 지위 | 핵심 해석 |
+| 항목 | 지위 | 해석 |
 |---|---|---|
-| TA | ISO 필수 | 관측 누설은 저표본이어도 fail; 미검출 pass에는 수량 필요 |
-| SPA | ISO 필수 | 자동 절차 완료와 별개로 사람 육안 검토는 항상 pending |
-| TVLA | 독립 평가 | fixed-vs-random 소견이며 ISO 종합 판정에 합산하지 않음 |
-| DPA | ISO 필수 | 사전 지정 민감값 0/1 집단; 관측 누설은 저표본이어도 fail |
-| CPA | 양성 대조/참고 | 비마스킹 대조 실패 시 미검출 해석 차단; ISO 판정 아님 |
-| soundness | 연구자 관점 | 에뮬레이션 구현 결함 후보; 물리 공격 성공 주장 아님 |
+| TA | ISO 필수 | 관측된 누설은 표본이 적어도 fail이다. 미검출을 pass로 보려면 표본 수량이 필요하다 |
+| SPA | ISO 필수 | 자동 절차가 끝나도 사람의 육안 검토는 항상 pending이다 |
+| TVLA | 독립 평가 | fixed-vs-random 소견이며 ISO 종합 판정에 합산하지 않는다 |
+| DPA | ISO 필수 | 사전에 지정한 민감값 0/1 집단을 비교한다. 관측된 누설은 표본이 적어도 fail이다 |
+| CPA | 양성 대조/참고 | 비마스킹 대조군이 실패하면 미검출 해석을 막는다. ISO 판정이 아니다 |
+| soundness | 연구자 관점 | 에뮬레이션에서 찾은 구현 결함 후보다. 물리 공격 성공을 주장하지 않는다 |
 
 먼저 `procedure_status`, `statistical_power`, `early_finding`, `preassessment_verdict`,
 `claim_scope`를 분리해 읽는다. `complete`를 pass로, `underpowered` 미검출을 안전으로,

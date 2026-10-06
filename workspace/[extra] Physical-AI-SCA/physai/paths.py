@@ -26,7 +26,7 @@ EXP = PROJECT / "exp"
 RUNS = PROJECT / "runs"
 TRACES = PROJECT / "traces"
 
-# 공용 라이브러리는 앞에 둔다 — 이 저장소의 정의가 우선이어야 한다.
+# 공용 라이브러리는 앞에 둔다. 이 저장소의 정의가 우선이어야 하기 때문이다.
 if str(LIB) not in sys.path:
     sys.path.insert(0, str(LIB))
 

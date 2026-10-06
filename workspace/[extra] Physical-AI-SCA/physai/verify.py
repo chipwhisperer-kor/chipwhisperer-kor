@@ -1,19 +1,19 @@
-"""증거 번들 검증 — 제3자가 결과를 믿을 수 있는지 기계적으로 확인한다.
+"""증거 번들 검증. 제3자가 결과를 믿을 수 있는지 기계적으로 확인한다.
 
     python3 -m physai.verify --run <spec-id>
 
 검사 항목
 
 1. `manifest.json` 이 있고 읽히는가
-2. 목록의 모든 파일이 존재하고 **sha256 이 일치**하는가
-3. Dataset(데이터셋)이 **여전히 `SCHEMA.md`를 지키는가**
-4. 툴체인이 manifest 에 적힌 것과 같은가 (다르면 경고 — 결과가 달라질 수 있다)
+2. 목록의 모든 파일이 존재하고 sha256이 일치하는가
+3. Dataset(데이터셋)이 여전히 `SCHEMA.md`를 지키는가
+4. 툴체인이 manifest에 적힌 것과 같은가. 다르면 결과가 달라질 수 있으므로 경고한다
 5. spec 이 계약을 지키고, `results.json` 이 그 spec 을 가리키는가
 6. 보고서 3종이 모두 있는가
 
-**툴체인 불일치는 실패가 아니라 경고다.** 다른 버전에서 결과가 재현되는지는 실제로
-다시 돌려 봐야 알 수 있고, 그것은 이 도구가 판단할 일이 아니다. 다만 조용히 넘어가면
-"검증됨" 이라는 말이 거짓이 되므로 반드시 보고한다.
+툴체인 불일치는 실패가 아니라 경고다. 다른 버전에서 결과가 재현되는지는 실제로
+다시 돌려 봐야 알 수 있고, 그것은 이 도구가 판단할 일이 아니다. 다만 표시 없이 넘어가면
+"검증됨"이라는 말이 거짓이 되므로 경고로 보고한다.
 
 종료 코드 0 = 모든 필수 검사 통과.
 """
@@ -122,7 +122,7 @@ def verify(run_id, study_path=None):
     now = report_mod._toolchain()
     for k, v in manifest.get("toolchain", {}).items():
         if now.get(k) != v:
-            warnings.append("툴체인 다름: %s — 기록 %r, 현재 %r" % (k, v, now.get(k)))
+            warnings.append("툴체인 다름: %s (기록 %r, 현재 %r)" % (k, v, now.get(k)))
 
     return {"ok": not problems, "run": run_id, "files_checked": checked,
             "problems": problems, "warnings": warnings,
@@ -144,7 +144,7 @@ def main(argv=None):
     r = verify(a.run, a.study)
     if not a.quiet:
         print("=" * 66)
-        print(" 증거 번들 검증 — %s" % a.run)
+        print(" 증거 번들 검증: %s" % a.run)
         print("=" * 66)
         print("  해시 대조한 파일: %d개" % r["files_checked"])
         for w in r["warnings"]:

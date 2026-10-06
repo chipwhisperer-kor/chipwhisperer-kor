@@ -30,7 +30,7 @@ import sca_schema as S  # noqa: E402
 from aes_ref import aes_ecb_encrypt  # noqa: E402
 import dataset_collect_lib as hw  # noqa: E402
 
-STATUS = "구현됨 — 실제 완료 여부는 실행 Dataset·manifest·verify로만 판단한다."
+STATUS = "구현됨. 실제 완료 여부는 실행 Dataset·manifest·verify로만 판단한다."
 SS_VER = "SS_VER_2_1"
 CRYPTO_TARGET = "NONE"
 MAX_RECOVERY_TRIES = 3
@@ -169,7 +169,7 @@ class PowerBench:
                 return out
             except Exception as exc:
                 last = exc
-        raise RuntimeError("복구 사다리 소진; 불완전한 논리 레코드는 저장하지 않았다: %s" % last)
+        raise RuntimeError("단계별 복구를 모두 시도했으나 실패했다. 불완전한 논리 레코드는 저장하지 않았다: %s" % last)
 
     def close(self):
         """열린 target과 scope를 가능한 만큼 닫는다. 개별 종료 실패는 다음 연결로 전파하지 않는다."""
@@ -205,7 +205,7 @@ def _build_firmware(spec):
 
 
 def _expected_inputs(spec):
-    """에뮬레이션 수집기와 같은 정본 함수로 모든 Subset 입력 배열을 만든다."""
+    """에뮬레이션 수집기와 같은 기준 함수로 모든 Subset 입력 배열을 만든다."""
     from ..collect import _make_inputs, _rng_for
 
     seed = int(spec["seed"])

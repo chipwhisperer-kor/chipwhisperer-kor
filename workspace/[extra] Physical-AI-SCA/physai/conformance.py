@@ -1,37 +1,28 @@
-"""ISO/IEC 17825 요건 대조표 — 무엇을 지켰고 무엇을 못 지켰는지 자동으로 판정한다.
+"""ISO/IEC 17825 요건 대조표. 무엇을 지켰고 무엇을 못 지켰는지 자동으로 판정한다.
 
-## 왜 이것이 이 프로젝트의 핵심 산출물인가
+이 모듈이 이 프로젝트의 중심 산출물인 이유는 다음과 같다. 자동화된 시험 환경의 가장 큰
+위험은 준수한 척하는 보고서다. 도구가 돌아가고 숫자가 나오면 그것이 곧 적합성 판정처럼
+읽힌다. 이 모듈은 반대로 못 지킨 것을 먼저 드러낸다.
 
-자동화된 시험 환경의 가장 큰 위험은 **준수한 척하는 보고서**다. 도구가 돌아가고 숫자가
-나오면 그것이 곧 적합성 판정처럼 읽힌다. 이 모듈은 반대로 **못 지킨 것을 먼저 드러낸다.**
+판정 등급을 다섯으로 나눈 이유가 그것이다. `준수`는 근거 값이 있고 요건을 만족한다는
+뜻이고, `미준수`는 근거 값이 있고 만족하지 못한다는 뜻이다. `해당없음`은 이 채널·IUT에
+적용되지 않는다는 뜻이며 이유를 함께 적어야 한다(`shall [07.02]`). `미기록`은 판정에
+필요한 값이 Dataset(데이터셋)에 없다는 뜻이며 추정치로 채우지 않는다(SCHEMA.md §5.3).
+`범위밖`은 독립 시험소·승인 기관·육안 검사처럼 이 환경이 원리적으로 판정할 수 없는
+항목이다.
 
-판정 등급을 다섯으로 나눈 이유가 그것이다.
+`미기록`과 `미준수`는 다르다. 전자는 "모른다", 후자는 "안 지켰다"이며, 둘을 섞으면
+뒤에 읽는 사람이 무엇을 고쳐야 하는지 알 수 없게 된다.
 
-| 등급 | 뜻 |
-|---|---|
-| `준수` | 근거 값이 있고 요건을 만족한다 |
-| `미준수` | 근거 값이 있고 만족하지 못한다 |
-| `해당없음` | 이 채널·IUT 에 적용되지 않는다 — **반드시 이유를 함께** (`shall [07.02]`) |
-| `미기록` | 판정에 필요한 값이 Dataset(데이터셋)에 없다 — **추정치로 채우지 않는다** (SCHEMA.md §5.3) |
-| `범위밖` | 이 환경이 원리적으로 판정할 수 없다 — 독립 시험소·승인 기관·육안 검사 |
+이 환경의 위치는 다음과 같다. 출력의 첫 절은 언제나 `scope` 선언이고 그 안의
+`not_claimed`가 맨 앞에 온다. ISO/IEC 17825 §1 Scope는 이 표준이 ISO/IEC 19790 적합성
+판정용이며 24759와 함께 쓰이고 암호모듈의 정의된 경계에서 시험한다고 명시한다. 우리가
+가진 것은 그 삼각 구조의 한 다리이고, IUT는 모듈이 아니라 라이브러리 하나다. 게다가
+Annex A.1·C·G·H에는 "can supersede this annex in its entirety"가 붙어 있다. 진짜 기준은
+승인 기관이 정한다. 그래서 이 환경은 적합성 평가가 아니라 사전 진단(pre-assessment)이다.
 
-**`미기록` 과 `미준수` 는 다르다.** 전자는 "모른다", 후자는 "안 지켰다" 이며, 둘을
-섞으면 다음 사람이 무엇을 고쳐야 하는지 알 수 없게 된다.
-
-## 이 환경의 위치
-
-출력의 첫 절은 언제나 `scope` 선언이고 그 안의 `not_claimed` 가 맨 앞에 온다.
-ISO/IEC 17825 §1 Scope 는 이 표준이 **ISO/IEC 19790 적합성 판정용**이며 **24759 와 함께**
-쓰이고 **암호모듈의 정의된 경계**에서 시험한다고 못박는다. 우리가 가진 것은 그 삼각
-구조의 한 다리이고, IUT 는 모듈이 아니라 라이브러리 하나다. 게다가 Annex A.1·C·G·H 에는
-"can supersede this annex in its entirety" 가 붙어 있다 — 진짜 기준은 승인 기관이 정한다.
-
-그래서 이 환경은 **적합성 평가가 아니라 사전 진단(pre-assessment)** 이다.
-
-## 인용 규약
-
-원문은 저작권 보호 문서이며 이 저장소에 커밋되지 않는다. 여기서는 **조항 번호와 요구의
-취지만** 자기 말로 적고 원문을 옮기지 않는다.
+인용 방식은 다음과 같다. 원문은 저작권 보호 문서이며 이 저장소에 커밋되지 않는다.
+여기서는 조항 번호와 요구의 취지만 자기 말로 적고 원문을 옮기지 않는다.
 출처: ISO/IEC 17825:2024, Second edition, 2024-01,
 *Information technology — Security techniques — Testing methods for the mitigation of
 non-invasive attack classes against cryptographic modules*.
@@ -67,7 +58,7 @@ def check(dataset_path=None, spec=None, results=None, level=3):
         results      : analyze 가 낸 results.json 내용 (없으면 시험 항목이 `미수행`)
         level        : 보안수준 3 또는 4. spec 이 있으면 그쪽을 따른다.
 
-    출력 dict — scope 선언 + 항목 목록 + 등급별 집계. 입력 파일은 읽기 전용이며, 파일이
+    출력은 dict로 scope 선언, 항목 목록, 등급별 집계를 담는다. 입력 파일은 읽기 전용이며, 파일이
     없거나 명세 구조가 잘못되면 로더 예외가 호출자에게 전파된다.
     """
     attrs = S.root_attrs(dataset_path) if dataset_path else {}
@@ -131,7 +122,7 @@ def _scope_items(spec):
 
 
 def _mandatory_test_items(spec, results, A, level):
-    """§7.3.2 `shall [07.03]` · §8.1 `shall [08.01]` — TA·SPA·DPA 셋 모두."""
+    """§7.3.2 `shall [07.03]` · §8.1 `shall [08.01]` 에 따른 TA·SPA·DPA 세 필수 시험 항목."""
     out = [_item("§7.3.2 `shall [07.03]` · §8.1 `shall [08.01]`",
                  "TA·SPA·DPA 세 가지를 모두 평가한다 (순서: TA→SPA→DPA)",
                  OK if results and all(
@@ -143,9 +134,9 @@ def _mandatory_test_items(spec, results, A, level):
                  note="셋 중 하나라도 수행하지 않으면 필수 요건 미충족이다.")]
 
     labels = {
-        "ta": ("§7.3.4 `shall [07.07]`", "타이밍 분석 — 실행시간이 CSP·평문에 의존하는가"),
-        "spa": ("§7.3.5 · §8.3.1", "단순 분석 — key schedule 중간값의 HW 노출"),
-        "dpa": ("§8.4 `shall [08.02]`", "차분 분석 — Welch t-test 로 두 집단 비교"),
+        "ta": ("§7.3.4 `shall [07.07]`", "타이밍 분석. 실행시간이 CSP·평문에 의존하는가"),
+        "spa": ("§7.3.5 · §8.3.1", "단순 분석. key schedule 중간값의 HW 노출"),
+        "dpa": ("§8.4 `shall [08.02]`", "차분 분석. Welch t-test 로 두 집단 비교"),
     }
     for k, (clause, req) in labels.items():
         r = (results or {}).get("tests", {}).get(k)
@@ -159,25 +150,25 @@ def _mandatory_test_items(spec, results, A, level):
                          evidence=r.get("reason", "")[:200],
                          note=r.get("caveat", "") or r.get("verdict_scope", "")))
 
-    # TA 의 2차(분산) 검정은 shall 이다 — 고차 제외는 DPA 에만 해당한다.
+    # TA 의 2차(분산) 검정은 shall 이다. 고차 제외는 DPA 에만 해당한다.
     r = (results or {}).get("tests", {}).get("ta")
     if r and r.get("stages"):
         did_var = any(s.get("t_var") is not None or s.get("spread", 1) < s.get("epsilon", 0)
                       for s in r["stages"] if isinstance(s, dict))
-        out.append(_item("§7.3.4", "타이밍은 평균뿐 아니라 **분산** 차이도 계산한다(2차 타이밍 누설)",
+        out.append(_item("§7.3.4", "타이밍은 평균뿐 아니라 분산 차이도 계산한다(2차 타이밍 누설)",
                          OK if did_var else NG,
                          note="고차 제외(Fig.1 NOTE 3)는 DPA 에만 해당하며 타이밍에는 해당하지 않는다."))
 
-    # §8.2 — 캐시 타이밍 프레임워크는 일반 타이밍 분석과 다른 요구다.
+    # §8.2 의 캐시 타이밍 프레임워크는 일반 타이밍 분석과 다른 요구다.
     out.append(_item("§8.2 (Reference [50])",
                      "캐시 타이밍 공격 프레임워크 (IUT 에 캐시가 있을 때)",
                      NR,
                      note=("대상 MCU 의 캐시 유무를 레퍼런스 매뉴얼로 확인하지 못했다. "
                            "확인 전에는 미기록으로 둔다. 이 항목과 무관하게 §7.3.4 일반 "
-                           "타이밍 분석은 무조건 수행했다 — 둘은 다른 요구다.")))
+                           "타이밍 분석은 무조건 수행했다. 둘은 다른 요구다.")))
     out.append(_item("Figure 1 NOTE 3", "고차 DPA·CPA 시험", NA,
                      note="표준이 필수 시험에서 제외한다. 이 환경도 판정에 쓰지 않으며, "
-                          "CPA 는 배관 검증용 양성 대조로만 돌린다."))
+                          "CPA 는 처리 흐름 확인용 양성 대조로만 돌린다."))
     return out
 
 
@@ -185,7 +176,7 @@ def _annex_a_items(attrs, spec, results, A, level):
     """Annex A의 수집량·전처리·정렬 요건을 실제 Metadata와 결과에 대조한다."""
     out = []
 
-    # A.2.1 / A.3.1 — 수집 시간 상한
+    # A.2.1 / A.3.1 수집 시간 상한
     lim = float(spec["criteria"]["max_acquisition_hours"])
     secs = attrs.get("acquisition_seconds")
     if secs is None:
@@ -197,7 +188,7 @@ def _annex_a_items(attrs, spec, results, A, level):
                          OK if hours <= lim else NG,
                          evidence="실제 %.2f h" % hours))
 
-    # A.2.3 / A.3.3 + Formula (1) — DPA 트레이스 수
+    # A.2.3 / A.3.3 + Formula (1) DPA 트레이스 수
     r = (results or {}).get("tests", {}).get("dpa", {})
     req = r.get("requirement")
     if req:
@@ -208,7 +199,7 @@ def _annex_a_items(attrs, spec, results, A, level):
     else:
         out.append(_item("%s.3 · Formula (1)" % A, "DPA 장수", NR))
 
-    # A.2.4 / A.3.4 — 타이밍 측정 (Annex A 유일의 shall collect)
+    # A.2.4 / A.3.4 타이밍 측정 (Annex A 유일의 shall collect)
     r = (results or {}).get("tests", {}).get("ta", {})
     req = r.get("requirement")
     need = int(spec["profile_requirements"]["ta_raw_per_block"])
@@ -222,7 +213,7 @@ def _annex_a_items(attrs, spec, results, A, level):
         out.append(_item("%s.4 **`shall collect`**" % A,
                          "타이밍 측정 각 %d회 (2블록)" % need, NR))
 
-    # A.2.2 / A.3.2 — SPA Trace 수와 해상도
+    # A.2.2 / A.3.2 SPA Trace 수와 해상도
     r = (results or {}).get("tests", {}).get("spa", {})
     req = r.get("requirement")
     if req:
@@ -231,7 +222,7 @@ def _annex_a_items(attrs, spec, results, A, level):
                          OK if req["met"] else NG,
                          evidence="; ".join(req.get("shortfall", [])) or "충족"))
         vis = r.get("visual_inspection", {})
-        out.append(_item("%s.2" % A, "SPA 는 **육안 검사와 통계 검정 둘 다** 통과해야 한다",
+        out.append(_item("%s.2" % A, "SPA 는 육안 검사와 통계 검정 둘 다 통과해야 한다",
                          OOS,
                          evidence="통계=%s, 육안=%s" % (r.get("verdict"), vis.get("status", "?")),
                          note="육안 검사는 사람의 행위다. 이 도구는 그림을 산출물로 내고 "
@@ -239,7 +230,7 @@ def _annex_a_items(attrs, spec, results, A, level):
     else:
         out.append(_item("%s.2" % A, "SPA Trace 수·해상도", NR))
 
-    # A.2.5 `shall [A.01]` — 전처리 (10회 평균)
+    # A.2.5 `shall [A.01]` 전처리 (10회 평균)
     if str(attrs.get("schema_version", "")) == "1.3" and \
             str(attrs.get("dataset_role", "")) == "derived-analysis":
         avg_key, avg = "aggregation_n", attrs.get("aggregation_n")
@@ -267,7 +258,7 @@ def _annex_a_items(attrs, spec, results, A, level):
                          note=("원본 반복 파형은 보존하고 파생 Dataset에서만 전처리한다."
                                if ok else "파이프라인 메타데이터가 없어 수행했다고 주장하지 않는다.")))
 
-    # A.2.6 `shall [A.02]` — 정렬
+    # A.2.6 `shall [A.02]` 정렬
     align = attrs.get("alignment")
     emulated = str(attrs.get("channel_type")) == "emulated-power"
     align_note = ("명령어 경계가 결정적이며 sample_map의 동일 인덱스로 정렬된다."
@@ -282,12 +273,12 @@ def _annex_a_items(attrs, spec, results, A, level):
 
 
 def _annex_b_items(attrs):
-    """Annex B — 측정 장비 요건. 물리 측정이 아니면 대부분 `해당없음` 이다."""
-    # channel_type 이 없으면 에뮬레이션으로 **간주하지 않는다.** 모르는 것을 안다고
+    """Annex B 측정 장비 요건. 물리 측정이 아니면 대부분 `해당없음` 이다."""
+    # channel_type 이 없으면 에뮬레이션으로 간주하지 않는다. 모르는 것을 안다고
     # 가정하면 물리 측정 요건을 통째로 '해당없음' 처리해 버리게 된다.
     ch = str(attrs.get("channel_type", ""))
     emulated = ch == "emulated-power"
-    reason = "에뮬레이션 채널 — 물리 측정 장비가 존재하지 않는다"
+    reason = "에뮬레이션 채널. 물리 측정 장비가 존재하지 않는다"
     out = []
 
     if emulated:
@@ -348,7 +339,7 @@ def _procedure_items(attrs, spec, results):
     c = spec["criteria"] if spec else None
 
     out.append(_item("§8.4 `shall [08.04]`",
-                     "통계 시험 **전에** effect size·α·β 를 지정한다",
+                     "통계 시험 전에 effect size·α·β 를 지정한다",
                      OK if c else NR,
                      evidence=("d=%s, α=%s, β=%s (spec 에 수집 전 기록)"
                                % (c["effect_size_d"], c["alpha"], c["beta"]) if c else "")))
@@ -366,7 +357,7 @@ def _procedure_items(attrs, spec, results):
                          note=slt["rationale"].strip()[:400]))
         out.append(_item("Annex H", "경계 확정", OOS,
                          note="H 는 informative 이며 승인 기관이 대체할 수 있다. "
-                              "이 환경은 경계를 **제안**할 뿐 확정하지 못한다."))
+                              "이 환경은 경계를 제안할 뿐 확정하지 못한다."))
         v = c["vendor_info"]
         missing = [k for k in ("algorithms", "design", "susceptible_conditions")
                    if not str(v.get(k, "")).strip()]
@@ -398,7 +389,7 @@ def to_markdown(rep):
     """대조표 사전을 세 보고서가 공통으로 싣는 한국어 Markdown으로 변환한다.
 
     표 셀의 줄바꿈·구분자를 이스케이프하며 파일을 쓰지 않는다. 필수 키가 없으면
-    `KeyError`가 발생해 불완전한 대조표가 조용히 생성되지 않게 한다.
+    `KeyError`가 발생해 불완전한 대조표가 표시 없이 생성되지 않게 한다.
     """
     L = []
     L.append("## 적용 범위 선언")
@@ -406,12 +397,12 @@ def to_markdown(rep):
     L.append("| | |")
     L.append("|---|---|")
     L.append("| 준용 표준 | %s |" % rep["standard"])
-    L.append("| 평가 유형 | **%s — 적합성 평가가 아니다** |" % rep["assessment_type"])
+    L.append("| 평가 유형 | %s (적합성 평가가 아니다) |" % rep["assessment_type"])
     L.append("| 보안수준 | Level %s |" % rep["security_level"])
     L.append("")
     L.append("> %s" % rep["position"])
     L.append("")
-    L.append("### 이 시험이 **주장하지 않는** 것")
+    L.append("### 이 시험이 주장하지 않는 것")
     L.append("")
     for s in rep["not_claimed"]:
         L.append("- %s" % s)
@@ -419,12 +410,12 @@ def to_markdown(rep):
     L.append("## 요건 대조표")
     L.append("")
     t = rep["tally"]
-    L.append("집계 — " + " · ".join("**%s** %d" % (k, v) for k, v in sorted(t.items())))
+    L.append("집계: " + " · ".join("%s %d" % (k, v) for k, v in sorted(t.items())))
     L.append("")
     L.append("| 조항 | 요구 | 판정 | 근거 | 비고 |")
     L.append("|---|---|---|---|---|")
     for it in rep["items"]:
-        L.append("| %s | %s | **%s** | %s | %s |"
+        L.append("| %s | %s | %s | %s | %s |"
                  % (it["clause"], it["requirement"], it["verdict"],
                     _cell(it["evidence"]), _cell(it["note"])))
     L.append("")

@@ -1,13 +1,12 @@
-"""부채널 데이터셋 스키마 — 상수·검증기·경로 기반 로더. 저장소 공용.
+"""부채널 데이터셋 스키마의 상수·검증기·경로 기반 로더. 저장소 공용 모듈이다.
 
-온디스크 규격의 정본은 저장소 루트의 `SCHEMA.md` 이고, 용어는 `GLOSSARY.md` 다.
-이 파일은 그 문서를 **코드로 옮긴 것**이며, 필드 이름을 여기 한 곳에만 두어
+온디스크 규격은 저장소 루트의 `SCHEMA.md`가 정의하고, 용어는 `GLOSSARY.md`가 정의한다.
+이 파일은 그 문서를 코드로 옮긴 것이며, 필드 이름을 여기 한 곳에만 두어
 스키마가 바뀌었을 때 고칠 곳이 하나가 되게 한다.
 
-왜 프로젝트 밖에 있는가
-    출처가 다른 관측 Dataset이 **같은 검증기**를 통과해야 하나의 분석기가 모두 받을 수
-    있다. 검증기가 프로젝트마다 따로 있으면
-    "준수"의 뜻이 프로젝트마다 달라진다.
+이 파일을 특정 프로젝트 밖에 둔 이유는 다음과 같다. 출처가 다른 관측 Dataset이
+같은 검증기를 통과해야 하나의 분석기가 모두 받을 수 있다. 검증기가 프로젝트마다
+따로 있으면 "준수"의 뜻이 프로젝트마다 달라진다.
 
 여기 있는 것은 하드웨어 제어가 없는 스키마 검사와 읽기 전용 HDF5 로더다. Dataset 파일을
 읽지만 수정하지 않으며, 파일 생성과 수집은 각 수집기의 책임이다.
@@ -36,13 +35,13 @@ F_KEY = "key"
 F_PLAINTEXT = "plaintext"
 F_CIPHERTEXT = "ciphertext"
 F_MASK = "mask"
-F_EXEC_TIME = "exec_time"          # 1.1 신설 — 레코드별 실행시간 (타이밍 분석 입력)
-F_SAMPLE_MAP = "sample_map"        # 1.1 신설 — 루트 배열 (샘플 → 명령어 역매핑)
-F_TRACE_REPEATS = "trace_repeats"  # 1.2 신설 — 평균 전 원 파형 (n, r, ns)
-F_EXEC_TIME_REPEATS = "exec_time_repeats"  # 1.2 신설 — 반복별 트리거 길이 (n, r)
-F_MASK_REPEATS = "mask_repeats"    # 1.2 신설 — masked 반복별 실제 회수 마스크
-F_REPEAT_GROUP_ID = "repeat_group_id"  # 1.3 — 같은 입력 Execution 묶음
-F_REPEAT_INDEX = "repeat_index"        # 1.3 — 묶음 안 0..capture_repeats-1
+F_EXEC_TIME = "exec_time"          # 1.1 신설. 레코드별 실행시간 (타이밍 분석 입력)
+F_SAMPLE_MAP = "sample_map"        # 1.1 신설. 루트 배열 (샘플 → 명령어 역매핑)
+F_TRACE_REPEATS = "trace_repeats"  # 1.2 신설. 평균 전 원 파형 (n, r, ns)
+F_EXEC_TIME_REPEATS = "exec_time_repeats"  # 1.2 신설. 반복별 트리거 길이 (n, r)
+F_MASK_REPEATS = "mask_repeats"    # 1.2 신설. masked 반복별 실제 회수 마스크
+F_REPEAT_GROUP_ID = "repeat_group_id"  # 1.3 신설. 같은 입력 Execution 묶음
+F_REPEAT_INDEX = "repeat_index"        # 1.3 신설. 묶음 안 0..capture_repeats-1
 
 DATASET_ROLES = ("raw-acquisition", "derived-analysis")
 
@@ -67,7 +66,7 @@ REQUIRED_METADATA_1_1 = tuple(
 ) + ("sample_axis",)
 
 # 시간축일 때만 의미가 있는 필드. 에뮬레이션 트레이스에는 존재하지 않으므로
-# 필수에서 뺀다 — 없는 값을 지어내지 않기 위한 분기다 (SCHEMA.md §5.3).
+# 필수에서 뺀다. 없는 값을 추정값으로 채우지 않기 위한 분기다 (SCHEMA.md §5.3).
 REQUIRED_METADATA_TIME_AXIS = ("sample_rate_hz", "sample_resolution_bits")
 
 # 에뮬레이션 트레이스 전용. 값이 모델의 출력이므로 모델을 모르면 해석할 수 없다.
@@ -77,7 +76,7 @@ REQUIRED_METADATA_EMULATED = (
 )
 
 # 전력 채널의 측정 장비 요건 판정에 필요한 값 (ISO/IEC 17825 Annex B).
-# 1.1 에서 선택 → 필수로 올렸다. 없으면 대역폭 요건을 **판정할 수 없다**.
+# 1.1 에서 선택 → 필수로 올렸다. 없으면 대역폭 요건을 판정할 수 없다.
 REQUIRED_METADATA_POWER_1_1 = ("bandwidth_hz",)
 
 # 1.2 실물 전력 수집 계약. 명목값은 측정값과 구분할 수 있도록 근거와 값의 성격을
@@ -111,8 +110,8 @@ REQUIRED_SUBSET_METADATA = ("role", "n_records", "key_mode", "pt_mode")
 SUBSET_ROLES = (
     "exploration", "profiling", "attack",
     "leakage-detection-fixed", "leakage-detection-random",
-    "timing",                       # 1.1 신설 — ISO/IEC 17825 A.2.4 타이밍 측정 블록
-    "simple-analysis",              # 1.1 신설 — A.2.2 SPA 파형쌍
+    "timing",                       # 1.1 신설. ISO/IEC 17825 A.2.4 타이밍 측정 블록
+    "simple-analysis",              # 1.1 신설. A.2.2 SPA 파형쌍
 )
 
 CHANNEL_TYPES = ("power", "em", "emulated-power", "debug-trace")
@@ -126,18 +125,16 @@ EXEC_TIME_UNITS = ("instruction", "adc_sample", "trace_tick")
 def validate_dataset(path=None):
     """데이터셋이 `SCHEMA.md` 를 지키는지 검사하고 위반 목록을 돌려준다.
 
-    입력
-        path : h5 파일 경로.
+    입력은 h5 파일 경로 `path`이고, 출력은 위반 문자열 리스트다. 리스트가 비어
+    있으면 준수다.
 
-    출력
-        위반 문자열 리스트. **비어 있으면 준수**다.
+    예외 대신 목록을 돌려주는 이유는 두 가지다. 위반이 여러 개일 때 첫 번째만 보고
+    고치면 다음 것이 또 나오므로 한 번에 다 보여 주는 편이 고치기 쉽다. 그리고
+    "부분 준수"를 오류로 취급하면 복원 불가능한 옛 파일을 아예 못 쓰게 된다
+    (SCHEMA.md §5.3).
 
-    왜 예외가 아니라 목록인가: 위반이 여러 개일 때 첫 번째만 보고 고치면 다음 것이
-    또 나온다. 한 번에 다 보여 주는 편이 고치기 쉽다. 그리고 "부분 준수" 를 오류로
-    취급하면 복원 불가능한 옛 파일을 아예 못 쓰게 된다 (SCHEMA.md §5.3).
-
-    파일에 적힌 `schema_version` 에 따라 규칙이 갈린다. 모르는 판번호면 그 사실만
-    보고하고 1.0 규칙으로 검사한다 — 미래 파일을 무조건 위반 처리하지 않기 위함이다.
+    파일에 적힌 `schema_version`에 따라 규칙이 갈린다. 모르는 판번호면 그 사실만
+    보고하고 1.0 규칙으로 검사한다. 미래 파일을 무조건 위반 처리하지 않기 위해서다.
     """
     if path is None:
         raise ValueError("path 를 넘겨야 한다.")
@@ -154,7 +151,7 @@ def validate_dataset(path=None):
 
         ver = str(a.get("schema_version", "1.0"))
         if ver not in KNOWN_VERSIONS:
-            bad.append("모르는 schema_version %r — 1.0 규칙으로 검사했다" % ver)
+            bad.append("모르는 schema_version %r. 1.0 규칙으로 검사했다" % ver)
             ver = "1.0"
 
         bad += _check_root_metadata(a, ver)
@@ -198,16 +195,16 @@ def _check_root_metadata(a, ver):
             if key not in a:
                 bad.append("루트 attrs 누락 (sample_axis=time): %s" % key)
 
-    # 에뮬레이션 필수 메타데이터(SCHEMA.md §3.9)는 **채널로** 정해진다.
+    # 에뮬레이션 필수 메타데이터(SCHEMA.md §3.9)는 채널로 정해진다.
     # 축으로만 분기하면 `channel_type=emulated-power` 인데 `sample_axis=time` 인 파일이
-    # leakage_model 도 binary_sha256 도 없이 통과한다 — 값이 무엇인지 알 수 없는
-    # 데이터셋이 "준수" 로 보고되는 셈이다.
+    # leakage_model 도 binary_sha256 도 없이 통과한다. 값이 무엇인지 알 수 없는
+    # 데이터셋이 "준수" 로 보고되는 것과 같다.
     if str(ch) == "emulated-power":
         for key in REQUIRED_METADATA_EMULATED:
             if key not in a:
                 bad.append("루트 attrs 누락 (channel_type=emulated-power): %s" % key)
         if axis and axis != "instruction":
-            bad.append("channel_type=emulated-power 인데 sample_axis=%r 다 — "
+            bad.append("channel_type=emulated-power 인데 sample_axis=%r 다. "
                        "에뮬레이션 트레이스의 축은 명령어여야 한다" % axis)
 
     if str(ch) == "power":
@@ -217,7 +214,7 @@ def _check_root_metadata(a, ver):
         for key in power_required:
             if key not in a:
                 bad.append("루트 attrs 누락 (channel_type=power): %s "
-                           "— 없으면 ISO/IEC 17825 Annex B 대역폭 요건을 판정할 수 없다" % key)
+                           "(없으면 ISO/IEC 17825 Annex B 대역폭 요건을 판정할 수 없다)" % key)
 
     if ver == "1.3":
         role = str(a.get("dataset_role", ""))
@@ -266,7 +263,7 @@ def _check_sample_map(h5, a, ver):
         return bad
     sm = h5[F_SAMPLE_MAP]
     if sm.ndim != 2 or sm.shape[1] != 3:
-        bad.append("%s 는 (ns, 3) 이어야 한다 — (segment_id, instruction_index, address). 현재 %s"
+        bad.append("%s 는 (ns, 3) 이어야 한다 (segment_id, instruction_index, address). 현재 %s"
                    % (F_SAMPLE_MAP, sm.shape))
     elif "samples_per_trace" in a and int(a["samples_per_trace"]) != sm.shape[0]:
         bad.append("%s 행 수 %d ≠ samples_per_trace %s"
@@ -296,7 +293,7 @@ def _check_subset(h5, name, a, ver):
     if F_TRACE not in g:
         return bad
 
-    # 행 정렬 — 이 규칙이 깨지면 레코드 대응이 무너져 데이터셋 전체가 무효다.
+    # 행 정렬 검사. 이 규칙이 깨지면 레코드 대응이 무너져 데이터셋 전체가 무효다.
     rows = {f: g[f].shape[0] for f in g}
     if len(set(rows.values())) != 1:
         bad.append("/%s 행 수 불일치: %s" % (name, rows))
@@ -435,13 +432,13 @@ def require_schema(path):
 
 
 # ─────────────────────────────────────────────────────────────
-# 경로 기반 로더 — 어느 프로젝트의 h5 든 읽는다
+# 경로 기반 로더. 어느 프로젝트의 h5 든 읽는다
 # ─────────────────────────────────────────────────────────────
 def group_len(path, group):
     """그룹이 실제로 보유한 레코드 수. 파형은 읽지 않는다.
 
-    목표 트레이스 수를 분석에 박으면 수집이 중간에 끊긴 파일에서 조용히 어긋난다.
-    "있는 만큼" 을 물어보는 창구다.
+    목표 트레이스 수를 분석 코드에 상수로 적으면 수집이 중간에 끊긴 파일에서 표시 없이
+    어긋난다. 이 함수는 실제 보유량을 물어보는 창구다.
 
     실패 조건: 파일이 없으면 FileNotFoundError, 그룹 이름이 틀리면 KeyError.
     """
@@ -494,27 +491,27 @@ def load_sample_map(path):
     """루트 `sample_map` 을 (ns, 3) uint32 배열로 읽는다.
 
     열: (segment_id, instruction_index, address)
-    실패 조건: 배열이 없으면 KeyError — 명령어 축 데이터셋이 아니라는 뜻이다.
+    배열이 없으면 KeyError가 발생한다. 명령어 축 데이터셋이 아니라는 뜻이다.
     """
     with h5py.File(_must_exist(path), "r") as h5:
         if F_SAMPLE_MAP not in h5:
-            raise KeyError("%s 가 없다 — sample_axis=instruction 데이터셋이 아니다: %s"
+            raise KeyError("%s 가 없다. sample_axis=instruction 데이터셋이 아니다: %s"
                            % (F_SAMPLE_MAP, path))
         return h5[F_SAMPLE_MAP][:]
 
 
 def instruction_window_columns(path, lo, hi):
-    """명령어 인덱스 구간 `[lo, hi)` 에 해당하는 **샘플 열 인덱스**를 돌려준다.
+    """명령어 인덱스 구간 `[lo, hi)`에 해당하는 샘플 열 인덱스를 돌려준다.
 
-    왜 필요한가: 명령어 축 데이터셋의 trace 는 성분을 **연접**한 것이라
-    `trace[:, lo:hi]` 로 자르면 **첫 성분만** 잘린다 — `hw_reg` 의 1000번 샘플과
-    `hd_reg` 의 1000번 샘플은 서로 다른 명령어다. 구간을 명령어 기준으로 다루려면
-    `sample_map` 의 명령어 인덱스 열로 골라야 한다.
+    이 변환이 필요한 이유는 명령어 축 데이터셋의 trace가 성분을 이어 붙인 것이기
+    때문이다. `trace[:, lo:hi]`로 자르면 첫 성분만 잘린다. `hw_reg`의 1000번 샘플과
+    `hd_reg`의 1000번 샘플은 서로 다른 명령어다. 구간을 명령어 기준으로 다루려면
+    `sample_map`의 명령어 인덱스 열로 골라야 한다.
 
-    이 변환이 분석 모듈마다 따로 있으면 한 곳만 고쳤을 때 조용히 어긋난다. 스키마의
+    이 변환이 분석 모듈마다 따로 있으면 한 곳만 고쳤을 때 표시 없이 어긋난다. 스키마의
     의미를 해석하는 일이므로 정의를 여기 둔다.
 
-    출력: 열 인덱스 (1차원 배열). `sample_map` 이 없으면 **None** — 명령어 축
+    출력은 열 인덱스 1차원 배열이다. `sample_map`이 없으면 None을 돌려준다. 명령어 축
     데이터셋이 아니라는 뜻이며, 호출측은 구간 제한 없이 전 구간을 보면 된다.
     """
     with h5py.File(_must_exist(path), "r") as h5:

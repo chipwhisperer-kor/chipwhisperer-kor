@@ -182,7 +182,7 @@ def summary_lines(spec):
     """수집 전에 프로파일·단계·유도 수량과 주장 제한을 사람이 검토할 줄로 만든다."""
     c, need = spec["criteria"], required_n(spec["criteria"])
     out = [
-        "spec         : %s — %s" % (spec["id"], spec["title"]),
+        "spec         : %s (%s)" % (spec["id"], spec["title"]),
         "프로파일     : %s / %s" % (spec["assessment_profile"], spec["campaign_stage"]),
         "알고리즘     : %s" % spec["algorithm"],
         "IUT          : %s (대책: %s)" % (spec["iut"]["name"], spec["iut"]["countermeasure"]),

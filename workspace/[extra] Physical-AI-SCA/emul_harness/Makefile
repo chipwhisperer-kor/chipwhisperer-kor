@@ -16,25 +16,25 @@ TARGET    := $(BUILD_DIR)/$(IUT).elf
 
 CC := arm-none-eabi-gcc
 
-# ── 컴파일 플래그 — 실물 펌웨어와 같아야 한다 ──────────────────────────────
+# ── 컴파일 플래그 · 실물 펌웨어와 같아야 한다 ──────────────────────────────
 #
 # 최적화 수준과 ABI 가 다르면 컴파일러가 다른 기계어를 낸다. 전이 누설은 레지스터
-# 할당·명령어 선택에서 생기므로, 플래그가 다르면 **다른 구현을 분석하는 셈**이 된다.
+# 할당·명령어 선택에서 생기므로, 플래그가 다르면 다른 구현을 분석하는 것과 같다.
 # 아래 값은 `[extra] SCALib/simpleserial_<IUT>/makefile` 이 상속하는
 # `workspace/base/Makefile.inc` 의 실제 빌드 명령에서 그대로 옮겼다:
 #
 #   -mcpu=cortex-m4 -mthumb -mfloat-abi=soft -Os -funsigned-char
 #   -funsigned-bitfields -fshort-enums -std=gnu99 -ffunction-sections -gdwarf-2
 #
-# 특히 **-Os** 다. `[extra] PRE-SCA` 의 기존 하네스는 -O2 를 쓰는데, 그 빌드는
+# 특히 -Os가 중요하다. `[extra] PRE-SCA`의 기존 실행 프로그램은 -O2를 쓰는데, 그 빌드는
 # 실측 펌웨어와 기계어가 다르므로 여기서는 따르지 않는다.
 CFLAGS := -mcpu=cortex-m4 -mthumb -mfloat-abi=soft
 CFLAGS += -Os
 CFLAGS += -funsigned-char -funsigned-bitfields -fshort-enums
 CFLAGS += -std=gnu99 -ffunction-sections -fmessage-length=0
-CFLAGS += -gdwarf-2                    # 누설 지점을 소스 행으로 되짚기 위해 필요
+CFLAGS += -gdwarf-2                    # 누설 지점을 소스 행에 대응시키는 데 필요하다
 CFLAGS += -I$(IUT_DIR) -I.
-CFLAGS += -DCBC=0 -DCTR=0              # 펌웨어와 동일 — ECB 경로만 컴파일
+CFLAGS += -DCBC=0 -DCTR=0              # 펌웨어와 같다. ECB 경로만 컴파일한다
 
 ifeq ($(IUT),masked-aes-c)
 CFLAGS += -DMASKED=1
@@ -42,7 +42,7 @@ endif
 
 # --specs=nosys.specs : 베어메탈 링크. rand/srand/memcpy 를 newlib 에서 가져오고
 # 시스템 콜은 스텁으로 채운다. 링커 스크립트를 따로 주지 않으므로 기본 스크립트가
-# .text 를 0x8000 에, _stack 을 0x80000 에 놓는다 — ElfParser 가 그 심볼들을 읽는다.
+# .text를 0x8000에, _stack을 0x80000에 놓는다. ElfParser가 그 심볼들을 읽는다.
 LDFLAGS := $(CFLAGS) --specs=nosys.specs
 
 OBJS := $(BUILD_DIR)/$(IUT)/main.o $(BUILD_DIR)/$(IUT)/aes.o
@@ -51,8 +51,8 @@ OBJS := $(BUILD_DIR)/$(IUT)/main.o $(BUILD_DIR)/$(IUT)/aes.o
 all: $(TARGET)
 
 # 수집기가 `build_flags` 메타데이터를 채울 때 이 타깃에게 묻는다.
-# Makefile 을 텍스트로 파싱하면 조건부 블록(ifeq)까지 긁어 **없는 플래그를 있다고
-# 기록하게 된다** — 실제로 그런 버그가 있었다. 정본은 make 자신이므로 make 에게 묻는다.
+# Makefile을 텍스트로 파싱하면 조건부 블록(ifeq)까지 읽어 없는 플래그를 있다고
+# 기록하게 된다. 실제로 그런 버그가 있었다. 기준은 make 자신이므로 make에게 묻는다.
 flags:
 	@echo '$(CFLAGS)'
 

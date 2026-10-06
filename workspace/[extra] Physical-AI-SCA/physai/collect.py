@@ -1,9 +1,9 @@
-"""CLI — spec을 읽어 SCHEMA.md 검증을 통과하는 Dataset(데이터셋)을 만든다.
+"""수집 CLI. spec을 읽어 SCHEMA.md 검증을 통과하는 Dataset(데이터셋)을 만든다.
 
     python3 -m physai.collect --spec exp/001.yaml
 
-수집 **전에** 실험 계획 보고서를 먼저 만든다. 결과를 본 뒤 판정 기준을 고르는
-사후 정당화를 구조로 막기 위해서다 — ISO/IEC 17825 §8.4 `shall [08.04]` 도 통계 시험
+수집 전에 실험 계획 보고서를 먼저 만든다. 결과를 본 뒤 판정 기준을 고르는
+사후 정당화를 구조로 막기 위해서다. ISO/IEC 17825 §8.4 `shall [08.04]`도 통계 시험
 전에 파라미터를 지정하라고 요구한다.
 
 stdout 마지막 줄에 JSON 요약을 낸다. 종료 코드 0 = 성공.
@@ -55,9 +55,9 @@ def _make_inputs(sub, rng, fixed_key, fixed_pt, n):
 # SPA Trace 쌍(ISO/IEC 17825 A.2.2)도 별도 생성기를 두지 않는다.
 #
 # 한때 `spa_pair_kind` 로 입력을 만드는 함수를 따로 두었는데, 그것이 subset 의
-# `key_mode`/`pt_mode` 를 무시해 **spec 이 "키 랜덤" 이라 선언한 subset 에 고정 키가
-# 들어가는** 버그가 있었다. h5 의 subset attrs 에는 선언값이 적히므로 메타데이터가
-# 거짓이 된다 — Dataset에서 가장 나쁜 종류의 결함이다.
+# `key_mode`/`pt_mode` 를 무시해 spec 이 "키 랜덤" 이라 선언한 subset 에 고정 키가
+# 들어가는 버그가 있었다. h5 의 subset attrs 에는 선언값이 적히므로 메타데이터가
+# 거짓이 된다. 이는 Dataset에서 가장 나쁜 종류의 결함이다.
 #
 # `spa_pair_kind` 는 **그 쌍을 어떤 의도로 만들었는지 적는 라벨**일 뿐이고, 입력을
 # 실제로 결정하는 것은 언제나 `key_mode`/`pt_mode` 다. 생성기가 하나뿐이면
@@ -189,7 +189,7 @@ def collect_emulation(spec, out_path=None, verbose=True, resume=False):
                 print("   %.1fs" % g.attrs["seconds"])
 
         # `recoveries`(자동 복구 이력)는 실물 수집기의 것이다. 에뮬레이션은 장비가
-        # 없어 복구할 일이 없으므로 적지 않는다 — 빈 배열을 남기면 "복구 없음" 과
+        # 없어 복구할 일이 없으므로 적지 않는다. 빈 배열을 남기면 "복구 없음" 과
         # "이 채널에는 개념이 없음" 이 구분되지 않는다.
         h5.attrs["acquisition_seconds"] = time.time() - t_start
         h5.attrs["acquisition_status"] = "complete"
@@ -218,14 +218,14 @@ def _write_root_metadata(h5, spec, tgt, ns, contract_sha256):
     h5.attrs["target_name"] = "emulated:%s" % tgt.metadata()["instruction_set"]
     h5.attrs["target_device"] = "Unicorn ARM (Cortex-M4 코드, 사이클 모델 없음)"
     # 에뮬레이터에는 클럭이 없다. 축이 명령어이므로 이 값은 의미가 없지만 스키마가
-    # 요구하므로 0 을 적고 그 뜻을 schema_note 에 남긴다 — 비워 두면 필수 필드 누락이 된다.
+    # 요구하므로 0 을 적고 그 뜻을 schema_note 에 남긴다. 비워 두면 필수 필드 누락이 된다.
     h5.attrs["target_clock_hz"] = 0.0
     h5.attrs["iut_algorithm"] = spec["scope"]["security_function"]
     h5.attrs["iut_implementation"] = spec["iut"]["name"]
     h5.attrs["iut_countermeasure"] = spec["iut"]["countermeasure"]
 
     h5.attrs["channel_type"] = "emulated-power"
-    h5.attrs["channel_probe"] = ("물리 프로브 없음 — 에뮬레이터가 누설 모델로 산출한 값이다")
+    h5.attrs["channel_probe"] = ("물리 프로브 없음. 에뮬레이터가 누설 모델로 산출한 값이다")
 
     h5.attrs["samples_per_trace"] = int(ns)
     h5.attrs["sample_dtype"] = "int16"
@@ -236,7 +236,7 @@ def _write_root_metadata(h5, spec, tgt, ns, contract_sha256):
     h5.attrs["trigger_source"] = "symbol:%s" % win["from_symbol"]
     h5.attrs["trigger_semantics"] = win.get(
         "semantics",
-        "%s 진입부터 %s 복귀까지 — 실측 펌웨어의 MY_AES_ECB 트리거와 같은 구간"
+        "%s 진입부터 %s 복귀까지. 실측 펌웨어의 MY_AES_ECB 트리거와 같은 구간"
         % (win["from_symbol"], win["to_symbol"]))
     h5.attrs["alignment"] = "none"
 
@@ -257,7 +257,7 @@ def _write_root_metadata(h5, spec, tgt, ns, contract_sha256):
         "에뮬레이션 채널. trace 값은 측정치가 아니라 leakage_model 의 출력이다. "
         "target_clock_hz=0 은 에뮬레이터에 클럭이 없다는 뜻이며 "
         "sample_axis=instruction 이므로 시간 단위 값은 존재하지 않는다. "
-        "exec_time 은 명령어 수이지 사이클 수가 아니다 — Unicorn 에 사이클 모델이 없다.")
+        "exec_time 은 명령어 수이지 사이클 수가 아니다. Unicorn 에 사이클 모델이 없다.")
 
 
 def main(argv=None):

@@ -3,11 +3,12 @@ services:
     build:
       context: ./cw-build
       dockerfile: Dockerfile
+    image: chipwhisperer-kor:preserved-20260929   # 2026-09-29 컨테이너 상태(확장·pip 패키지)를 보존한 이미지다. `build`하면 이 태그를 덮어쓴다
     container_name: chipwhisperer-kor
     restart: unless-stopped
     privileged: true
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"            # code-server는 인증이 없으므로(--auth none) 로컬 전용이다. 원격에서는 ssh -L로 접속한다
     volumes:
-      - ../workspace:/workspace           # 작업 파일 저장소
-      - /dev/bus/usb:/dev/bus/usb      # USB 장치 직접 매핑
+      - ../workspace:/workspace           # 작업 파일을 두는 디렉터리다
+      - /dev/bus/usb:/dev/bus/usb      # USB 장치를 직접 매핑한다

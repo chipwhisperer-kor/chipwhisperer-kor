@@ -1,7 +1,7 @@
-# [extra] SCALib — Normal AES ∥ Masked AES 비교 예제
+# [extra] SCALib: Normal AES ∥ Masked AES 비교 예제
 
-[SCALib](https://github.com/simple-crypto/SCALib) 0.6.4 기능을 **기능 하나당 노트북 하나**로 익히되,
-**비마스킹 AES**(`tiny-AES-c`)와 **마스킹 AES**(`masked-aes-c`)를 **같은 단계에서 나란히** 비교한다.
+[SCALib](https://github.com/simple-crypto/SCALib) 0.6.4 기능을 기능 하나당 노트북 하나로 익히되,
+비마스킹 AES(`tiny-AES-c`)와 마스킹 AES(`masked-aes-c`)를 같은 단계에서 나란히 비교한다.
 
 공식 ChipWhisperer 튜토리얼(`workspace/1.`~`3.`)과는 별개의 연구용 자료다.
 
@@ -19,10 +19,10 @@
                     └─→ 1.0 … 6.0  (단계마다 Normal ∥ Masked, 하드웨어 불필요)
 ```
 
-`traces/*.h5` 는 GB 단위라 저장소에 넣지 않는다.
+`traces/*.h5`는 GB 단위라 저장소에 넣지 않는다.
 
-분석 노트북 `1.0`–`6.0` 은 **하드웨어 없이** 돌아간다. h5 두 개만 있으면 된다.
-`1.0` 이 `nb_output/poi_*.npz` 를 만들고 나머지가 그것을 읽으므로 **번호 순서로 실행**한다.
+분석 노트북 `1.0`–`6.0`은 하드웨어 없이 돌아간다. h5 두 개만 있으면 된다.
+`1.0`이 `nb_output/poi_*.npz`를 만들고 나머지가 그것을 읽으므로 번호 순서로 실행한다.
 
 ```bash
 docker exec -it chipwhisperer-kor bash
@@ -49,11 +49,11 @@ done
 | Dataset | `scalib_dataset_tiny-AES-c.h5` | `scalib_dataset_masked-aes-c.h5` |
 | POI | `poi_tiny-AES-c.npz` | `poi_masked-aes-c.npz` |
 
-경로·라벨 정의의 정본은 `scalib_common.py` 의 `TARGETS` 다.
+경로·라벨은 `scalib_common.py`의 `TARGETS` 한 곳에서만 정의한다.
 
-**암호 라이브러리는 이 서브프로젝트 밖에 있다.** 저장소 공용 트리 `workspace/iut/`
+암호 라이브러리는 이 서브프로젝트 밖에 있다. 저장소 공용 트리 `workspace/iut/`
 (IUT(테스트 대상 구현), `GLOSSARY.md` 용어)에 한 벌만 두고, 이 프로젝트의 펌웨어
-두 개와 `[extra] Physical-AI-SCA` 의 에뮬레이션 하네스가 **같은 `aes.c` 를 컴파일**한다.
+두 개와 `[extra] Physical-AI-SCA`의 에뮬레이션 실행 프로그램이 같은 `aes.c`를 컴파일한다.
 같은 소스여야 실측 트레이스와 에뮬레이션 결과를 같은 구현에 대한 관측으로 나란히 놓을 수 있다.
 라이브러리 출처·패치 내역은 `../../iut/README.md`에 있다. 이 문서의 §6에도 분석에 필요한
 세 패치의 목적과 보호 범위를 요약해, 외부 문서를 열지 않아도 비교 결과를 해석할 수 있게 했다.
@@ -64,42 +64,42 @@ done
 
 | 노트북 | SCALib API | 비교 초점 |
 |--------|-----------|-----------|
-| `1.0.SNR` | `metrics.SNR` | 1차 SBox SNR·POI, **암호화 구간 경계 `enc_start`** 산출 |
+| `1.0.SNR` | `metrics.SNR` | 1차 SBox SNR·POI, 암호화 구간 경계 `enc_start` 산출 |
 | `1.1.Quantizer` | `preprocessing.Quantizer` | 동일 양자화 파이프라인 |
-| `2.0.Ttest` | `metrics.Ttest` | TVLA — 전 구간 vs 암호화 구간 |
+| `2.0.Ttest` | `metrics.Ttest` | TVLA, 전 구간 vs 암호화 구간 |
 | `2.1.MTtest` | `metrics.MTtest` | 시점 조합(2차) t-test |
-| `3.0.CPA` | `attacks.Cpa` | 1차 CPA — 암호화 구간 전체 스캔 |
+| `3.0.CPA` | `attacks.Cpa` | 1차 CPA, 암호화 구간 전체 스캔 |
 | `4.0.LDAClassifier` | `modeling.LDAClassifier` | 템플릿 1바이트 |
 | `4.1.MultiLDA` | `modeling.MultiLDA` | 16바이트 동시 |
 | `4.2.RLDA` | `modeling.RLDAClassifier` + `metrics.RLDAInformationEstimator` | 회귀 LDA·정보량(비트) |
 | `5.0.SASCA` | `attacks.FactorGraph` / `BPState` | 정보 결합 |
 | `6.0.KeyRank` | `postprocessing.rank_*` | 전역 키 순위 (시리즈 결론) |
 
-분석 노트북 패턴: **단계 → 의도 → Normal → Masked(공격자) → Masked(연구자) → 비교**
-(타겟 전체를 직렬로 끝내지 않음).
+분석 노트북은 ‘단계 → 의도 → Normal → Masked(공격자) → Masked(연구자) → 비교’ 순서로 진행한다.
+한 타겟 전체를 직렬로 끝낸 뒤 다음 타겟으로 넘어가지 않는다.
 
 ### 세 가지 관점
 
 | 관점 | 아는 것 | `mask` 사용 |
 |------|---------|:----------:|
-| 공격자 | 평문(+암호문) | **안 씀** |
-| 평가자 | 평문 + 키 (누설 진단용) | 안 씀 |
-| 연구자 | 평문 + 키 + **마스크 값** | 씀 |
+| 공격자 | 평문(+암호문) | 쓰지 않는다 |
+| 평가자 | 평문 + 키 (누설 진단용) | 쓰지 않는다 |
+| 연구자 | 평문 + 키 + 마스크 값 | 쓴다 |
 
-연구자 절은 언제나 제목으로 분리한다. 공격 셀이 `mask` 를 참조하면 비교의 의미가 무너진다.
+연구자 절은 언제나 제목으로 분리한다. 공격 셀이 `mask`를 참조하면 비교의 의미가 무너진다.
 
-### 비교는 왜 "암호화 구간" 에서만 하는가
+### 비교를 "암호화 구간"에서만 하는 이유
 
-`masked-aes-c` 는 `CipherMasked` 안만 보호하고 **`KeyExpansion` 은 벤더 원본 비마스킹**이다.
-그런데 이 저장소의 펌웨어는 키 스케줄을 트리거 **안**에서 수행하므로, 트레이스 앞부분은
-두 타겟이 똑같이 무방비다. 전 구간으로 비교하면 그 공통 누설이 마스킹 효과를 가린다
-(전 구간 TVLA `|t|`: Normal 114 / Masked 116 — 차이가 없어 보인다).
+`masked-aes-c`는 `CipherMasked` 안만 보호하고 `KeyExpansion`은 벤더 원본 비마스킹이다.
+그런데 이 저장소의 펌웨어는 키 스케줄을 트리거 안에서 수행하므로, 트레이스 앞부분은
+두 타겟이 똑같이 무방비다. 전 구간으로 비교하면 그 공통 누설이 마스킹 효과를 가린다.
+전 구간 TVLA `|t|`는 Normal 114 / Masked 116으로, 차이가 없어 보인다.
 
-그래서 `1.0`이 **평문 의존 누설이 시작되는 Sample(샘플)**(`enc_start`)을 찾아 `poi_*.npz`에
+그래서 `1.0`이 평문 의존 누설이 시작되는 Sample(샘플)(`enc_start`)을 찾아 `poi_*.npz`에
 저장하고, `2.0`–`6.0`이 그 이후 구간에서만 비교한다. 저장된 노트북 실행 출력에서는
 Normal 5093 / Masked 5089이며, 암호화 구간의 1차 TVLA 임계 초과율은 45.3% vs 10.2%로 갈린다.
 
-키 스케줄 누설은 마스킹의 실패가 아니라 이 PoC 의 **보호 범위 밖**이다.
+키 스케줄 누설은 마스킹의 실패가 아니라 이 PoC의 보호 범위 밖이다.
 
 ---
 
@@ -117,8 +117,8 @@ Normal 5093 / Masked 5089이며, 암호화 구간의 1차 TVLA 임계 초과율�
   └─ Husky USERIO D0←TRIG, AUX←CLKIN, Measure←SHUNTL
 ```
 
-Husky 는 AUX 로 타겟 클럭을 받아 **동기 샘플링**한다(`clkgen_src = "extclk_aux_io"`).
-그래서 Lite 가 HS2 로 타겟에 클럭을 공급하기 전에는 Husky 설정이 lock 되지 않는다.
+Husky는 AUX로 타겟 클럭을 받아 동기 샘플링한다(`clkgen_src = "extclk_aux_io"`).
+그래서 Lite가 HS2로 타겟에 클럭을 공급하기 전에는 Husky 설정이 lock되지 않는다.
 
 ### 펌웨어 빌드
 
@@ -130,41 +130,41 @@ make PLATFORM=CW308_STM32F3 CRYPTO_TARGET=NONE SS_VER=SS_VER_2_1 clean
 make PLATFORM=CW308_STM32F3 CRYPTO_TARGET=NONE SS_VER=SS_VER_2_1
 ```
 
-`SS_VER_2_1` 만 지원한다. 두 트리는 `TARGET`·`SRC` 만 다르고 상위
-`workspace/base/Makefile.inc` 를 공유한다.
+`SS_VER_2_1`만 지원한다. 두 트리는 `TARGET`·`SRC`만 다르고 상위
+`workspace/base/Makefile.inc`를 공유한다.
 
 ### 프로토콜 (SimpleSerial 2.1)
 
 | cmd | scmd | 의미 |
 |-----|------|------|
 | `0x81` | `k`/`p`/`l` | 키 / 평문 / 길이 |
-| `0x81` | `s` | **Masked만** 마스크 난수 시드 4B (little-endian) |
+| `0x81` | `s` | Masked만. 마스크 난수 시드 4B (little-endian) |
 | `0x82` | `c` | 트리거 구간에서 `MY_AES_ECB` |
 | `0x83` | `r` | 암호문 16B |
-| `0x83` | `m` | **Masked만** 마스크 10B (트리거 **이후**) |
+| `0x83` | `m` | Masked만. 마스크 10B (트리거 이후) |
 
 Trace(트레이스) 길이는 `scope.adc.trig_count` 관측값으로 정한다. 마스킹 AES는 비마스킹보다 길다.
 
-### 마스크 시드 규약 (Masked 수집 시 필수)
+### 마스크 시드 전달 방식 (Masked 수집 시 필수)
 
-STM32F303 에는 TRNG 가 없고 스택·전역 주소는 매 부팅 같은 값이라, 타겟이 스스로
-쓸 만한 시드를 만들 수 없다. 그래서 **호스트가 `0x81 's'` 로 시드를 준다.**
+STM32F303에는 TRNG가 없고 스택·전역 주소는 매 부팅 같은 값이라, 타겟이 스스로
+쓸 만한 시드를 만들 수 없다. 그래서 호스트가 `0x81 's'`로 시드를 준다.
 
-`dataset_collect_lib` 의 `collect_group` / `resume_group` 이 그룹을 채우기 직전에,
-그리고 자동 복구(§8) 직후에 `set_mask_seed()` 를 부르고 쓴 시드를 그룹 HDF5 attrs
-`mask_seeds` 에 남긴다. 라운드 번호는 프로세스 변수가 아니라 **이미 기록된 시드 개수**
+`dataset_collect_lib`의 `collect_group` / `resume_group`이 그룹을 채우기 직전에,
+그리고 자동 복구(§8) 직후에 `set_mask_seed()`를 부르고 쓴 시드를 그룹 HDF5 attrs
+`mask_seeds`에 남긴다. 라운드 번호는 프로세스 변수가 아니라 이미 기록된 시드 개수
 에서 세므로, 이어받기 스크립트를 껐다 켜도 같은 수열이 재생되지 않는다.
 
-실기 확인: 같은 시드를 심으면 마스크 수열이 그대로 재현되고, 다른 시드면 달라진다.
-즉 시드가 수열을 결정하므로 라운드마다 새 시드를 주면 재시작이 구조적으로 불가능하다.
+실기에서 확인한 바로는 같은 시드를 심으면 마스크 수열이 그대로 재현되고, 다른 시드면 달라진다.
+시드가 수열을 결정하므로, 라운드마다 새 시드를 주면 같은 수열이 다시 시작되는 일이 구조적으로 없다.
 
 
 ---
 
 ## 5. Dataset 규격
 
-**저장 구조의 정본은 저장소 루트의 [`SCHEMA.md`](../../SCHEMA.md) 다.** 용어는
-[`GLOSSARY.md`](../../GLOSSARY.md) 를 따른다. 여기에는 이 서브프로젝트 고유 부분만 적는다.
+저장 구조는 저장소 루트의 [`SCHEMA.md`](../../SCHEMA.md)가 정의한다. 용어는
+[`GLOSSARY.md`](../../GLOSSARY.md)를 따른다. 여기에는 이 서브프로젝트 고유 부분만 적는다.
 
 ### Subset 구성
 
@@ -172,13 +172,13 @@ STM32F303 에는 TRNG 가 없고 스택·전역 주소는 매 부팅 같은 값�
 |---|---|---|---|
 | `/explore` | `exploration` | 랜덤 | 랜덤 |
 | `/profiling` | `profiling` | 랜덤 | 랜덤 |
-| `/attack` | `attack` | **고정** | 랜덤 |
+| `/attack` | `attack` | 고정 | 랜덤 |
 | `/tvla_rk` | `leakage-detection-random` | 랜덤 | 고정 |
-| `/tvla_fk` | `leakage-detection-fixed` | **고정** | 고정 |
+| `/tvla_fk` | `leakage-detection-fixed` | 고정 | 고정 |
 
-배열은 스키마대로 `trace`·`key`·`plaintext`·`ciphertext` 이며, Masked 만 `mask` 가 더 있다.
+배열은 스키마대로 `trace`·`key`·`plaintext`·`ciphertext`이며, Masked만 `mask`가 더 있다.
 
-### `mask` — 이 서브프로젝트 고유
+### `mask`: 이 서브프로젝트 고유
 
 | | Normal | Masked |
 |--|--------|--------|
@@ -186,10 +186,10 @@ STM32F303 에는 TRNG 가 없고 스택·전역 주소는 매 부팅 같은 값�
 | `iut_countermeasure` | `"none"` | `"1st-order Boolean masking …"` |
 
 레이아웃: `M1 M2 M3 M4 M' M M1' M2' M3' M4'`
-난수 6바이트 + MixColumns 유도 4바이트. **공격 분석 셀은 `mask` 를 쓰지 않는다.**
+난수 6바이트 + MixColumns 유도 4바이트다. 공격 분석 셀은 `mask`를 쓰지 않는다.
 연구자 절에서만 사용한다.
 
-구현에서 유도한 마스킹된 중간값 (`1.0` §10 에 유도 과정이 있다):
+구현에서 유도한 마스킹된 중간값은 다음과 같다(`1.0` §10에 유도 과정이 있다).
 
 ```text
 SubBytes 입력 레지스터 = p ^ k ^ mask[4]
@@ -217,86 +217,86 @@ HDF5 파일은 용량 때문에 저장소에 포함하지 않으므로, 현재 �
 | tvla_rk / tvla_fk | 1,000 each |
 
 수집기는 두 타겟에 같은 시드·같은 목표 Trace 수를 써 입력 벡터를 정렬한다. 다만 분석 노트북은
-목표치 상수(`N_PROFILING`)가 아니라 `group_len(group, target)`으로 **실제 보유한 트레이스 수**를
-읽는다. 수집이 중간에 끊긴 파일을 그대로 분석하면 조용히 어긋나기 때문이다.
+목표치 상수(`N_PROFILING`)가 아니라 `group_len(group, target)`으로 실제 보유한 트레이스 수를
+읽는다. 수집이 중간에 끊긴 파일을 그대로 분석하면 경고 없이 어긋나기 때문이다.
 
-수집 로직 정본: `dataset_collect_lib.py`.  
-트레이스 수·시드 정본: `scalib_common.py` (`SEED=1234` 등).
+수집 로직은 `dataset_collect_lib.py`에, 트레이스 수·시드(`SEED=1234` 등)는 `scalib_common.py`에만 정의한다.
 
 ---
 
-## 6. `masked-aes-c` 패치 — 최소 수정 3건
+## 6. `masked-aes-c` 패치: 최소 수정 3건
 
 원본은 마스크가 스택 지역변수라 외부 판독이 불가능하다. 이 서브프로젝트는 최소 패치를 둔다.
 
 1. `AES_get_last_masks()` 로 마지막 `mask[10]` 제공 (연구용 export)
 2. 내부 per-encrypt `srand(time(NULL))` 제거 → 시드는 호스트가 `0x81 's'` 로 준다
-3. **`rand() % 0xFF` → `rand() & 0xFF`**
+3. `rand() % 0xFF` → `rand() & 0xFF`
 
 3번은 벤더 원본의 범위 오류를 고친다. `% 0xFF`는 0–254만 내놓아 `0xFF`가 한 번도 나오지
 않지만, 하위 8비트를 취하면 0–255 전체를 사용할 수 있다. 다만 `rand()`는 CSPRNG가 아니며
 이 패치는 제품 보안을 주장하지 않는다. 수집한 `mask[0..5]`의 중복과 관측 범위를 별도로
-검사해야 한다. 암호·마스킹 **공식 자체는 변경하지 않았다.**
+검사해야 한다. 암호·마스킹 공식 자체는 변경하지 않았다.
 
-> 저장된 노트북 실행 출력은 빌드·플래시·통신·골든 AES 일치, `0x81 's'` 에코,
-> `0x83 'm'` 회수를 기록한다. 이어진 117,000장 Dataset에서 각 Subset의 마스크는 모두
-> 고유했고 난수부 `mask[0..5]`의 관측 범위는 0–255였다. 생성 HDF5는 저장소에 없으므로
-> 새 장비 환경에서는 다시 확인해야 한다.
+저장된 노트북 실행 출력은 빌드·플래시·통신·골든 AES 일치, `0x81 's'` 에코,
+`0x83 'm'` 회수를 기록한다. 이어진 117,000장 Dataset에서 각 Subset의 마스크는 모두
+고유했고 난수부 `mask[0..5]`의 관측 범위는 0–255였다. 생성 HDF5는 저장소에 없으므로
+새 장비 환경에서는 다시 확인해야 한다.
 
 ---
 
 ## 7. `nb_output/`
 
-- `poi_*.npz` — `1.0` 이 타겟별로 저장, `2.0` 이후가 읽음
+- `poi_*.npz`는 `1.0`이 타겟별로 저장하고 `2.0` 이후가 읽는다.
 
   | 키 | 내용 |
   |---|---|
   | `poi`, `poi_windows`, `snr_peak` | 공격자 관점 POI (SBox 출력 라벨) |
   | `enc_start` | 암호화 구간 시작 샘플 |
-  | `poi_research`, `poi_research_windows`, `snr_peak_research`, `poi_mask` | **연구자 관점** POI (Masked 전용) |
+  | `poi_research`, `poi_research_windows`, `snr_peak_research`, `poi_mask` | 연구자 관점 POI (Masked 전용) |
 
 ---
 
 ## 8. 장시간 수집의 자동 복구
 
-수십만 장을 몇 시간 받는 동안 USB 는 끊기고 Husky 는 먹통이 된다. 사람이 지켜보다
+수십만 장을 몇 시간 받는 동안 USB가 끊기거나 Husky가 응답하지 않는 일이 생긴다. 사람이 지켜보다
 다시 눌러 줄 수 없으므로 `Bench.capture()`(`dataset_collect_lib.py`)가 스스로 회복한다.
-수집 노트북은 이 함수만 쓰며, `capture_retry` 를 직접 부르지 않는다.
+수집 노트북은 이 함수만 쓰며, `capture_retry`를 직접 부르지 않는다.
 
 | 단계 | 하는 일 | 최대 |
 |:----:|---------|:----:|
 | 1 | 단순 재시도 | 3회 |
-| 2 | 재연결 — 장비를 다시 열고 클럭·게인·`adc.samples` 복원 | 2회 |
-| 3 | **Husky 펌웨어 재기록** — `0x22 0x03` 소거 → SAM-BA → `program_sam_firmware` | 1회 |
+| 2 | 재연결. 장비를 다시 열고 클럭·게인·`adc.samples` 복원 | 2회 |
+| 3 | Husky 펌웨어 재기록. `0x22 0x03` 소거 → SAM-BA → `program_sam_firmware` | 1회 |
 
 성공하면 그 자리에서 수집을 이어간다. 전부 실패하면 예외로 멈추며, 디스크에 flush된
 레코드는 이어받기 셀로 재개할 수 있다. 복구 이력은 루트 HDF5 attrs의 `recoveries`에 남고
-`dataset_summary()` 가 출력한다.
+`dataset_summary()`가 출력한다.
 
-> `0.1.Dataset_Collect_masked-aes-c.ipynb`의 저장된 실행 출력은 117,000장 수집 중
-> `reflash`, `reconnect`, `reconnect` 세 번의 자동 복구를 기록한다. 이는 과거 실행의
-> 증거이며 현재 장비에서도 같은 결과를 보장하지 않는다.
+`0.1.Dataset_Collect_masked-aes-c.ipynb`의 저장된 실행 출력은 117,000장 수집 중
+`reflash`, `reconnect`, `reconnect` 세 번의 자동 복구를 기록한다. 이는 과거 실행의
+증거이며 현재 장비에서도 같은 결과가 나온다고 볼 근거는 아니다.
 
-복구 뒤에는 반드시 두 가지를 되돌린다. 빠뜨리면 트레이스가 조용히 어긋난다.
+복구 뒤에는 두 가지를 되돌려야 한다. 빠뜨리면 트레이스가 경고 없이 어긋난다.
 
-- **측정 설정 복원** — `setup_husky` 재실행 후 처음 실측한 `ns` 를 그대로 다시 넣는다.
-  여기서 `trig_count` 를 다시 재면 값이 달라져 행마다 길이가 맞지 않는다.
-- **마스크 시드 재주입** — 복구 중 타겟이 전원을 잃었으면 `rand()` 수열이 처음부터
-  재생된다. 새 시드를 심고 `mask_seeds` attr 에 누적 기록한다.
+- 측정 설정 복원. `setup_husky` 재실행 후 처음 실측한 `ns`를 그대로 다시 넣는다.
+  여기서 `trig_count`를 다시 재면 값이 달라져 행마다 길이가 맞지 않는다.
+- 마스크 시드 재주입. 복구 중 타겟이 전원을 잃었으면 `rand()` 수열이 처음부터
+  재생된다. 새 시드를 심고 `mask_seeds` attr에 누적 기록한다.
 
-### 3단계가 왜 필요한가
+### 3단계가 필요한 이유
 
-Husky 펌웨어가 손상되면 **버전은 정상값(1.5.0)으로 보고하면서** FPGA 레지스터 읽기만
-어긋난다 — 모든 `FPGA_READ` 응답 앞에 `0xff` 한 바이트가 더 붙어 `cw.scope()` 가
-`Unknown hwInfoVer: Default/Unknown` 으로 실패한다. 버전 비교로는 발견할 수 없다.
+Husky 펌웨어가 손상되면 버전은 정상값(1.5.0)으로 보고하면서 FPGA 레지스터 읽기만
+어긋난다. 모든 `FPGA_READ` 응답 앞에 `0xff` 한 바이트가 더 붙어 `cw.scope()`가
+`Unknown hwInfoVer: Default/Unknown`으로 실패한다. 버전 비교로는 발견할 수 없다.
 
-이 고장은 USB 포트 전원 차단·허브 재열거·**물리적 재삽입 어느 것으로도 낫지 않고**
-재기록만 듣는다. 실패해도 벽돌이 되지 않는다 — SAM 의 하드웨어 부트로더는 지울 수 없어,
-소거 뒤 재기록이 실패해도 장치는 SAM-BA(`03eb:6124`)로 USB 에 남아 재시도할 수 있다.
+이 고장은 USB 포트 전원 차단·허브 재열거·물리적 재삽입 어느 것으로도 낫지 않고
+재기록만 듣는다. 재기록이 실패해도 장치가 복구 불능 상태가 되지는 않는다. SAM의 하드웨어
+부트로더는 지울 수 없어, 소거 뒤 재기록이 실패해도 장치는 SAM-BA(`03eb:6124`)로 USB에 남아
+재시도할 수 있다.
 
-> 컨테이너의 `/dev` 는 호스트와 분리된 tmpfs 이고 `/dev/bus/usb` 만 bind-mount 라
-> 새 tty 노드가 안 보일 수 있다. `_samba_port()` 가 `/sys/class/tty` 에서 major:minor 를
-> 읽어 `mknod` 로 만든다. 별도 설정이 필요 없다.
+컨테이너의 `/dev`는 호스트와 분리된 tmpfs이고 `/dev/bus/usb`만 bind-mount라
+새 tty 노드가 안 보일 수 있다. `_samba_port()`가 `/sys/class/tty`에서 major:minor를
+읽어 `mknod`로 만든다. 별도 설정이 필요 없다.
 
 ---
 
@@ -306,4 +306,4 @@ Husky 펌웨어가 손상되면 **버전은 정상값(1.5.0)으로 보고하면�
 - tiny-AES-c <https://github.com/kokke/tiny-AES-c>
 - masked-aes-c <https://github.com/CENSUS/masked-aes-c> (MELITY boolean masking PoC)
 
-링크는 보조다. 각 노트북은 그 하나만으로 해당 단계를 따라갈 수 있게 작성한다.
+링크는 보조 자료다. 각 노트북은 그 하나만으로 해당 단계를 따라갈 수 있게 작성한다.

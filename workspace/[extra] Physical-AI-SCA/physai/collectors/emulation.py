@@ -1,55 +1,46 @@
-"""에뮬레이션 수집기 — 구현 층의 누설을 명령어 단위로 관측한다.
+"""에뮬레이션 수집기. 구현 층의 누설을 명령어 단위로 관측한다.
 
-## 무엇을 왜 만드나
+논문이 증명하는 것은 "올바르게 마스킹된 구현에서는 모든 연산의 HW·HD가 비마스킹
+알고리즘의 민감값과 통계적으로 독립"이라는 명제다. 코딩 과정의 휴먼 에러는 그 고리를
+되살린다. 같은 레지스터에 두 share를 연달아 쓰면 `HD = HW(share1 ^ share2) = HW(민감값)`이
+되어, 수식은 그대로인데 구현만 새는 상태가 된다.
 
-논문이 증명하는 것은 "올바르게 마스킹된 구현에서는 모든 연산의 HW·HD 가 비마스킹
-알고리즘의 민감값과 통계적으로 독립" 이라는 명제다. 코딩 과정의 휴먼 에러는 그 고리를
-되살린다 — 같은 레지스터에 두 share 를 연달아 쓰면
-`HD = HW(share1 ^ share2) = HW(민감값)` 이 되어, **수식은 그대로인데 구현만 새는**
-상태가 된다.
+이 결함은 실측 Trace로 찾기 어렵다. 잡음에 묻히고 명령어 단위로 짚을 수 없기 때문이다.
+에뮬레이션은 정반대 조건을 준다. 잡음이 0이고 샘플 하나가 명령어 하나다. 그래서 물리
+잡음 없이 종속성을 관찰하고, 검출된 Sample(샘플)을 어느 명령어가 만들었는지
+`sample_map`으로 대응시킬 수 있다.
 
-이 결함은 실측 Trace로 찾기 어렵다(잡음에 묻히고 명령어 단위로 짚을 수 없다).
-에뮬레이션은 정반대 조건을 준다 — **잡음 0, 샘플 하나가 명령어 하나.**
-그래서 물리 잡음 없이 종속성을 관찰하고, 검출된 Sample(샘플)을 어느 명령어가 만들었는지
-`sample_map`으로 되짚을 수 있다.
-
-**이것은 실측의 대용품이 아니다.** HW/HD 모델은 글리치·커플링 같은 물리 효과를 담지
+다만 이것은 실측의 대용품이 아니다. HW/HD 모델은 글리치·커플링 같은 물리 효과를 담지
 않으므로, 여기서 깨끗해도 실물에서 샐 수 있다. 세 관측은 서로 다른 고리를 본다.
 
-## 누설 벡터
-
-명령어마다 네 성분을 뽑아 **성분별로 연접**한다. 길이 = 4 × L (L = 구간 명령어 수).
+누설 벡터는 명령어마다 네 성분을 뽑아 성분별로 이어 붙인 것이다. 길이는 4 × L이고
+L은 구간 명령어 수다.
 
     trace = [ hw_reg | hd_reg | hw_mem | hd_mem ]
 
-| 성분 | 정의 | 잡는 것 |
-|---|---|---|
-| `hw_reg` | 그 명령어가 쓴 레지스터들의 실행 후 값의 HW 합 | 값 자체의 누설 |
-| `hd_reg` | **HW(R_before ^ R_after)** — 같은 레지스터의 앞뒤 | 레지스터 전이 누설 |
-| `hw_mem` | 그 명령어의 메모리 쓰기 값들의 HW 합 | 메모리 값 누설 |
-| `hd_mem` | **HW(old ^ new)** — 같은 주소의 앞뒤 | 메모리 전이 누설 |
+`hw_reg`는 그 명령어가 쓴 레지스터들의 실행 후 값의 HW 합으로, 값 자체의 누설을 잡는다.
+`hd_reg`는 같은 레지스터의 앞뒤 값으로 계산한 HW(R_before ^ R_after)로, 레지스터 전이
+누설을 잡는다. `hw_mem`은 그 명령어의 메모리 쓰기 값들의 HW 합으로, 메모리 값 누설을
+잡는다. `hd_mem`은 같은 주소의 앞뒤 값으로 계산한 HW(old ^ new)로, 메모리 전이 누설을
+잡는다.
 
-**HD 는 같은 저장소의 한 명령어 앞뒤 값끼리만 계산한다.** 서로 다른 레지스터 쌍
+HD는 같은 저장소의 한 명령어 앞뒤 값끼리만 계산한다. 서로 다른 레지스터 쌍
 (`HD(R2_before, R5_after)`)은 실제 하드웨어에서 전이 누설이 생기는 방식이 아니고,
-조합이 폭발해 오탐만 만든다.
+조합이 크게 늘어나 오탐만 만든다.
 
-메모리 성분을 넣는 이유: tiny-AES 계열은 state 를 메모리 배열에 두고 **in-place 로
-갱신**한다. 전이 결함은 레지스터보다 이 state 버퍼에서 더 자주 난다.
+메모리 성분을 넣는 이유는 tiny-AES 계열이 state를 메모리 배열에 두고 in-place로
+갱신하기 때문이다. 전이 결함은 레지스터보다 이 state 버퍼에서 더 자주 난다.
 
-## 구현이 기대는 에뮬레이터 동작
+구현은 다음 에뮬레이터 동작에 기댄다. 로컬 자가검사에서 `UC_HOOK_CODE`는 명령어 실행
+전에 호출됐으므로, 연속한 두 hook의 같은 레지스터를 XOR하면 그 명령어의 전이가 된다.
+`[extra] PRE-SCA`의 `logger.py`도 같은 방식이다. `UC_HOOK_MEM_WRITE`도 쓰기 전에
+호출됐으므로 콜백 안의 `mem_read`가 이전 값을 준다. `UC_HOOK_MEM_WRITE_AFTER`는
+Unicorn 2.1.4에 없으므로 이 방법뿐이다. `capstone`의 `insn.regs_access()`가 명령어별
+쓰기 레지스터를 주므로 미리 캐싱해 hook에서 17개를 다 읽지 않는다.
 
-- 로컬 자가검사에서 `UC_HOOK_CODE`는 명령어 **실행 전**에 호출됐다 → 연속한 두 hook의 같은 레지스터를
-  XOR 하면 그 명령어의 전이가 된다. `[extra] PRE-SCA` 의 `logger.py` 도 같은 방식이다.
-- `UC_HOOK_MEM_WRITE`도 **쓰기 전**에 호출됐다 → 콜백 안의 `mem_read`가 이전 값을 준다.
-  (`UC_HOOK_MEM_WRITE_AFTER` 는 Unicorn 2.1.4 에 **없다** — 이 방법뿐이다.)
-- `capstone`의 `insn.regs_access()`가 명령어별 쓰기 레지스터를 준다 → 미리 캐싱해
-  hook 에서 17개를 다 읽지 않는다.
-
-## PC 를 레지스터 성분에서 빼는 이유
-
-제어흐름이 데이터 독립이면 PC 는 인덱스마다 상수라 분산이 0 이고 누설 신호가 없다.
-데이터 의존이면 그것은 **타이밍 분석(TA)이 잡을 일**이고, 이 벡터에 섞으면 정렬이
-무너져 다른 성분까지 오염된다. 그래서 뺀다.
+PC는 레지스터 성분에서 뺀다. 제어흐름이 데이터 독립이면 PC는 인덱스마다 상수라 분산이
+0이고 누설 신호가 없다. 데이터 의존이면 그것은 타이밍 분석(TA)이 잡을 일이고, 이
+벡터에 섞으면 정렬이 무너져 다른 성분까지 오염된다.
 """
 
 import hashlib
@@ -69,7 +60,7 @@ from elfParser import ElfParser                     # noqa: E402  (paths 가 경
 
 COMPONENTS = ("hw_reg", "hd_reg", "hw_mem", "hd_mem")
 
-# capstone 레지스터 이름 → unicorn 상수. **pc 는 일부러 넣지 않는다** (위 설명 참고).
+# capstone 레지스터 이름 → unicorn 상수. pc 는 일부러 넣지 않는다 (위 설명 참고).
 REG_MAP = {
     "r0": UC_ARM_REG_R0, "r1": UC_ARM_REG_R1, "r2": UC_ARM_REG_R2, "r3": UC_ARM_REG_R3,
     "r4": UC_ARM_REG_R4, "r5": UC_ARM_REG_R5, "r6": UC_ARM_REG_R6, "r7": UC_ARM_REG_R7,
@@ -78,13 +69,13 @@ REG_MAP = {
 }
 
 # 32비트 값의 HW 를 바이트 단위로 더해 얻는다 (파이썬 int.bit_count 보다 빠르지 않지만
-# 배열 연산에 쓰기 좋다). 아래 hook 은 int.bit_count() 를 직접 쓴다 — Python 3.10+.
+# 배열 연산에 쓰기 좋다). 아래 hook 은 int.bit_count() 를 직접 쓴다 (Python 3.10+).
 _PAGE = 0x1000
 _STOP_ADDR = 0x7000          # 반환 주소로 쓸 미사용 페이지 (.text 0x8000 아래)
 _LOW_BASE, _LOW_SIZE = 0x0000, 0x1000
 _CODE_BASE, _CODE_SIZE = 0x8000, 0x8000
 _STACK_BASE, _STACK_SIZE = 0x7F000, 0x2000
-# 하네스가 실제로 쓰는 출력 바이트 수: 암호문 16 + 마스크 10 (main.c 규약).
+# 에뮬레이션 실행 프로그램이 실제로 쓰는 출력 바이트 수: 암호문 16 + 마스크 10 (main.c 의 입출력 프로토콜).
 _VIR_OUT_USED = 26
 
 
@@ -123,19 +114,19 @@ class EmulationTarget:
         self.stack = e.get_stack_addr()
         self.main = e.get_func_address("main") & ~1
         self.vir_in, self.vir_out = e.get_io_addr_data()
-        # 하네스 규약(main.c)이 요구하는 최소 크기. 심볼이 그보다 작으면 규약이 어긋난
-        # ELF 를 읽고 있다는 뜻이므로 조용히 잘못된 값을 회수하기 전에 멈춘다.
+        # 실행 프로그램의 입출력 프로토콜(main.c)이 요구하는 최소 크기. 심볼이 그보다
+        # 작으면 프로토콜이 어긋난 ELF 를 읽고 있다는 뜻이므로 잘못된 값을 회수하기 전에 멈춘다.
         self.vir_in_len = e.get_symbol_len("vir_IN")
         self.vir_out_len = e.get_symbol_len("vir_OUT")
         if self.vir_in_len < 36 or self.vir_out_len < 26:
             raise RuntimeError(
-                "하네스 버퍼가 규약보다 작다: vir_IN=%d(≥36), vir_OUT=%d(≥26). "
-                "emul_harness/main.c 의 입출력 규약과 ELF 가 어긋난다."
+                "실행 프로그램 버퍼가 프로토콜보다 작다: vir_IN=%d(≥36), vir_OUT=%d(≥26). "
+                "emul_harness/main.c 의 입출력 프로토콜과 ELF 가 어긋난다."
                 % (self.vir_in_len, self.vir_out_len))
 
         w = window or {"from_symbol": "AES_init_ctx", "to_symbol": "AES_ECB_encrypt"}
         self.win_from = e.get_func_address(w["from_symbol"]) & ~1
-        # 구간의 끝. to_symbol 이 **복귀**하는 지점에서 관측을 닫는다 —
+        # 구간의 끝. to_symbol 이 복귀하는 지점에서 관측을 닫는다.
         # 진입 시점의 LR 이 호출자로 돌아갈 주소이므로 기록기가 그것을 기억한다.
         # 이것이 없으면 관측이 main 끝까지 이어져, 마스킹 타겟에서는
         # AES_get_last_masks() 가 비밀인 마스크를 트레이스 안으로 끌고 들어온다.
@@ -192,7 +183,7 @@ class EmulationTarget:
     def _new_uc(self):
         """새 Unicorn 인스턴스에 메모리·ELF 이미지·초기 레지스터를 설정해 반환한다.
 
-        Trace마다 독립 상태를 보장하기 위해 실행 인스턴스를 재사용하지 않는다. 매핑이나
+        Trace마다 상태를 독립으로 유지하기 위해 실행 인스턴스를 재사용하지 않는다. 매핑이나
         이미지 쓰기 실패는 Unicorn 예외로 전파되며 호스트 파일은 변경하지 않는다.
         """
         uc = Uc(UC_ARCH_ARM, UC_MODE_THUMB if self.mode == 2 else UC_MODE_ARM)
@@ -219,11 +210,11 @@ class EmulationTarget:
             ct        : bytes(16)
             masks     : bytes(10) 또는 None
             trace_arr : int16 (4L,) 또는 None
-            exec_time : int — 관측 구간의 명령어 수
+            exec_time : int. 관측 구간의 명령어 수
 
         실패 조건
             구간 명령어 수가 첫 실행과 다르면 RuntimeError.
-            **조용히 자르지 않는다** — 자르면 sample_map 이 어긋나 엉뚱한 명령어를
+            길이를 맞추려고 자르지 않는다. 자르면 sample_map 이 어긋나 엉뚱한 명령어를
             결함으로 지목하게 되고, 이 도구에서 가장 나쁜 실패 모드다.
         """
         uc = self._new_uc()
@@ -273,9 +264,9 @@ class EmulationTarget:
         return out
 
     def sample_map(self):
-        """(ns, 3) uint32 — (segment_id, instruction_index, address).
+        """(ns, 3) uint32 배열 (segment_id, instruction_index, address)을 돌려준다.
 
-        누설이 검출된 샘플을 명령어로 되짚는 유일한 수단이다. 이것이 없으면
+        누설이 검출된 샘플을 명령어에 대응시키는 유일한 수단이다. 이것이 없으면
         "샌다" 까지만 말할 수 있고 "여기서 샌다" 를 말할 수 없다.
 
         `trace=True` 실행 전에는 `RuntimeError`가 발생한다. 반환 배열을 새로 만들며 타겟
@@ -292,14 +283,14 @@ class EmulationTarget:
         return np.concatenate(blocks, axis=0)
 
     def build_flags(self):
-        """이 ELF 를 만든 실제 컴파일 플래그를 **make 에게 물어** 가져온다.
+        """이 ELF 를 만든 실제 컴파일 플래그를 make 에게 물어 가져온다.
 
         Makefile 을 텍스트로 파싱하지 않는다. 조건부 블록(`ifeq (MASKED)`)까지 긁어
         비마스킹 빌드에 `-DMASKED=1` 이 있다고 기록하는 버그가 실제로 있었다.
-        **거짓 메타데이터는 없는 것보다 나쁘다** — 다음 사람이 그 값을 믿고 재현을
-        시도하면 다른 바이너리가 나온다.
+        틀린 메타데이터는 없는 것보다 나쁘다. 뒤에 읽는 사람이 그 값을 믿고 재현을
+        시도하면 다른 바이너리가 나오기 때문이다.
 
-        실패 조건: make 를 부를 수 없으면 RuntimeError. 지어낸 값으로 대체하지 않는다.
+        make 를 부를 수 없으면 RuntimeError 가 발생한다. 추정값으로 대체하지 않는다.
         """
         import subprocess
         r = subprocess.run(["make", "-s", "IUT=%s" % self.iut, "flags"],
@@ -307,7 +298,7 @@ class EmulationTarget:
         if r.returncode != 0:
             raise RuntimeError(
                 "build_flags 를 확인할 수 없다 (make -s IUT=%s flags → rc=%d).\n%s\n"
-                "추정치로 채우지 않는다 — 재현의 고정점이기 때문이다."
+                "추정치로 채우지 않는다. 재현의 고정점이기 때문이다."
                 % (self.iut, r.returncode, r.stderr.strip()))
         return " ".join(r.stdout.split())
 
@@ -342,9 +333,9 @@ class EmulationTarget:
 
 
 def _has_masks(iut_name):
-    """마스크 10바이트를 출력하는 하네스로 등록된 IUT 이름인지 반환한다.
+    """마스크 10바이트를 출력하는 실행 프로그램으로 등록된 IUT 이름인지 반환한다.
 
-    현재 등록값은 `masked-aes-c` 하나다. 다른 마스킹 IUT를 추가할 때는 출력 규약을 구현한
+    현재 등록값은 `masked-aes-c` 하나다. 다른 마스킹 IUT를 추가할 때는 출력 프로토콜을 구현한
     뒤 이 허용 목록에도 명시해야 하며, 이름을 추측해 자동 판정하지 않는다.
     """
     return iut_name == "masked-aes-c"
@@ -393,7 +384,7 @@ class _CountRecorder:
 class _TraceRecorder:
     """네 성분을 모은다.
 
-    `UC_HOOK_CODE` 가 실행 **전**에 걸리므로 한 스텝 지연이 필요하다.
+    `UC_HOOK_CODE` 가 실행 전에 걸리므로 한 스텝 지연이 필요하다.
     hook i 에서 (a) 직전 명령어가 쓴 레지스터를 지금 읽어 '실행 후' 값을 확정하고,
     (b) 이번 명령어가 쓸 레지스터의 현재 값을 '실행 전' 으로 저장한다.
     """
@@ -432,7 +423,7 @@ class _TraceRecorder:
         """관측 구간 경계를 추적하고 명령어별 레지스터 누설 기록을 한 단계씩 진행한다."""
         if address == self.win_from:
             self._in = True
-        # 구간의 끝 — to_symbol 이 **복귀**하는 지점에서 닫는다.
+        # 구간의 끝. to_symbol 이 복귀하는 지점에서 닫는다.
         # 진입 시점의 LR 이 곧 호출자(main)로 돌아갈 주소이므로 그것을 기억해 둔다.
         if address == self.win_to and self._ret is None:
             self._ret = uc.reg_read(UC_ARM_REG_LR) & ~1
@@ -461,7 +452,7 @@ class _TraceRecorder:
         """현재 명령어의 메모리 쓰기 전·후 값에서 HW·HD를 누적한다."""
         if not self._in or not self.hw_mem:
             return
-        # 로컬 자가검사에서 콜백은 쓰기 **전**에 호출됐으므로 mem_read가 이전 값을 준다.
+        # 로컬 자가검사에서 콜백은 쓰기 전에 호출됐으므로 mem_read가 이전 값을 준다.
         old = int.from_bytes(uc.mem_read(address, size), "little")
         new = value & ((1 << (8 * size)) - 1)
         self.hw_mem[-1] += new.bit_count()
@@ -481,7 +472,7 @@ class _TraceRecorder:
 
 
 # ─────────────────────────────────────────────────────────────
-# 자가검사 — 계획의 PoC 게이트를 언제든 다시 돌릴 수 있게 남긴다
+# 자가검사. 계획의 PoC 게이트를 언제든 다시 돌릴 수 있게 남긴다
 # ─────────────────────────────────────────────────────────────
 def selftest(iut_name, n=10, seed=1234):
     """골든 AES·마스크·명령어 수·속도를 확인하고 결과 dict 를 돌려준다.
@@ -550,19 +541,19 @@ def _cli():
         try:
             r = selftest(name, n=a.n)
         except FileNotFoundError as e:
-            print("[건너뜀] %s — %s" % (name, e))
+            print("[건너뜀] %s: %s" % (name, e))
             continue
         out.append(r)
         print("=" * 66)
         print(" %s   sha256 %s…" % (r["iut"], r["sha256"][:12]))
         print("=" * 66)
         print("  ① 골든 AES 일치   : %s (%d/%d)"
-              % ("예" if r["golden_ok"] else "**아니오**", r["n"] - r["golden_fail"], r["n"]))
+              % ("예" if r["golden_ok"] else "아니오", r["n"] - r["golden_fail"], r["n"]))
         print("  ② 마스크          : %s"
               % ("해당없음" if not r["masks_len"]
                  else "%d바이트, 고유 %d/%d" % (r["masks_len"], r["masks_unique"], r["n"])))
         print("  ③ 명령어 수       : %d–%d → %s"
-              % (r["instr_min"], r["instr_max"], "고정" if r["instr_fixed"] else "**변동**"))
+              % (r["instr_min"], r["instr_max"], "고정" if r["instr_fixed"] else "변동"))
         print("  ④ 1장당 시간      : %.1f ms (%.0f tr/s)"
               % (r["seconds_per_trace"] * 1000, 1 / r["seconds_per_trace"]))
         print("  ⑤ 샘플/트레이스   : %d" % r["samples_per_trace"])

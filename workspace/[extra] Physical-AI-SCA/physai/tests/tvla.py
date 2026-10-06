@@ -1,7 +1,7 @@
-"""독립 TVLA — 고정 입력과 랜덤 입력의 1차 Welch t-test.
+"""독립 TVLA. 고정 입력과 랜덤 입력의 1차 Welch t-test를 수행한다.
 
 TVLA는 널리 쓰이는 누설 탐색 절차지만 ISO/IEC 17825의 필수 TA·SPA·DPA 판정과 같은
-항목은 아니다. 따라서 검출 여부와 검정력을 독립 축으로 보고하고 ISO 종합 판정에는
+항목은 아니다. 그래서 검출 여부와 검정력을 독립 축으로 보고하고 ISO 종합 판정에는
 합산하지 않는다. 검출은 저표본에서도 사실이지만 미검출은 충분한 표본 없이는 결론이 아니다.
 """
 
@@ -22,7 +22,7 @@ def run(dataset_path, spec, threshold_info, n_required):
                                      fields=[S.F_TRACE])[S.F_TRACE], dtype=np.float64)
     ns = fixed.shape[1]
     # 파생 Dataset의 float64 평균을 정수형으로 되돌리면 10회 평균의 분수 정보가 사라진다.
-    # scipy의 벡터화 Welch 검정은 입력 정밀도를 보존하며 equal_var=False가 절차의 정본이다.
+    # scipy의 벡터화 Welch 검정은 입력 정밀도를 보존하며 equal_var=False가 이 절차의 기준 설정이다.
     with np.errstate(divide="ignore", invalid="ignore"):
         t = np.asarray(ttest_ind(fixed, random, axis=0, equal_var=False).statistic,
                        dtype=np.float64)

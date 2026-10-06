@@ -1,4 +1,4 @@
-"""ISO/IEC 17825 §8.4 DPA — 사전 지정 민감값으로 나눈 두 집단의 Welch t-test.
+"""ISO/IEC 17825 §8.4 DPA. 사전 지정 민감값으로 나눈 두 집단의 Welch t-test를 수행한다.
 
 fixed-vs-random 입력 검정은 ``tvla.py``가 담당한다. 이 모듈은 알고리즘 계약이 수집 전에
 고정한 민감값을 계산하고 그 값으로 동일 subset을 분할한다. 누설 관측은 표본 수와 무관하게
@@ -58,7 +58,7 @@ def run(dataset_path, spec, threshold_info, n_required, sensitive_window=None):
         reason = "충분한 표본에서 민감 경계 안의 임계 초과가 없다"
     else:
         verdict = "inconclusive"
-        reason = ("장수 부족 — 보유 %d장, Formula (1) 요구 %d장. "
+        reason = ("트레이스 수 부족. 보유 %d장, Formula (1) 요구 %d장. "
                   "미검출을 누설 없음으로 해석하지 않는다." % (n_total, n_required))
     n_nan = int(np.count_nonzero(np.isnan(t)))
     return {

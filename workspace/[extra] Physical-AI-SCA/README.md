@@ -1,14 +1,14 @@
-# Physical-AI-SCA — ISO L3/L4 부채널 사전진단과 CW Lab 파일럿
+# Physical-AI-SCA: ISO L3/L4 부채널 사전진단과 CW Lab 파일럿
 
 이 프로젝트는 실험 계획, 에뮬레이션/ChipWhisperer 수집, 통계 분석, 증거 검증과 보고를
 하나의 재현 가능한 흐름으로 묶는다. ISO/IEC 17825:2024의 방법론을 준용하지만
-ISO/IEC 19790 모듈 경계, 승인 기관과 독립 시험소가 없으므로 **적합성 평가가 아니라
-pre-assessment**다.
+ISO/IEC 19790 모듈 경계, 승인 기관과 독립 시험소가 없으므로 적합성 평가가 아니라
+사전 진단(pre-assessment)이다.
 
 ## 처음 실행하는 사람
 
 ChipWhisperer Docker의 code-server에서
-`demo/0.1.Demo_without_TraceWhisperer.ipynb`를 열고 **Run All**을 누른다. 기본 study는
+`demo/0.1.Demo_without_TraceWhisperer.ipynb`를 열고 Run All을 누른다. 기본 study는
 `demo/study.yaml`이며 다음 네 실험을 순서대로 수행한다.
 
 | 채널 | 비마스킹 양성 대조 | 마스킹 IUT |
@@ -17,7 +17,7 @@ ChipWhisperer Docker의 code-server에서
 | CW308T-STM32F3 전력 | tiny-AES-c | masked-aes-c |
 
 기본값은 `iso-17825-l3 + cw-lab-pilot`이다. 실물 단계에는 연결된 ChipWhisperer Husky와
-CW308T-STM32F3가 필요하다. Grok CLI는 컨테이너가 아니라 **호스트**에 설치하고 로그인한다.
+CW308T-STM32F3가 필요하다. Grok CLI는 컨테이너가 아니라 호스트에 설치하고 로그인한다.
 Run All은 사전 자문과 출판 감사 셀에서 요청 파일을 쓴 뒤 기다린다. 각 셀은 호스트의
 `chipwhisperer-kor` 저장소 루트에서 실행할 정확한 Python 한 줄을 출력한다. 표시된 one-shot
 스크립트는 현재 요청 하나를 검증하고 Grok headless를 포그라운드에서 한 번 호출한 뒤 응답
@@ -32,7 +32,7 @@ JSON을 쓰고 즉시 종료한다. 감시기·데몬·백그라운드 Grok은 �
 |---|---|
 | `iso-17825-l3` | Annex A.2 수량·효과크기·시간·전처리 |
 | `iso-17825-l4` | Annex A.3 수량과 L4 필터·정적/동적 정렬 |
-| `smoke` | 계약·코드·배관의 최소 확인 |
+| `smoke` | 계약·코드·처리 흐름의 최소 확인 |
 | `cw-lab-pilot` | 본시험 전에 같은 절차를 저표본으로 예행 |
 | `full` | 프로파일의 수집량과 Formula (1)을 목표로 수행 |
 
@@ -40,7 +40,7 @@ CW Lab은 “노이즈 없는 제3의 레벨”이나 간이 판정이 아니다
 통제된 환경에서 시간이 긴 L3/L4 본시험 전에 수행하는 파일럿이다. 절차, 증거, 한계와 결론
 규율은 본시험과 같지만 통계 검정력은 별도로 `underpowered`라고 기록한다.
 
-프로파일 수치의 정본은 `physai/profiles.py` 하나다. 원시 YAML에는 보안 수준, effect size,
+프로파일 수치는 `physai/profiles.py` 한 곳에서만 정의한다. 원시 YAML에는 보안 수준, effect size,
 α·β, 시간 제한, 반복 수와 subset 수량을 복제하지 않는다.
 
 | 기준 | L3 | L4 |
@@ -165,8 +165,8 @@ HDF5 옆의 `.provenance.json`, run의 NPZ와 보고서 그림에 남는다.
 프로파일에서 해석된 수량·통계·전처리는 `runs/<study>_preflight.json`에 결정적으로 기록한다.
 노트북은 이 파일과 원본 명세를 `runs/grok_request.json`에 프로젝트 상대경로·크기·SHA-256으로
 기록하고 현재 셀에서 응답을 기다린다. 사용자가 호스트에서 표시된 Python 한 줄을 실행할 때만 Grok이 시작되며 완료 후 즉시
-종료한다. 모델·추론 강도·task 문장·출력 스키마·다음 제한의 정본은 모두
-`physai/grok_once.py` 하나다.
+종료한다. 모델·추론 강도·task 문장·출력 스키마·다음 제한은 모두
+`physai/grok_once.py` 한 곳에서만 정의한다.
 
 ```text
 --single --no-memory --no-subagents --disable-web-search --no-plan
@@ -179,16 +179,16 @@ HDF5 옆의 `.provenance.json`, run의 NPZ와 보고서 그림에 남는다.
 
 감사 JSON은 모든 입력의 프로젝트 상대경로·바이트·SHA-256을 기록한다. 통합 보고서 생성 시 현재
 파일과 다시 비교해 stale 감사를 거부한다. Grok이 쓴 finding에는 파일/필드 근거와 한계를
-함께 요구하며 수치·판정·해시의 정본은 항상 결정적 JSON이다.
+함께 요구하며 수치·판정·해시의 기준은 항상 결정적 JSON이다.
 
 ## 보고서와 CLI
 
 각 run은 다음 산출물을 만든다.
 
-- `01_experiment_plan.{md,html}` — 수집 전 계약과 계획
-- `02_analysis_report.{md,html}` — 수치, 판정 축, SPA/TVLA/DPA/CPA와 전처리 증거
-- `03_evidence_manifest.{md,html}` + `manifest.json` — 재현 명령과 파일 해시
-- `results.json` — 기계 판독 정본
+- `01_experiment_plan.{md,html}`: 수집 전 계약과 계획
+- `02_analysis_report.{md,html}`: 수치, 판정 축, SPA/TVLA/DPA/CPA와 전처리 증거
+- `03_evidence_manifest.{md,html}` + `manifest.json`: 재현 명령과 파일 해시
+- `results.json`: 기계가 읽는 기준 파일
 
 통합 보고서는 `demo/0.1.Demo_without_TraceWhisperer_Report.{md,html}`이다. HTML은 외부 CDN
 없이 CSS와 그림을 내장하고 화면·인쇄에 모두 맞춘다.
@@ -220,7 +220,7 @@ python3 -m physai.demo --study demo/study.yaml --report
 4. 지원한다면 CPA 예측 행렬과 soundness 가능 여부
 
 그 뒤 experiment의 `algorithm`, subset 폭을 사용하는 수집기와 펌웨어 통신을 함께 구현한다.
-현재 에뮬레이션 하네스와 ChipWhisperer SimpleSerial 수집기는 AES 16바이트 구현이다. 폭만
+현재 에뮬레이션 실행 프로그램과 ChipWhisperer SimpleSerial 수집기는 AES 16바이트 구현이다. 폭만
 명세에서 바꿔 놓고 동작한다고 주장하지 않는다. 골든 연산, 분할 균형, 알려진 누설 합성
 데이터와 양성 대조를 먼저 테스트한다.
 
@@ -244,7 +244,7 @@ python3 -m physai.demo --study demo/study.yaml --report
 - 에뮬레이션은 물리 글리치·커플링·파이프라인 효과를 포함하지 않는다.
 - Unicorn 실행시간은 명령어 수이며 Cortex-M4 cycle-accurate 시간이 아니다.
 - EM 채널과 독립 시험소 판정은 제공하지 않는다.
-- CPA 실패/성공은 ISO 판정이 아니라 배관과 공격 참고다.
+- CPA 실패/성공은 ISO 판정이 아니라 처리 흐름의 양성 대조와 공격 참고다.
 - 고차 DPA는 현재 범위 밖이다. TA의 분산 검정은 별개로 수행한다.
 - `미기록`, `미준수`, `검정력 부족`, `검출 없음`을 서로 바꾸어 쓰지 않는다.
 

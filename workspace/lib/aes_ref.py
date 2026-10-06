@@ -1,13 +1,15 @@
-"""AES-128 참조 구현 — 저장소 공용.
+"""AES-128 참조 구현. 저장소 공용 모듈이다.
 
-부채널 분석은 "타겟이 어떤 중간값을 계산했는가"를 호스트에서 다시 계산해 라벨로 삼는다.
-그 계산이 프로젝트마다 따로 있으면, 에뮬레이션 결과와 실측 결과가 **서로 다른 값**을
-같은 이름으로 부르게 되어 비교가 조용히 무너진다. 그래서 정의는 여기 한 곳에 둔다.
+부채널 분석은 타겟이 계산한 중간값을 호스트에서 다시 계산해 라벨로 삼는다.
+그 계산이 프로젝트마다 따로 있으면 에뮬레이션 결과와 실측 결과가 서로 다른 값을
+같은 이름으로 부르게 되어, 두 결과를 비교해도 그 차이를 알아차릴 수 없다.
+그래서 정의는 이 파일 한 곳에만 둔다.
 
-여기 있는 것은 **하드웨어와 무관한 순수 계산**뿐이다. 장비 제어는 각 프로젝트에 있다.
+이 모듈에는 하드웨어와 무관한 순수 계산만 있다. 장비 제어는 각 프로젝트에 있다.
+모든 함수는 입력 배열을 수정하지 않고 새 배열이나 bytes를 반환한다.
 
 쓰는 곳
-    workspace/[extra] SCALib/scalib_common.py        (재노출 → SCALib 노트북 12개)
+    workspace/[extra] SCALib/scalib_common.py        (같은 이름으로 다시 제공, SCALib 노트북 12개가 사용)
     workspace/[extra] SCALib/dataset_collect_lib.py  (수집 중 골든 검증)
     workspace/[extra] Physical-AI-SCA/physai/        (에뮬 수집·누설 검정)
 """
@@ -47,15 +49,15 @@ N_ROUNDS = 10
 def sbox_out(plaintext, key):
     """1라운드 SBox 출력 = SBOX[plaintext XOR key].
 
-    입력: 각각 (n, 16) 또는 (16,) uint8 배열. 브로드캐스트된다.
-    출력: 입력과 같은 shape 의 uint8 배열.
+    입력은 각각 (n, 16) 또는 (16,) uint8 배열이며 브로드캐스트된다.
+    출력은 입력과 같은 shape의 uint8 배열이다.
 
     부채널 공격이 겨냥하는 가장 흔한 중간값이다. 평문 한 바이트와 키 한 바이트에만
-    의존하므로 키를 바이트 단위로 나누어 추측할 수 있다(분할 정복).
-    Masked 구현에서도 **공격자 관점** 라벨은 이 값이다(마스크는 모른다).
+    의존하므로 키를 바이트 단위로 나누어 추측할 수 있다. Masked 구현에서도 마스크를
+    모르는 공격자 관점의 라벨은 이 값이다.
 
-    입력은 수정하지 않는다. 두 형상이 브로드캐스트될 수 없으면 NumPy ``ValueError``가
-    발생하며 값은 uint8로 변환되므로 원래 정수의 상위 비트는 버려진다.
+    두 형상이 브로드캐스트될 수 없으면 NumPy ``ValueError``가 발생한다. 값은 uint8로
+    변환되므로 원래 정수의 상위 비트는 버려진다.
     """
     return SBOX[np.bitwise_xor(np.asarray(plaintext, dtype=np.uint8),
                                np.asarray(key, dtype=np.uint8))]
@@ -64,8 +66,8 @@ def sbox_out(plaintext, key):
 def aes_ecb_encrypt(key16, plain16):
     """호스트 골든 모델: AES-128 ECB 한 블록.
 
-    타겟이 낸 암호문과 대조해 통신·구현이 정상인지 확인하는 데 쓴다.
-    입력을 bytes로 복사하고 16바이트 암호문을 반환하며 외부 상태는 변경하지 않는다.
+    타겟이 낸 암호문과 대조해 통신과 구현이 정상인지 확인하는 데 쓴다.
+    입력을 bytes로 복사하고 16바이트 암호문을 반환한다.
     PyCryptodome이 없으면 ``ImportError``, 키나 평문 길이가 16이 아니면 하위 API의
     ``ValueError``가 발생한다.
     """
@@ -76,8 +78,8 @@ def aes_ecb_encrypt(key16, plain16):
 def _xtime(a):
     """uint8 값마다 GF(2^8)의 2를 곱한 같은 형상의 배열을 반환한다.
 
-    입력은 NumPy 배열로 복사·변환하며 수정하지 않는다. 정수 범위를 벗어난 값은 uint8
-    변환 규칙을 따르고, 배열로 변환할 수 없는 입력은 NumPy 예외를 발생시킨다.
+    정수 범위를 벗어난 값은 uint8 변환 규칙을 따르고, 배열로 변환할 수 없는 입력은
+    NumPy 예외를 발생시킨다.
     """
     a = np.asarray(a, dtype=np.uint8)
     return np.where(a & 0x80, ((a.astype(np.uint16) << 1) ^ 0x1B) & 0xFF,
@@ -87,15 +89,14 @@ def _xtime(a):
 def key_schedule(key16):
     """AES-128 라운드 키 11개를 만든다.
 
-    입력: (16,) 또는 (n, 16) uint8
-    출력: (11, 16) 또는 (n, 11, 16) uint8
+    입력은 (16,) 또는 (n, 16) uint8이고, 출력은 (11, 16) 또는 (n, 11, 16) uint8이다.
 
-    KeyExpansion 은 두 IUT 모두 **비마스킹**이다(masked-aes-c 도 키 스케줄은 벤더 원본).
-    그래서 이 값은 마스킹 여부와 무관하게 SPA 시험(ISO/IEC 17825 §8.3.1 이 지목하는
-    key derivation)의 라벨로 쓸 수 있다.
+    KeyExpansion은 두 IUT 모두 마스킹하지 않는다. masked-aes-c도 키 스케줄은 벤더
+    원본 그대로다. 그래서 이 값은 마스킹 여부와 무관하게 SPA 시험(ISO/IEC 17825
+    §8.3.1이 지목하는 key derivation)의 라벨로 쓸 수 있다.
 
-    입력은 수정하지 않는다. 마지막 축이 16이 아니면 배열 대입 과정에서 NumPy 형상 오류가
-    발생한다. 1차원 입력만 ``(11, 16)``으로 축약하고 그 밖에는 배치 축을 유지한다.
+    마지막 축이 16이 아니면 배열 대입 과정에서 NumPy 형상 오류가 발생한다. 1차원
+    입력만 ``(11, 16)``으로 축약하고 그 밖에는 배치 축을 유지한다.
     """
     k = np.atleast_2d(np.asarray(key16, dtype=np.uint8))
     n = k.shape[0]
@@ -117,8 +118,8 @@ def key_schedule(key16):
 def _shift_rows(s):
     """열 우선 ``(n, 16)`` AES state에 ShiftRows를 적용한 새 배열을 반환한다.
 
-    입력을 변경하지 않는다. 두 번째 축이 16보다 짧거나 2차원 인덱싱을 지원하지 않으면
-    NumPy 인덱싱 예외가 발생한다.
+    두 번째 축이 16보다 짧거나 2차원 인덱싱을 지원하지 않으면 NumPy 인덱싱 예외가
+    발생한다.
     """
     idx = np.array([0, 5, 10, 15, 4, 9, 14, 3, 8, 13, 2, 7, 12, 1, 6, 11])
     return s[:, idx]
@@ -127,8 +128,8 @@ def _shift_rows(s):
 def _mix_columns(s):
     """열 우선 AES state 배열에 MixColumns를 적용해 새 배열을 반환한다.
 
-    입력은 `(n, 16)` uint8 배열이어야 한다. 입력을 변경하지 않으며, shape이 맞지 않으면
-    NumPy 인덱싱 또는 브로드캐스팅 오류가 호출자에게 그대로 전파된다.
+    입력은 `(n, 16)` uint8 배열이어야 한다. shape이 맞지 않으면 NumPy 인덱싱 또는
+    브로드캐스팅 오류가 호출자에게 그대로 전파된다.
     """
     out = np.empty_like(s)
     for c in range(4):
@@ -149,15 +150,16 @@ def intermediates(key16, plain16):
 
     출력 (dict, 값은 모두 (n, 16) uint8)
         add_rk0    : p ^ k              1라운드 AddRoundKey 출력
-        sbox_out   : SBOX[p ^ k]        1라운드 SubBytes 출력  ← 가장 흔한 공격 표적
+        sbox_out   : SBOX[p ^ k]        1라운드 SubBytes 출력 (가장 흔한 공격 표적)
         round<r>   : r 라운드 종료 시 state (r = 1..10)
         roundkey<r>: r 라운드 키 (r = 0..10)
 
-    **이 값들은 이 저장소의 soundness 검정이 쓰는 비마스킹 민감값 라벨이다.** 검정은
-    관측한 HW·HD와 이 라벨의 통계적 종속성을 마스킹 구현 결함 후보로 보고한다. 종속성은
-    후보를 좁히는 관측 결과이며, 그 자체만으로 물리 누설이나 공격 가능성을 확정하지 않는다.
+    이 값들은 이 저장소의 soundness 검정이 쓰는 비마스킹 민감값 라벨이다. 검정은
+    관측한 HW·HD와 이 라벨의 통계적 종속성을 마스킹 구현의 결함 후보로 보고한다.
+    종속성은 후보를 좁히는 관측 결과이며, 그 자체만으로 물리 누설이나 공격 가능성을
+    확정하지 않는다.
 
-    부작용 없음. 실패 조건: shape 이 (…,16) 이 아니면 ValueError.
+    부작용은 없다. shape이 (…, 16)이 아니면 ValueError가 발생한다.
     """
     k = np.atleast_2d(np.asarray(key16, dtype=np.uint8))
     p = np.atleast_2d(np.asarray(plain16, dtype=np.uint8))

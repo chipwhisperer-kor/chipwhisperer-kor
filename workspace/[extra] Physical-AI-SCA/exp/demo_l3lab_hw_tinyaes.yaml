@@ -1,9 +1,9 @@
 schema_version: 2
 id: "demo_l3lab_hw_tinyaes"
-title: "통합 데모 실물 전력 — tiny-AES-c CPA 양성 대조"
+title: "통합 데모 실물 전력: tiny-AES-c CPA 양성 대조"
 rationale: >
   CW308T-STM32F3에서 tiny-AES-c를 실행하고 Husky로 같은 입력을 10회씩 각각 보존한 뒤 분석 파생물에서 평균한다.
-  CPA 16바이트 복구는 수집·정렬·라벨 배관의 필수 양성 대조이며 실패하면 완료로 처리하지 않는다.
+  CPA 16바이트 복구는 수집·정렬·라벨 처리 흐름의 양성 대조이며, 실패하면 완료로 처리하지 않는다.
 scope:
   standard: "ISO/IEC 17825:2024"
   assessment_type: "pre-assessment"
@@ -11,13 +11,13 @@ scope:
   csp_classes: ["cryptographic key"]
   channels: ["power"]
   not_claimed:
-    - "ISO/IEC 19790 적합성 — 모듈 경계·CSP 정의가 환경 밖이다"
-    - "독립 시험소 평가 — 벤더와 시험자가 동일하다"
-    - "EM 및 cw_debugtrace 관측 — 준비된 채널이 아니다"
-    - "명령어 주소 역추적과 soundness — sample_map이 없는 물리 파형에는 적용하지 않는다"
-    - "SPA 육안 판정 — 사람의 검토가 필요하다"
-    - "DPA 검출 없음에 따른 안전 판정 — Formula (1) 요구량보다 작다"
-    - "션트 최대값 검증 — 공장 R3 값보다 큰 저항을 비교하지 않았다"
+    - "ISO/IEC 19790 적합성은 주장하지 않는다. 모듈 경계와 CSP 정의가 환경 밖에 있다."
+    - "독립 시험소 평가는 주장하지 않는다. 벤더와 시험자가 같다."
+    - "EM과 cw_debugtrace 관측은 주장하지 않는다. 준비된 채널이 아니다."
+    - "명령어 주소 역추적과 soundness는 주장하지 않는다. sample_map이 없는 물리 파형에는 적용하지 않는다."
+    - "SPA 육안 판정은 주장하지 않는다. 사람의 검토가 필요하다."
+    - "DPA 검출 없음에 따른 안전 판정은 주장하지 않는다. 장수가 Formula (1) 요구량보다 작다."
+    - "션트 최대값 검증은 주장하지 않는다. 공장 R3 값보다 큰 저항을 비교하지 않았다."
 iut: {name: "tiny-AES-c", countermeasure: "none"}
 collector:
   kind: "cw_power"

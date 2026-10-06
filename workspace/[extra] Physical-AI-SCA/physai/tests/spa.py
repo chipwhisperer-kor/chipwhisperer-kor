@@ -1,50 +1,40 @@
-"""필수 시험 2 — 단순 분석 (SPA/SEMA), ISO/IEC 17825 §7.3.5·§8.3.1.
+"""필수 시험 2. 단순 분석(SPA/SEMA), ISO/IEC 17825 §7.3.5·§8.3.1.
 
-## 대칭키에서 SPA 가 겨냥하는 것
+대칭키에서 SPA가 겨냥하는 것은 key derivation(key schedule)이다. §8.3.1은 대칭키
+암호에서 SPA·SEMA의 알려진 위협을 key derivation으로 지목하며, 시험소가 중간값의
+Hamming weight를 알아낼 수 있으면 키가 드러난다고 설명한다. 이 저장소의 두 IUT는
+키 스케줄을 관측 구간 안에서 수행하고, `masked-aes-c`조차 `KeyExpansion`은 벤더 원본
+비마스킹이다. 그래서 시험 대상이 명확히 존재한다.
 
-§8.3.1: 대칭키 암호에서 SPA·SEMA 의 알려진 위협은 **key derivation(key schedule)** 이다.
-"시험소가 중간값의 Hamming weight 를 알아낼 수 있으면 키가 드러난다."
+요건은 Annex A.2.2(Level 3)와 A.3.2(Level 4)가 정한다. Trace(트레이스) 수는 Level 3이
+11장(같은 데이터쌍 1 + 미리 정한 다른 쌍 1 + 랜덤 다른 쌍 4)이고 Level 4가 21장이다.
+해상도는 Level 3이 CSP 비트당 100 Sample(샘플) 이상, Level 4가 1,000 Sample 이상이다.
+두 Level 모두 육안 검사와 통계 검정을 둘 다 통과해야 한다.
 
-이 저장소의 두 IUT 는 키 스케줄을 관측 구간 **안**에서 수행하고, `masked-aes-c` 조차
-`KeyExpansion` 은 벤더 원본 비마스킹이다. 그래서 시험 대상이 명확히 존재한다.
+통계 검정에서 무엇을 fail로 볼지가 중요하다. "평문이 다르면 트레이스도 다르다"는 fail
+조건이 아니다. 그 기준을 쓰면 완벽하게 마스킹된 구현을 포함해 모든 구현이 실패한다.
+데이터가 다르면 소비 전력이 다른 것은 당연하고, 그것 자체는 비밀의 누설이 아니다.
+§8.3.1이 지목한 SPA 표적은 key derivation이므로 판정 기준을 키에 건다.
 
-## 요건 (Annex A.2.2 / A.3.2)
+트레이스 쌍은 세 종류다. `same-data`(같은 키·평문)는 관측의 재현성, 곧 잡음 바닥을
+보여 준다. 대책이 없으면 0이어야 하고, 마스킹이면 마스크 재랜덤화로 0이 아니며 그것이
+기준선이 된다. `different-data-fixed`(키가 다름, 평문 고정)는 단일 트레이스가 키에 따라
+달라지는지를 보며, 특히 key schedule 구간에서 판정 근거가 된다. `different-data-random`
+(키 고정, 평문 다름)은 평문 의존 구조를 보여 주는 참고 자료이며 fail 근거가 아니다.
 
-| | Level 3 | Level 4 |
-|---|---|---|
-| Trace(트레이스) 수 | 11 (같은 데이터쌍 1 + 미리 정한 다른 쌍 1 + 랜덤 다른 쌍 4) | 21 |
-| 해상도 | CSP 비트당 ≥100 Sample(샘플) | ≥1,000 Sample |
+최종 판정은 이 도구가 내리지 못한다. A.2.2는 육안 검사와 통계 검정 둘 다 통과해야
+한다고 정하는데, 육안 검사는 정의상 사람의 행위다. 또한 잡음이 0인 결정적 채널에서는
+키가 다를 때 트레이스가 달라지는 것만으로 통계 실패를 확정할 수 없다. 그래서 이 도구는
+구조 관측 여부와 요건 부족을 기록하되 최종 결과를 항상 `inconclusive`로 둔다. 사람은
+증거 그림과 수치를 함께 검토해 판정해야 한다.
 
-**"육안 검사와 통계 검정을 둘 다 통과해야 한다."**
-
-## 통계 검정의 구성 — 무엇을 fail 로 볼 것인가
-
-**"평문이 다르면 트레이스도 다르다"는 fail 조건이 아니다.** 그 기준을 쓰면 완벽하게
-마스킹된 구현을 포함해 **모든 구현이 실패한다** — 데이터가 다르면 소비 전력이 다른 것은
-당연하고, 그것 자체는 비밀의 누설이 아니다.
-
-§8.3.1 이 지목한 SPA 표적은 **key derivation** 이다. 그래서 판정 기준을 키에 건다.
-
-| 트레이스 쌍 | 무엇을 보나 | 판정에서의 역할 |
-|---|---|---|
-| `same-data` (같은 키·평문) | 관측의 재현성 = **잡음 바닥** | 대책 없으면 0 이어야 한다. 마스킹이면 마스크 재랜덤화로 0 이 아니며 그것이 기준선이 된다 |
-| `different-data-fixed` (**키가 다름**, 평문 고정) | 단일 트레이스가 키에 따라 달라지는가 | **판정 근거** — 특히 key schedule 구간 |
-| `different-data-random` (키 고정, 평문 다름) | 평문 의존 구조 | 참고. **fail 근거가 아니다** |
-
-## 최종 판정은 이 도구가 내리지 못한다
-
-A.2.2 는 **"육안 검사와 통계 검정 둘 다 통과해야 한다"** 고 정한다. 육안 검사는 정의상
-사람의 행위다. 또한 잡음이 0인 결정적 채널에서는 키가 다를 때 트레이스가 달라지는 것만으로
-통계 실패를 확정할 수 없다. 따라서 이 도구는 구조 관측 여부와 요건 부족을 기록하되 최종
-결과를 항상 **`inconclusive`**로 둔다. 사람은 증거 그림과 수치를 함께 검토해 판정해야 한다.
-
-**AI 가 "육안으로 확인했다" 고 쓰지 않는다.** 그렇게 쓰면 하지 않은 시험을 했다고
-주장하는 것이 되고, 그 한 줄이 보고서 전체의 신뢰를 무너뜨린다.
+AI가 "육안으로 확인했다"고 쓰지 않는다. 그렇게 쓰면 하지 않은 시험을 했다고 주장하는
+것이 되고, 그 한 줄이 보고서 전체의 신뢰를 무너뜨린다.
 """
 
 import numpy as np
 
-from .. import paths        # noqa: F401 — workspace/lib 를 sys.path 에 넣는다
+from .. import paths        # noqa: F401  (workspace/lib 를 sys.path 에 넣는다)
 
 import sca_schema as S      # noqa: E402
 
@@ -74,11 +64,10 @@ def _pair_distance(traces):
 def run(dataset_path, spec, key_schedule_window=None):
     """SPA 시험.
 
-    입력
-        key_schedule_window : (start, end) **명령어 인덱스** 구간 — §8.3.1 이 지목한
-                              key schedule. None 이면 전 구간만 본다.
+    입력 `key_schedule_window`는 §8.3.1이 지목한 key schedule의 (start, end) 명령어
+    인덱스 구간이다. None이면 전 구간만 본다.
 
-    출력 dict — `verdict`, 통계 결과, **육안 항목은 항상 미결**. Dataset은 읽기 전용이며
+    출력은 dict로 `verdict`와 통계 결과를 담으며, 육안 항목은 항상 미결이다. Dataset은 읽기 전용이며
     필드·Subset 누락은 스키마 로더 예외 또는 `not-applicable` 결과로 드러난다.
     """
     lvl = int(spec["criteria"]["security_level"])
@@ -117,7 +106,7 @@ def run(dataset_path, spec, key_schedule_window=None):
     emulated = "emulated-power" in spec["scope"]["channels"]
     masked = spec["iut"]["countermeasure"] != "none"
 
-    # 판정 근거는 **키가 다른 쌍**뿐이다 (§8.3.1 — key derivation).
+    # 판정 근거는 키가 다른 쌍뿐이다 (§8.3.1 의 key derivation).
     # 평문이 다른 쌍은 참고로만 싣는다.
     JUDGED = "different-data-fixed"
     findings = []
@@ -149,12 +138,12 @@ def run(dataset_path, spec, key_schedule_window=None):
         shortfall.append("해상도 %d Sample(요구 %d Sample)" % (ns, need_points))
     if not judged:
         shortfall.append("키가 다른 트레이스 쌍(spa_pair_kind=different-data-fixed)이 없다 "
-                         "— §8.3.1 이 지목한 표적을 시험할 수 없다")
+                         "(§8.3.1 이 지목한 표적을 시험할 수 없다)")
 
-    # 판정 의미론 — 이 도구는 SPA 에서 `pass` 도 `fail` 도 스스로 내지 않는다.
+    # 판정 의미론. 이 도구는 SPA 에서 `pass` 도 `fail` 도 스스로 내지 않는다.
     #
     # 잡음 바닥이 0인 결정적 채널에서 "키가 다르면 트레이스도 다르다"는 사실상 항상 참이라,
-    # 그것만으로 fail 을 내면 **어떤 구현도 통과할 수 없는 판별력 없는 시험**이 된다.
+    # 그것만으로 fail 을 내면 어떤 구현도 통과할 수 없는 판별력 없는 시험이 된다.
     # 반대로 pass 를 내려면 A.2.2 가 요구하는 육안 검사가 필요한데 그것은 사람의 몫이다.
     #
     # 그래서 측정값은 그대로 싣되 판정은 `inconclusive` 로 두고, 관측된 것이 무엇인지
@@ -176,13 +165,13 @@ def run(dataset_path, spec, key_schedule_window=None):
         "claim_scope": "자동 통계 절차만 완료; 사람의 SPA 육안 검토는 포함하지 않음",
         "statistical_verdict": stat,
         "verdict_scope": ("이 도구는 SPA 의 최종 판정을 내지 않는다. A.2.2 는 육안 검사와 "
-                          "통계 검정을 **둘 다** 통과하라고 요구하는데 육안은 사람의 행위다. "
+                          "통계 검정을 둘 다 통과하라고 요구하는데 육안은 사람의 행위다. "
                           "키가 다른 파형의 차이만으로 비밀 의존성과 실제 공격 가능성을 "
                           "확정할 수 없으므로, 관측 잡음 바닥과 `statistical_verdict` 및 "
                           "증거 그림을 함께 보고 사람이 판정한다."),
         "statistical_verdict_meaning": {
             "key-dependent-structure-observed":
-                "키가 다른 단일 트레이스들이 잡음 바닥을 넘어 구별된다 — §8.3.1이 지목한 "
+                "키가 다른 단일 트레이스들이 잡음 바닥을 넘어 구별된다. §8.3.1이 지목한 "
                 "key derivation 노출의 소견. 실제 키 복구 가능성은 육안·후속 분석의 몫이다.",
             "no-difference-beyond-noise":
                 "키가 달라도 잡음 바닥을 넘는 차이가 없다.",
@@ -190,7 +179,7 @@ def run(dataset_path, spec, key_schedule_window=None):
                 "A.2.2의 Trace 수·해상도 요건을 못 채웠거나 키가 다른 쌍이 없다.",
         },
         "clause": "ISO/IEC 17825 §7.3.5·§8.3.1, Annex A.%d.2" % (2 if lvl == 3 else 3),
-        "target": "key derivation (key schedule) — §8.3.1 이 지목한 대칭키 SPA 표적",
+        "target": "key derivation (key schedule). §8.3.1 이 지목한 대칭키 SPA 표적",
         "noise_floor": noise,
         "noise_floor_note": _noise_floor_note(emulated, masked),
         "findings": findings,
@@ -201,7 +190,7 @@ def run(dataset_path, spec, key_schedule_window=None):
         "key_schedule_leak": bool(ks_leak),
         "visual_inspection": {
             "status": "pending",
-            "required_by": "ISO/IEC 17825 A.%d.2 — 육안과 통계 **둘 다** 통과해야 한다"
+            "required_by": "ISO/IEC 17825 A.%d.2. 육안과 통계 둘 다 통과해야 한다"
                            % (2 if lvl == 3 else 3),
             "artifact": "spa_traces.svg (증거 번들)",
             "note": "이 도구는 육안 검사를 수행하지 않으며 수행했다고 주장하지 않는다.",

@@ -130,10 +130,10 @@ def _grok_checkpoint(study_id, task, files):
     """
     request = grok_once.create_request(paths.PROJECT, study_id, task, files)
     output = grok_once.response_path(paths.PROJECT, study_id, task)
-    print("\nGrok 검토가 필요합니다. 호스트의 chipwhisperer-kor 저장소 루트에서", flush=True)
-    print("다음 한 줄을 실행하십시오:\n", flush=True)
+    print("\nGrok 검토가 필요하다. 호스트의 chipwhisperer-kor 저장소 루트에서", flush=True)
+    print("다음 한 줄을 실행한다:\n", flush=True)
     print(grok_once.HOST_COMMAND, flush=True)
-    print("\n호스트 응답을 기다리는 중입니다. 취소하려면 이 셀을 중단하십시오.", flush=True)
+    print("\n호스트 응답을 기다리는 중이다. 취소하려면 이 셀을 중단한다.", flush=True)
     while True:
         if output.is_file():
             response = json.loads(output.read_text(encoding="utf-8"))

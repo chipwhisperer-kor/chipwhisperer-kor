@@ -1,28 +1,26 @@
 """[extra] SCALib 예제 노트북 공용 정의.
 
 Normal AES(tiny-AES-c)와 Masked AES(masked-aes-c) 두 타겟이 같은 AES 상수·
-같은 Subset 규약을 쓰고, Dataset(데이터셋)·POI 경로만 타겟마다 다르다. 그 정의를 노트북에
-복사하면 고칠 곳이 폭발하므로 **정의는 여기 한 곳**에 둔다.
+같은 Subset 수집 조건을 쓰고, Dataset(데이터셋)·POI 경로만 타겟마다 다르다. 그 정의를
+노트북에 복사하면 고칠 곳이 크게 늘어나므로 정의는 이 파일 한 곳에만 둔다.
 설명은 각 노트북이 자기완결적으로 제공하되 값·경로·스키마 식별자는 이 파일을 참조한다.
 
-여기 있는 것은 **이 서브프로젝트 고유의 데이터와 규약**뿐이다.
+여기 있는 것은 이 서브프로젝트 고유의 데이터와 수집 조건뿐이다.
 분석 로직은 각 노트북이 직접 보여준다.
 
-## 저장소 공용 정의는 `workspace/lib/` 에 있다
-
-스키마(필드 이름·검증기)와 AES 참조 계산은 이 서브프로젝트만의 것이 아니다.
+저장소 공용 정의는 `workspace/lib/`에 있다. 스키마(필드 이름·검증기)와 AES 참조 계산은 이 서브프로젝트만의 것이 아니다.
 출처가 다른 관측 Dataset이 같은 검증기를 통과하고 같은 중간값을 라벨로 써야 결과를
 나란히 놓을 수 있으므로, 그 정의는 저장소 공용 트리에 있다.
 
     workspace/lib/sca_schema.py   스키마 상수·검증기·경로 기반 로더
     workspace/lib/aes_ref.py      SBOX·HW·중간값 참조 계산
 
-**이 파일이 그것을 그대로 재노출한다.** 그래서 수집 2개와 분석 10개를 합친 노트북 12개는
-`from scalib_common import SBOX, validate_dataset` 처럼 종전과 똑같이 쓰면 된다 —
-공용 트리로 옮기면서 노트북을 한 줄도 고치지 않기 위한 장치다. 재노출은 정의를
-복제하는 것이 아니라 참조하는 것이므로 "정의는 한 곳" 원칙을 지킨다.
+이 파일은 그 정의를 import해 같은 이름으로 다시 제공한다. 그래서 수집 2개와 분석 10개를
+합친 노트북 12개는 `from scalib_common import SBOX, validate_dataset`처럼 종전과 똑같이
+쓰면 된다. 공용 트리로 옮기면서 노트북을 한 줄도 고치지 않기 위한 방법이다. 정의를
+복제하는 것이 아니라 참조하는 것이므로 "정의는 한 곳에만 둔다"는 원칙을 지킨다.
 
-Dataset의 온디스크 구조는 저장소 루트의 SCHEMA.md를 따른다. 용어는 GLOSSARY.md가 정본이다.
+Dataset의 온디스크 구조는 저장소 루트의 SCHEMA.md를 따른다. 용어는 GLOSSARY.md를 기준으로 한다.
 """
 
 import sys
@@ -37,7 +35,7 @@ _LIB = Path(__file__).resolve().parent.parent / "lib"
 if str(_LIB) not in sys.path:
     sys.path.insert(0, str(_LIB))
 
-# ── 공용 정의 재노출 (정의는 workspace/lib/ 에 있다) ────────
+# ── 공용 정의를 같은 이름으로 다시 제공 (정의는 workspace/lib/ 에 있다) ────────
 from sca_schema import (          # noqa: E402
     SCHEMA,
     F_TRACE, F_KEY, F_PLAINTEXT, F_CIPHERTEXT, F_MASK,
@@ -53,9 +51,9 @@ from aes_ref import SBOX, HW, sbox_out   # noqa: E402
 # 이 서브프로젝트의 수집기가 만드는 Dataset의 판번호.
 #
 # 공용 스키마 문서는 이미 1.1 이지만, 이 프로젝트의 수집 코드는 1.1 이 요구하는
-# 필드(sample_axis·bandwidth_hz·레코드별 exec_time …)를 **기록하지 않는다.**
-# 판번호만 올려 적으면 없는 것을 있다고 주장하는 셈이므로 1.0 으로 남긴다.
-# 그 값들을 실제로 재게 되면 그때 올린다 — 그때까지는 대조표가 "미기록" 으로 보고한다.
+# 필드(sample_axis·bandwidth_hz·레코드별 exec_time …)를 기록하지 않는다.
+# 판번호만 올려 적으면 없는 것을 있다고 주장하는 것과 같으므로 1.0 으로 남긴다.
+# 그 값들을 실제로 재게 되면 그때 올린다. 그때까지는 대조표가 "미기록" 으로 보고한다.
 SCHEMA_VERSION = "1.0"
 
 # ── 이 서브프로젝트의 subset 이름 → role ────────────────────
@@ -73,10 +71,10 @@ TRACES = _ROOT / "traces"
 NB_OUTPUT = _ROOT / "nb_output"
 
 # 암호 라이브러리는 이 서브프로젝트 밖 공용 트리에 있다. 두 SCALib 펌웨어의 makefile과
-# Physical-AI-SCA 에뮬레이션 하네스가 모두 이 경로의 같은 IUT 소스를 직접 컴파일한다.
+# Physical-AI-SCA 에뮬레이션 실행 프로그램이 모두 이 경로의 같은 IUT 소스를 직접 컴파일한다.
 IUT_ROOT = _ROOT.parent / "iut"
 
-# ── 타겟 레지스트리 (단일 공급원) ───────────────────────────
+# ── 타겟 레지스트리 (정의는 여기 한 곳) ───────────────────────────
 # 키 = 라이브러리 디렉터리 이름. 펌웨어·수집 노트북·h5·POI 파일명과 같은 축.
 TARGETS = {
     "tiny-AES-c": {
@@ -101,11 +99,11 @@ TARGETS = {
 
 TARGET_IDS = tuple(TARGETS.keys())
 
-# 수집 프로토콜 상수 — 0.0 / 0.1이 같은 시드·트레이스 수를 쓰도록 한 곳에 둔다.
+# 수집 조건 상수. 0.0 / 0.1이 같은 시드·트레이스 수를 쓰도록 한 곳에 둔다.
 # SEED와 목표치를 유지해야 기존 Normal Dataset과 같은 입력 벡터·Subset 크기를 재현한다.
 #
-# N_*는 **튜토리얼 수집 목표치**이지 통계 판정 기준이 아니다. 실제로 파일에 몇 장이
-# 들어 있는지의 정본은 HDF5 파일 자신이며,
+# N_*는 튜토리얼 수집 목표치이지 통계 판정 기준이 아니다. 실제로 파일에 몇 장이
+# 들어 있는지는 HDF5 파일 자신이 기준이며,
 # 분석 노트북은 이 상수가 아니라 group_len()으로 실제 보유한 트레이스 수를 읽는다.
 # 수집이 중간에 끊겨 목표에 못 미치는 파일이 있을 수 있기 때문이다.
 SEED = 1234
@@ -121,8 +119,8 @@ MASK_LEN = 10  # [M1 M2 M3 M4 M' M M1' M2' M3' M4']; HDF5 `mask` 한 행.
 def require_target(target):
     """타겟 id 를 검사하고 TARGETS 항목(dict)을 돌려준다.
 
-    실패 조건: 모르는 id 이면 KeyError. 기본값으로 조용히 한 타겟만 도는
-    함정을 막기 위해 호출측이 target 을 반드시 넘기게 한다.
+    모르는 id이면 KeyError가 발생한다. 기본값 때문에 표시 없이 한 타겟만 도는
+    일을 막기 위해 호출측이 target을 꼭 넘기게 한다.
     """
     if target not in TARGETS:
         raise KeyError(
@@ -192,10 +190,9 @@ def load_group(group, target, n=None, samples=None):
 def group_len(group, target):
     """Subset이 실제로 보유한 Trace 수를 배열 본문 없이 반환한다.
 
-    N_PROFILING 같은 목표치를 노트북에 박으면 목표에 못 미친 Dataset에서
-    조용히 IndexError 나 빈 슬라이스가 난다. "있는 만큼" 을 물어보는 창구다.
-
-    실패 조건: 그룹 이름이 틀리면 KeyError.
+    N_PROFILING 같은 목표치를 노트북에 상수로 적으면 목표에 못 미친 Dataset에서
+    원인 표시 없이 IndexError나 빈 슬라이스가 난다. 이 함수는 실제 보유량을 물어보는
+    창구다. 그룹 이름이 틀리면 KeyError가 발생한다.
     """
     spec = require_target(target)
     if not spec["dataset"].is_file():
@@ -221,12 +218,9 @@ def load_poi(target):
 def validate_dataset(target=None, path=None):
     """Dataset이 SCHEMA.md를 지키는지 검사하고 위반 목록을 반환한다.
 
-    입력
-        target : 등록된 타겟 id. path 를 주면 무시된다.
-        path   : 임의의 HDF5 경로. 저장소 밖 파일이나 튜토리얼 Trace를 검사할 때 쓴다.
-
-    출력
-        위반 문자열 리스트. **비어 있으면 준수**다.
+    입력 `target`은 등록된 타겟 id이며 `path`를 주면 무시된다. `path`는 임의의 HDF5
+    경로로, 저장소 밖 파일이나 튜토리얼 Trace를 검사할 때 쓴다. 출력은 위반 문자열
+    리스트이고, 비어 있으면 준수다.
 
     출처가 다른 관측 Dataset이 모두 저장소 공용 검증기를 사용하므로, 채널마다
     "스키마 준수"의 뜻이 달라지지 않는다. 파일은 변경하지 않는다.
@@ -282,7 +276,7 @@ def dataset_summary(target=None):
                 problems = validate_dataset(tid)
                 lines.append("  %-22s %s" % (
                     "스키마 준수",
-                    "예" if not problems else "**아니오** — 스키마 위반 %d건"
+                    "예" if not problems else "아니오 (스키마 위반 %d건)"
                     % len(problems)))
                 lines.append("  Subset")
                 for name in h5:
@@ -290,7 +284,7 @@ def dataset_summary(target=None):
                     extra = ""
                     if F_MASK in g:
                         extra = "  %s%s" % (F_MASK, g[F_MASK].shape)
-                    # 결측을 '?' 로 조용히 넘기지 않는다. 빠진 것은 빠졌다고 읽히게 한다.
+                    # 결측을 '?' 로 표시 없이 넘기지 않는다. 빠진 것은 빠졌다고 읽히게 한다.
                     missing = [a for a in ("key_mode", "pt_mode") if a not in g.attrs]
                     mode = ("키=%s 평문=%s" % (g.attrs["key_mode"], g.attrs["pt_mode"])
                             if not missing
