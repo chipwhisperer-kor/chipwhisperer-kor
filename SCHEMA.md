@@ -246,9 +246,14 @@ Annex B.1이 "동기 샘플링이면 훨씬 낮은 샘플레이트로도 유효�
 | `fixed_key` | uint8[] | 이 데이터셋에서 "고정" 으로 쓴 키. 교육용 채점 기준 |
 | `fixed_pt` | uint8[] | 교육용 분석에서 정답 대조에 쓰는 고정 평문 |
 | `recoveries` | str[] | 수집 중 자동 복구가 일어난 이력 |
+| `pretrigger_samples` | int | 트리거 시점 앞에 저장한 샘플 수. `trace`의 `pretrigger_samples` 번째 열이 트리거 에지다. 적지 않으면 0, 곧 열 0이 에지이며 1강과 CW310 1.0·2.0 Dataset이 그렇다 |
 
 `fixed_key`·`fixed_pt`는 평가용 정답이라 실제 시험 데이터셋이라면 넣지 않는다.
 이 저장소는 교육용이므로 채점을 위해 남긴다.
+
+`pretrigger_samples`를 둔 이유는 CW310 3강의 PicoScope Dataset이 트리거 에지 앞 0.25 µs를 함께
+저장하기 때문이다. 이 수가 없으면 읽는 쪽이 t=0을 어느 열에 둘지 알 수 없다. 1강·CW310 1.0·2.0처럼
+에지부터 저장한 파일은 적지 않아도 뜻이 같다.
 
 ### 3.9 에뮬레이션 [1.1, `channel_type="emulated-power"` 일 때 필수]
 
@@ -464,15 +469,30 @@ TA는 파생값이 아니라 원본의 Execution별 `exec_time`을 사용한다.
 
 ## 7. Dataset 생성 경로와 Git 추적 정책
 
+칩위스퍼러·PicoScope 로 수집한 Trace Dataset은 Git에 넣지 않는다. 부채널 테스트 보드에서 받은
+소비전력·전자기파 트레이스는 수집 파라미터(§3 Metadata)와 수집 코드가 남아 있으면 같은 실험실에서
+다시 수집할 수 있다는 합의가 있는 데이터이기 때문이다. 백업 대상은 데이터값이 아니라 그 파라미터와
+코드다. 이 정책이 §3의 필수 Metadata를 빠짐없이 적어야 하는 또 하나의 이유다. 파라미터가 빠진
+Dataset은 재수집할 수 없다.
+
+예외는 스키마 예제다. 데이터값이 아니라 파일 구조(루트 attrs·subset·배열 배치)를 보이기 위한 소수의
+파일만 추적한다. 현재 그 목록은 `workspace/traces/20260825_220525_SCA_DB.h5` 하나다. 규칙의 단일
+정의는 `workspace/.gitignore`(`*.h5` 제외와 `!` 예외)이고, 아래 표의 "스키마 예제로 추적" 행이 그
+예외 목록과 같아야 한다.
+
 | 경로 | 판번호 | Git 추적 상태 | 생성 후 확인할 조건 |
 |---|---|---|---|
-| `workspace/[extra] SCALib/traces/scalib_dataset_tiny-AES-c.h5` | 1.0 | `*.h5` 제외. clone에 포함되지 않음 | 수집 노트북 완료 후 검증기 통과 |
-| `workspace/[extra] SCALib/traces/scalib_dataset_masked-aes-c.h5` | 1.0 | `*.h5` 제외. clone에 포함되지 않음 | `mask` 포함, 수집 노트북 완료 후 검증기 통과 |
-| `workspace/traces/20260825_220525_SCA_DB.h5` | 1.0 | 파일 있음 | 1.0 규칙으로 검증기 통과 |
-| `workspace/[extra] Physical-AI-SCA/traces/*.h5` | 1.1 | `*.h5` 제외. clone에 포함되지 않음 | 에뮬레이션이면 `sample_map`·`exec_time` 포함 후 검증기 통과 |
+| `workspace/[extra] SCALib/traces/scalib_dataset_tiny-AES-c.h5` | 1.0 | 제외 | 수집 노트북 완료 후 검증기 통과 |
+| `workspace/[extra] SCALib/traces/scalib_dataset_masked-aes-c.h5` | 1.0 | 제외 | `mask` 포함, 수집 노트북 완료 후 검증기 통과 |
+| `workspace/traces/20260825_220525_SCA_DB.h5` | 1.0 | 스키마 예제로 추적 | 1강 노트북. 1.0 규칙으로 검증기 통과 |
+| `workspace/[extra] Physical-AI-SCA/traces/*.h5` | 1.1 | 제외 | 에뮬레이션이면 `sample_map`·`exec_time` 포함 후 검증기 통과 |
+| `workspace/traces/{일시}_CW310_AES_DB.h5` | 1.0 | 제외 | CW310 1.0 노트북. 1.0 규칙으로 검증기 통과 |
+| `workspace/traces/{일시}_CW310_WIDE_DB.h5` | 1.0 | 제외 | CW310 2.0 노트북. 1.0 규칙으로 검증기 통과 |
+| `workspace/traces/{일시}_CW310_AES_CW1200_DB.h5` | 1.0 | 제외 | CW310 3.0 노트북의 CW1200 채널. 같은 일시 접두사의 `_PICO_DB.h5`와 i번째 행이 같은 Execution이다 |
+| `workspace/traces/{일시}_CW310_AES_PICO_DB.h5` | 1.1 | 제외 | CW310 3.0 노트북의 PicoScope 3418E 채널. `bandwidth_hz`는 명목값(`bandwidth_is_nominal=True`), `pretrigger_samples` 포함, CW1200 파일과 key·plaintext·ciphertext 배열이 같다 |
 
 생성 대상 경로가 있다는 사실과 특정 작업 디렉터리에 파일이 존재한다는 사실은 다르다.
-위 제외 대상은 로컬에 있을 수도 없을 수도 있으므로 정적 문서에서 존재 여부를 고정하지
+제외 대상은 clone에 들어오지 않고 로컬에 있을 수도 없을 수도 있으므로 정적 문서에서 존재 여부를 고정하지
 않는다. 노트북의 과거 실행 출력만 보고 준수를 주장하지 않으며, 실제 파일을 확인하고
 `workspace/lib/sca_schema.py`의 검증기를 통과한 결과만 현재 상태로 보고한다.
 

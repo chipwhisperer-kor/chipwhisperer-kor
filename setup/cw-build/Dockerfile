@@ -47,6 +47,8 @@ WORKDIR /workspace
 # - openssh-client: 컨테이너 안에서 git over SSH 등 SSH 클라이언트를 쓴다.
 # - procps(ps 명령), less: host VS Code가 주입하는 VS Code 서버의 프로세스 관리와
 #                          git/터미널 페이저 동작에 필요하다.
+# - libpsospa(/opt/picoscope): PicoScope 3418E 네이티브 드라이버. apt 저장소가 아니라 아래 별도
+#                          RUN 에서 .deb 를 풀어 설치한다.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     fonts-nanum \
     build-essential \
@@ -67,6 +69,26 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     less \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+# PicoScope 3418E 네이티브 드라이버 libpsospa. requirements.txt 의 pypicosdk 가 /opt/picoscope/lib 를
+# 기본 경로로 찾으므로 별도 경로 설정이 필요 없다.
+# - dpkg -i 대신 dpkg-deb -x 로 푸는 이유: 이 .deb 의 postinst 가 `set -e` 아래에서
+#   `udevadm control --reload-rules && udevadm trigger` 를 실행하는데, 이미지 빌드 중에는 udevd 가
+#   없어 빌드가 실패한다. udev 규칙은 컨테이너가 아니라 host 의 몫이고(컨테이너는 privileged root 로
+#   /dev/bus/usb 를 그대로 쓴다), 패키지 내용물은 /opt/picoscope 와 /usr/share/doc 뿐이라 풀기만 하면
+#   같은 결과가 된다. ld.so.conf.d 등록은 postinst 가 하던 일을 그대로 옮긴 것이다.
+# - 의존 패키지 중 libc6·libgcc-s1·libstdc++6 은 python:3.12-bookworm 에 이미 있고, libusb-1.0-0 은 위 apt 단계의
+#   libusb-1.0-0-dev 가 함께 설치한다. 그래서 이 RUN 은 apt 단계 뒤에 온다.
+# - 1.1.7 에 고정하는 이유: 노트북이 검증한 조합이 pypicosdk 1.7.5 + libpsospa 1.1.7 이다.
+#   sha256 은 내려받은 파일이 바뀌지 않았는지 확인한다.
+ARG LIBPSOSPA_DEB=libpsospa_1.1.7-0r5994_amd64.deb
+RUN curl -fsSL -o /tmp/${LIBPSOSPA_DEB} \
+        "https://labs.picotech.com/picoscope7/debian/pool/main/libp/libpsospa/${LIBPSOSPA_DEB}" \
+    && echo "d26636136cdbe1ac389243a1a014951f5f838f57e77d64cbed37bbb00a137473  /tmp/${LIBPSOSPA_DEB}" | sha256sum -c - \
+    && dpkg-deb -x /tmp/${LIBPSOSPA_DEB} / \
+    && echo /opt/picoscope/lib > /etc/ld.so.conf.d/picoscope.conf \
+    && ldconfig \
+    && rm /tmp/${LIBPSOSPA_DEB}
 
 # ChipWhisperer와 Jupyter 환경 설치
 COPY requirements.txt .

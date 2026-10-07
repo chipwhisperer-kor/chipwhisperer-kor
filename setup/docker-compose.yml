@@ -3,7 +3,8 @@ services:
     build:
       context: ./cw-build
       dockerfile: Dockerfile
-    image: chipwhisperer-kor:preserved-20260929   # 2026-09-29 컨테이너 상태(확장·pip 패키지)를 보존한 이미지다. `build`하면 이 태그를 덮어쓴다
+    image: chipwhisperer-kor:20261007   # `docker compose up -d --build` 가 Dockerfile 로 만드는 태그다(pypicosdk·libpsospa 포함).
+                                        # 2026-09-29 컨테이너 상태를 보존한 이전 이미지 `chipwhisperer-kor:preserved-20260929` 는 덮어쓰지 않고 남겨 둔다
     container_name: chipwhisperer-kor
     restart: unless-stopped
     privileged: true

@@ -52,7 +52,7 @@ pyusb
 # 실제 설치 버전을 결정한다. 상한을 푸는 조건은 chipwhisperer 가 pkg_resources 를
 # importlib.resources 로 옮기는 것이다 (unicorn 은 이미 그렇게 했다).
 #
-# 이 저장소에서 버전을 고정하는 유일한 패키지다. 나머지는 최신을 따라간다.
+# pypicosdk 와 함께 이 저장소가 버전을 고정하는 두 패키지 중 하나다. 나머지는 최신을 따라간다.
 #
 # 알아둘 부작용: 80.0 부터는 pkg_resources import 시 UserWarning 을 띄우고 이는 기본
 # 필터에서도 보이므로, 노트북 첫 셀에 영문 경고가 한 번 찍힌다 (동작에는 문제 없음).
@@ -67,3 +67,12 @@ capstone
 # 3.12 에서는 그 제약이 없으므로 고정하지 않는다.
 # 이전에는 노트북 셀의 %pip 로만 설치돼 rebuild 하면 사라졌다. 정의를 여기 한 곳에 둔다.
 scalib
+
+# PicoScope 3418E 파이썬 래퍼. `4. FPGA CW310/3.0.CW310_with_PicoScope.ipynb` 가 쓴다.
+# 고정하는 이유: 노트북이 래퍼의 비공개 헬퍼 `_get_attr_function`/`_call_attr_function` 로
+# IsReady 폴링(제한 시간이 있는 대기. 공개 is_ready() 는 트리거가 없으면 영원히 멈춘다)과
+# ±5 mV SetChannelOn(RANGE 열거형에 없는 범위)을 직접 호출한다. 비공개 이름은 판이 바뀌면
+# 사라질 수 있으므로 검증한 1.7.5 에 고정한다. `[extra] PicoScope` 노트북이 자기 `.runtime/` 에
+# 받는 판과 같다. 네이티브 드라이버 libpsospa 는 Dockerfile 이 설치한다.
+# 의존성은 판 제한 없는 numpy 뿐이라 chipwhisperer 의 numpy<=1.26.4 와 충돌하지 않는다.
+pypicosdk==1.7.5

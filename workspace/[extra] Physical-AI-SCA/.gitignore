@@ -1,5 +1,4 @@
-# 데이터셋은 GB 단위라 커밋하지 않는다. collect 로 재생성한다.
-traces/**/*.h5
+# traces/ 의 Dataset(*.h5) 은 collect 로 재생성한다. 제외 규칙은 workspace/.gitignore 에 한 곳만 둔다.
 # 실행 산출물 — 보고서·그림·중간 배열. 필요하면 report 로 다시 만든다.
 runs/
 # 에뮬레이션 ELF 는 빌드 산출물이다. make -C emul_harness IUT=<name> 로 만든다.

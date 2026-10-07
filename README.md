@@ -191,8 +191,9 @@ flowchart LR
 |--------|------|------|
 | `1.0.CW310_AES_main.ipynb` | CW310 Kintex-7 위의 AES-128 하드웨어. 비트스트림 확인, 레지스터 I/O, PLL 클럭, 골든 검증, HDF5 수집 | CW1200(Pro) + CW310, 1강 완료 후 |
 | `2.0.CW310_WideReg_main.ipynb` | 1024-bit 와이드 레지스터와 사용자 코어 자리. 128바이트 I/O와 더미 코어(XOR) Trace 수집 | 1.0 완료 후 |
+| `3.0.CW310_with_PicoScope.ipynb` | 같은 AES 실행을 CW1200(40 MS/s 동기)과 PicoScope 3418E(8-bit 1채널 5 GS/s, AUX 트리거)로 동시에 받아 HDF5 두 파일로 저장. 커플링과 입력 범위를 실측으로 고른다 | 1.0 완료 후, PicoScope 3418E 추가 |
 
-> 비트스트림 2개(`fpga/build/{aes,wide}/cw310_top.bit`)와 레지스터 맵 `fpga/common/cw310_defines.v`는 저장소에 포함되어 있어 Vivado 없이 노트북을 실행할 수 있다. HDL·제약·빌드 스크립트(Vivado 2018.2, 유료)는 로컬 연구용이며 git에 넣지 않는다. 두 노트북은 `CW1200_SERIAL_NUMBER`·`CW310_SERIAL_NUMBER`로 지정된 두 장비만 열고, 연결에 실패해도 다른 장비로 전환하지 않는다. 크립토 클럭은 CW310의 PLL이 만들어 HS1으로 CW1200에 공급되고(`scope.clock.adc_src='extclk_x4'`), 트리거는 코어의 `busy`(IO4)다. CW310의 USB-C 전원 포트에는 PD 공급기(15 V 또는 20 V, 1 A 이상)가 필요하다. 일반 5 V USB 전원으로는 K410T가 설정 직후 브라운아웃되어 DONE이 떨어진다.
+> 비트스트림 2개(`fpga/build/{aes,wide}/cw310_top.bit`)와 레지스터 맵 `fpga/common/cw310_defines.v`는 저장소에 포함되어 있어 Vivado 없이 노트북을 실행할 수 있다. HDL·제약·빌드 스크립트(Vivado 2018.2, 유료)는 로컬 연구용이며 git에 넣지 않는다. 세 노트북은 `CW1200_SERIAL_NUMBER`·`CW310_SERIAL_NUMBER`로 지정된 두 장비만 열고, 연결에 실패해도 다른 장비로 전환하지 않는다. 3.0은 션트 테스트포인트를 Y자 커넥터로 CW1200과 PicoScope 3418E 채널 A에 나누고 IO4를 1× 프로브로 PicoScope AUX에 넣는다. AUX 임계값은 1.65 V 고정이라 10:1 프로브로는 트리거되지 않았고(2026-10-07 실측), 노트북은 auto-trigger 없이 타임아웃 오류로 그것을 드러낸다. pypicosdk와 libpsospa는 Docker 이미지에 들어 있다. 크립토 클럭은 CW310의 PLL이 만들어 HS1으로 CW1200에 공급되고(`scope.clock.adc_src='extclk_x4'`), 트리거는 코어의 `busy`(IO4)다. CW310의 USB-C 전원 포트에는 PD 공급기(15 V 또는 20 V, 1 A 이상)가 필요하다. 일반 5 V USB 전원으로는 K410T가 설정 직후 브라운아웃되어 DONE이 떨어진다.
 
 **base/ (공통 자료)**
 
@@ -522,7 +523,7 @@ git pull
 ```
 
 > [!TIP]
-> `workspace/traces/`의 대용량 `.h5` 파일이나 `[extra]` 실험 출력물은 저장소 크기를 키울 수 있다. 필요하면 `.gitignore`로 제외한다.
+> 칩위스퍼러·PicoScope로 수집한 Trace Dataset(`*.h5`)은 `workspace/.gitignore`가 제외한다. 수집 파라미터(`SCHEMA.md` Metadata)와 수집 노트북이 있으면 같은 실험실에서 다시 수집할 수 있는 데이터라 파일이 아니라 파라미터를 백업한다. 예외는 파일 구조를 보이는 스키마 예제 `workspace/traces/20260825_220525_SCA_DB.h5` 하나다.
 
 </details>
 

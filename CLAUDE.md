@@ -14,7 +14,7 @@ ChipWhisperer 기반 부채널 분석(SCA)과 오류주입(FA)을 가르치기 �
 
 개발은 VMware Ubuntu 게스트에서 이뤄진다. 문서에서 "host"는 물리 PC가 아니라 이 게스트, 곧 Docker 호스트를 가리킨다. `setup/docker-compose.yml`은 `workspace/`를 컨테이너의 `/workspace`에 bind-mount하고 `privileged`와 `/dev/bus/usb` 매핑으로 ChipWhisperer 하드웨어에 접근한다. 노트북 실행과 펌웨어 빌드는 컨테이너 안에서 하는 것을 전제로 한다. Python 3.12, `chipwhisperer`, `gcc-arm-none-eabi`, `gcc-avr`는 컨테이너에만 있고 호스트에는 보통 없다.
 
-파이썬 버전은 3.12가 상한이다. chipwhisperer 6.0.0이 `numpy<=1.26.4`를 요구하는데 numpy 1.26.4에는 cp313 휠이 없다. 또한 chipwhisperer가 `capture/trace/TraceWhisperer.py`에서 `pkg_resources`를 import하고 이 모듈은 `import chipwhisperer`만으로 로드되므로, `setuptools<82` 핀이 필요하다(pkg_resources는 82.0.0에서 삭제됐다). 두 제약 모두 `setup/cw-build/requirements.txt`에 이유와 함께 적혀 있다.
+파이썬 버전은 3.12가 상한이다. chipwhisperer 6.0.0이 `numpy<=1.26.4`를 요구하는데 numpy 1.26.4에는 cp313 휠이 없다. 또한 chipwhisperer가 `capture/trace/TraceWhisperer.py`에서 `pkg_resources`를 import하고 이 모듈은 `import chipwhisperer`만으로 로드되므로, `setuptools<82` 핀이 필요하다(pkg_resources는 82.0.0에서 삭제됐다). 두 제약 모두 `setup/cw-build/requirements.txt`에 이유와 함께 적혀 있다. 같은 파일이 `pypicosdk==1.7.5`도 고정한다. `4. FPGA CW310/3.0` 노트북이 래퍼의 비공개 헬퍼로 IsReady 폴링과 ±5 mV 범위 설정을 직접 호출하기 때문이다. 네이티브 드라이버 libpsospa 1.1.7은 Dockerfile이 .deb를 `dpkg-deb -x`로 푼다. 패키지의 postinst가 `udevadm`을 호출해 이미지 빌드에서 실패하기 때문이다. `[extra] PicoScope` 노트북 6개는 이와 별개로 자기 `.runtime/`에 같은 판을 받아 `override_directory`로 쓰며, 이미지 변경의 영향을 받지 않는다.
 
 ```bash
 cd setup/
@@ -65,7 +65,7 @@ SCA·FA는 독립 A–Z 실행을 위해 `reset_target`, `my_fsr_cmd`, `my_setti
 
 `3. Release the Husky`의 두 와이어태핑 노트북도 자기완결적이다. 두 노트북은 `HUSKY_SERIAL_NUMBER`와 `LITE_SERIAL_NUMBER`를 각각 `cw.scope(sn=...)`에 전달하며, Lite는 프로그래밍·통신·클럭 공급을, Husky는 수동 관측(SCA) 또는 수동 관측·전압 글리치(FA)를 담당한다. 필요한 헬퍼는 각 노트북 안에 있어 별도 공용 헬퍼 노트북을 실행하지 않는다.
 
-`4. FPGA CW310`의 두 노트북(`1.0.CW310_AES_main.ipynb`, `2.0.CW310_WideReg_main.ipynb`)도 자기완결적이다. 각각 `CW1200_SERIAL_NUMBER`를 `cw.scope(sn=…)`에, `CW310_SERIAL_NUMBER`를 `cw.target(scope, cw.targets.CW310, bsfile=…, defines_files=[…], force=True, sn=…)`에 넘겨 지정 장비만 연다. USB에 Husky·Lite가 함께 꽂혀 있으므로 시리얼 없는 `cw.scope()`는 "Multiple ChipWhisperers connected"로 실패한다. `defines_files`는 꼭 넘겨야 한다. chipwhisperer 6.0.0의 기본 경로(`…/firmware/fpgas/aes/hdl/cw305_aes_defines.v`)가 설치본에 없기 때문이다. `force=True`가 없으면 이미 프로그래밍된 FPGA를 다시 쓰지 않는다.
+`4. FPGA CW310`의 세 노트북(`1.0.CW310_AES_main.ipynb`, `2.0.CW310_WideReg_main.ipynb`, `3.0.CW310_with_PicoScope.ipynb`)도 자기완결적이다. 각각 `CW1200_SERIAL_NUMBER`를 `cw.scope(sn=…)`에, `CW310_SERIAL_NUMBER`를 `cw.target(scope, cw.targets.CW310, bsfile=…, defines_files=[…], force=True, sn=…)`에 넘겨 지정 장비만 연다. USB에 Husky·Lite가 함께 꽂혀 있으므로 시리얼 없는 `cw.scope()`는 "Multiple ChipWhisperers connected"로 실패한다. `defines_files`는 꼭 넘겨야 한다. chipwhisperer 6.0.0의 기본 경로(`…/firmware/fpgas/aes/hdl/cw305_aes_defines.v`)가 설치본에 없기 때문이다. `force=True`가 없으면 이미 프로그래밍된 FPGA를 다시 쓰지 않는다.
 
 비트스트림은 컨테이너가 아니라 호스트에서 `4. FPGA CW310/fpga/build.sh aes|wide`로 만든다. Vivado 2018.2는 호스트 `/opt/Xilinx`에만 있다. 산출물 `fpga/build/<design>/cw310_top.bit`(15.9 MB)은 git에 포함한다. 실습자는 Vivado 없이 노트북만 실행하기 때문이다. 노트북은 Xilinx `.bit` 헤더(설계명·부품 `7k410tfbg676`·빌드 날짜/시각)를 읽어 부품을 확인한 뒤 프로그래밍한다. 레지스터 맵의 단일 정의는 `fpga/common/cw310_defines.v`이고 Vivado(`include`)와 노트북(`defines_files`)이 같은 파일을 읽는다. `CW310.registers == 12`이므로 define 수를 바꾸면 경고가 난다. HDL은 NewAE cw310-bergen-board의 AES 예제를 정리한 로컬 전용 사본(git 제외)으로, XADC·ILA IP를 빼고 `O_clksettings` 포트를 연결해 `REG_CLKSETTINGS`가 동작하게 했다. 이유는 로컬 `fpga/aes/cw310_top.v` 머리 주석에 있다.
 
@@ -79,7 +79,9 @@ CW310에서 주의할 점은 다섯 가지다.
 
 128바이트 레지스터 쓰기는 32바이트 청크로 나눠 `_naeusb.cmdWriteMem`으로 보낸다. 48바이트 이상은 벌크 엔드포인트로 가는데 CW310 펌웨어 1.5.0이 벌크 쓰기를 레지스터에 반영하지 않기 때문이다. 실측으로 48·64·128 B 쓰기는 0으로 읽혔고, 47 B까지는 정상이었으며, 벌크 읽기는 정상이었다. 노트북은 모든 쓰기를 다시 읽어 검증한다. 이득은 35 dB를 쓴다. 25 dB는 봉우리가 0.1 미만이고 45 dB는 AES 포화 위험이 있다.
 
-두 노트북의 Dataset은 1강과 같은 Schema 1.0을 쓴다. 1.1은 power 채널에 `bandwidth_hz`를 요구하는데 CW1200 아날로그 대역폭의 실측값도 명목값도 없어 추정값으로 채우지 않는다.
+1.0·2.0과 3.0의 CW1200 Dataset은 1강과 같은 Schema 1.0을 쓴다. 1.1은 power 채널에 `bandwidth_hz`를 요구하는데 CW1200 아날로그 대역폭의 실측값도 명목값도 없어 추정값으로 채우지 않는다. 3.0의 PicoScope Dataset은 1.1이다. 드라이버 장비 정보(variant JSON)에 입력 범위별 명목 대역폭이 있어 `bandwidth_hz`를 적고 `bandwidth_is_nominal=True`로 표시한다.
+
+3.0은 1.0의 CW310·CW1200 셀을 그대로 쓰고 PicoScope 3418E MSO를 더한다. 8-bit·채널 A만 켠 5 GS/s가 최고 시간축 분해능이고(10-bit는 2.5 GS/s, 채널 2개면 절반), 트리거는 채널 수에 들지 않는 AUX로 받는다. AUX 임계값은 1.65 V 고정이라 10:1 프로브를 거친 IO4(약 0.33 V)는 트리거되지 않았고 1× 프로브로 바꾼 뒤 트리거됐다(2026-10-07 실측). auto-trigger를 끄고 `IsReady` 폴링에 2 s 제한을 두어 미트리거를 `TimeoutError`로 보고한다. `scope.adc.trig_count`는 arm 뒤의 busy 샘플을 누적하므로 arm 없이 돌린 연산 횟수만큼 배수가 된다. 캡처 창은 4단계가 arm 직후 읽은 값(`MAX_TR_LEN`)으로 정한다. 채널 A 커플링은 DC 1 MΩ ±2 V 사전 측정의 DC 평균이 ±0.25 V 안이면 DC 50 Ω, 아니면 AC로 정하고, 입력 범위는 ±2 V에서 ±5 mV까지 한 단계씩 내려가며 그 범위의 분해능으로 다시 재서 고른다(±5 mV는 pypicosdk `RANGE`에 없어 드라이버 `SetChannelOn`을 직접 호출한다). PicoScope 캡처 창은 CW1200 `trig_count`로 실측한 busy 길이에 앞뒤 0.25 µs를 더한 것이다. 수집은 같은 Execution을 `{일시}_CW310_AES_CW1200_DB.h5`(1.0)와 `{일시}_CW310_AES_PICO_DB.h5`(1.1) 두 파일에 같은 행 번호로 저장하고, 7단계가 두 파일의 key·plaintext·ciphertext 동일성을 단언한다. PicoScope `trace`는 입력단 mV를 float32로 저장하고 트리거 위치를 `pretrigger_samples`(SCHEMA.md §3.8)에 적는다.
 
 ### 커스텀 SimpleSerial 2.1 프로토콜
 
@@ -131,12 +133,14 @@ Dataset 수집에서는 16처럼 셀마다 다시 정한다. 둘은 같은 정�
 
 `intermediates()`가 공용인 이유도 같다. 에뮬과 실측이 서로 다른 값을 같은 이름으로 부르면 비교가 표시 없이 무너진다.
 
-시각화는 matplotlib이 아니라 `output_notebook()`을 쓰는 Bokeh다. 트레이스 파일은 용량이 크므로 요청받지 않는 한 커밋에 넣지 않는다.
+시각화는 matplotlib이 아니라 `output_notebook()`을 쓰는 Bokeh다.
 
-`[extra] SCALib/traces/`의 생성 HDF5 파일은 Git에서 제외되므로 clone에는 들어오지 않으며,
-로컬 존재 여부는 작업 환경마다 다르다. 발견한 파일의 준수 여부는 컨테이너 안에서 공용
-검증기로 직접 확인한다. 튜토리얼의 `workspace/traces/20260825_220525_SCA_DB.h5`는
-Schema 1.0 검증을 통과하지만, 뒤 판에서 추가된 시험 요건 Metadata는 요구하지 않는 파일이다.
+칩위스퍼러·PicoScope로 수집한 Trace Dataset(HDF5)은 Git에 넣지 않는다. 부채널 테스트 보드에서 받은 소비전력·전자기파 트레이스는 수집 파라미터(SCHEMA.md Metadata)와 수집 코드가 남아 있으면 같은 실험실에서 다시 수집할 수 있다는 합의가 있는 데이터이므로, 백업 대상은 데이터값이 아니라 그 파라미터와 코드다. 규칙의 단일 정의는 `workspace/.gitignore`(`*.h5`·`*.hdf5` 제외)이고 하위 프로젝트 `.gitignore`에 같은 규칙을 다시 적지 않는다. 예외는 파일 구조를 보이는 스키마 예제뿐이며, 현재 `workspace/traces/20260825_220525_SCA_DB.h5` 하나를 `!` 규칙으로 추적한다. 목록은 SCHEMA.md §7 표와 같아야 한다. 수집 노트북이 만든 새 파일은 자동으로 제외되므로 커밋 전에 따로 지울 필요가 없다.
+
+제외된 Dataset은 clone에 들어오지 않으며 로컬 존재 여부는 작업 환경마다 다르다. 발견한 파일의
+준수 여부는 컨테이너 안에서 공용 검증기로 직접 확인한다. 스키마 예제인
+`workspace/traces/20260825_220525_SCA_DB.h5`는 Schema 1.0 검증을 통과하지만, 뒤 판에서 추가된
+시험 요건 Metadata는 요구하지 않는 파일이다.
 
 ## `[extra]` 프로젝트: 각자가 자기 규칙을 갖는다
 
